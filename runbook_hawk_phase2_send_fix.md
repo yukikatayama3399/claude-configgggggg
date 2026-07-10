@@ -60,6 +60,40 @@ salutation = f"{name} 様"
 2. 姓・名が片方欠損しているレコードの挙動を確認（余分な空白・「 様」だけにならないか）。
 3. 変更をローカルにコミット等で記録（可能なら）。
 
+## STEP 1-ALT. 既存下書きをIDを保ったまま直接修正（今日中に送りたい場合）
+
+再生成せず、既存の950下書きを**その場で**姓名修正する。**下書きIDが変わらない**ので
+`phase2_draft_ids.txt` はそのまま使え、修正後すぐ STEP 5 の送信コマンドに進める。
+
+> スクリプト: `fix_phase2_names.py`（本リポジトリ同梱）。Gmail API `users.drafts.update` を使用。
+> **この環境（Claude側）からは実行できない**（連携ツールに drafts.update が無い）。**Mac側で実行**すること。
+
+手順:
+1. 準備
+   - `pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib`
+   - `credentials.json`（OAuthクライアント, スコープ `gmail.modify`）を同ディレクトリに置く
+   - **姓名の正データ CSV** を用意（Salesforceからエクスポート）:
+     ```csv
+     email,last_name,first_name
+     miz15854@casio.co.jp,水谷,早希
+     i-kuwahara@stf.kodansha.co.jp,桑原,勲
+     ```
+     ※ 当て推量の文字列入れ替えはしない。姓/名が分かれた正データで置換する。
+2. **ドライラン（必須）**— 変更予定を表示するだけ:
+   ```bash
+   python3 fix_phase2_names.py --ids ~/hawk_send/phase2_draft_ids.txt --names ~/hawk_send/phase2_names.csv
+   ```
+   出力の `would fix ... -> 姓 名 様` を目視確認。`SKIP`（CSVに無い宛先）が無いかも確認。
+3. 本適用:
+   ```bash
+   python3 fix_phase2_names.py --ids ~/hawk_send/phase2_draft_ids.txt --names ~/hawk_send/phase2_names.csv --apply
+   ```
+4. STEP 4 の抜き取り検証へ（Claude側でも下書きを読んで「姓 名 様」を確認可能）。
+5. 検証OKなら STEP 5 の送信コマンド。
+
+> 併せて **STEP 1（生成スクリプトの結合順修正）も必ず実施**すること。
+> STEP 1-ALT は既存下書きの応急修正であり、直さないと次回生成でまた逆順になる。
+
 ## STEP 2. 950件を再生成
 
 1. 修正後スクリプトで950件の下書きを再生成する。
