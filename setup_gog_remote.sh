@@ -78,6 +78,10 @@ head -c 1 "$CONFIG_DIR/credentials.json" | grep -q '{' \
 chmod 600 "$CONFIG_DIR/credentials.json"
 log "credentials.json 復元: $CONFIG_DIR/credentials.json"
 
+gog auth credentials set "$CONFIG_DIR/credentials.json" --no-input \
+  || fail "credentials.json の登録(gog auth credentials set)に失敗"
+log "credentials.json を gog に登録: OK"
+
 # ---- 4. トークンのインポート ----
 TOKEN_TMP="$(mktemp)"
 trap 'rm -f "$TOKEN_TMP"' EXIT
