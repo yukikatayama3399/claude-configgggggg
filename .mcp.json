@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "google-docs": {
+      "type": "http",
+      "url": "${GOOGLE_DOCS_MCP_URL}",
+      "headers": {
+        "X-API-Key": "${GOOGLE_DOCS_MCP_API_KEY}"
+      }
+    }
+  }
+}
