@@ -123,7 +123,7 @@ log "アカウント一覧:"
 gog auth list --no-input || true
 log "auth doctor で健全性チェック:"
 if gog auth doctor --check --no-input; then
-  log "✅ セットアップ完了。例: gog --account yuki.katayama@fout.jp --readonly calendar events --today"
+  log "✅ セットアップ完了。例: gog --account yuki.katayama@fout.jp calendar events --today"
 else
   echo ""
   echo "⚠️  doctor がエラーを報告。上のメッセージを確認して。"

@@ -34,8 +34,14 @@ Mac で `keyring connection timed out` が出たら、キーチェーンの許�
 
 ### 使い方の基本
 - アカウント指定: `--account yuki.katayama@fout.jp`
-- 読み取り専用にしたい時: `--readonly`
 - JSON 出力: `-j`
+- 破壊的操作の事前確認: `-n` (dry-run。実行せず内容だけ表示)
+- Gmail の送信だけ禁止: `--gmail-no-send`
+
+**`--readonly` はコマンド用のフラグではない。** `gog auth add` 専用で、
+認可時にスコープを絞るためのもの。`gog --account X --readonly ...` は
+`unknown flag --readonly` で失敗する。コマンド単位で読み取り専用にする
+手段は無いので、安全に倒したいときは `-n` か `--gmail-no-send` を使う。
 
 ### よく使う例
 ```bash
