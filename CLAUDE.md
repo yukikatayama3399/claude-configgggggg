@@ -16,6 +16,22 @@ Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操�
   (`.claude/hooks/session-start.sh`) が開始時に自動セットアップする。
 - 手動で使う場合: `bash setup_gog_remote.sh`
 
+### 複数アカウントを使う場合
+`gog auth tokens export <email>` は1アカウント1ファイルなので、
+2つ目以降は環境変数を接尾辞付きで足す（`GOG_TOKEN_EXPORT_B64_2`,
+`GOG_TOKEN_EXPORT_B64_3`, …）。`setup_gog_remote.sh` が全部インポートする。
+
+```bash
+# Mac側: アカウント追加 → トークン書き出し → base64
+gog auth add <email> --services gmail --gmail-scope full
+gog auth tokens export <email> --out /tmp/gog_token.json
+openssl base64 -A -in /tmp/gog_token.json | pbcopy && rm /tmp/gog_token.json
+# → Claude Code web の環境変数 GOG_TOKEN_EXPORT_B64_2 に貼る → 新セッション開始
+```
+
+Mac で `keyring connection timed out` が出たら、キーチェーンの許可待ち。
+`gog auth list` を実行してダイアログに「常に許可」を押してから再実行する。
+
 ### 使い方の基本
 - アカウント指定: `--account yuki.katayama@fout.jp`
 - 読み取り専用にしたい時: `--readonly`

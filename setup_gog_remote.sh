@@ -4,8 +4,16 @@
 # Claude Code クラウド環境で gog (gogcli) を使えるようにする
 # 前提: 以下3つの環境変数がセッションに登録済みであること
 #   GOG_CREDENTIALS_B64   … credentials.json (client_id) の base64
-#   GOG_TOKEN_EXPORT_B64  … `gog auth tokens export` 出力の base64
+#   GOG_TOKEN_EXPORT_B64  … `gog auth tokens export <email>` 出力の base64
 #   GOG_KEYRING_PASSWORD  … 暗号化ファイルkeyringのパスワード
+#
+# 複数アカウントを使う場合:
+#   gog auth tokens export は1アカウント1ファイルなので、2つ目以降は
+#   GOG_TOKEN_EXPORT_B64_2, GOG_TOKEN_EXPORT_B64_3, … と接尾辞を付けて
+#   環境変数を追加すれば全部インポートされる。
+#   例) GOG_TOKEN_EXPORT_B64   = yuki.katayama@fout.jp のトークン
+#       GOG_TOKEN_EXPORT_B64_2 = yuki.katayama3399@gmail.com のトークン
+#
 # 使い方: bash setup_gog_remote.sh
 # 冪等: 何度実行してもOK
 # ============================================================
@@ -83,13 +91,32 @@ gog auth credentials set "$CONFIG_DIR/credentials.json" --no-input \
 log "credentials.json を gog に登録: OK"
 
 # ---- 4. トークンのインポート ----
+# GOG_TOKEN_EXPORT_B64 と、接尾辞付きの GOG_TOKEN_EXPORT_B64_* を全部インポートする。
+# (gog auth tokens export は1アカウント1ファイルなので、複数アカウントは変数を増やす)
 TOKEN_TMP="$(mktemp)"
 trap 'rm -f "$TOKEN_TMP"' EXIT
-echo "$GOG_TOKEN_EXPORT_B64" | base64 -d > "$TOKEN_TMP"
-gog auth tokens import "$TOKEN_TMP" --no-input --force \
-  || fail "トークンのインポート失敗。ローカルで再export(gog auth tokens export)して環境変数を焼き直す必要があるかも。"
+
+import_token() {
+  local var="$1" val="${!1:-}"
+  [ -n "$val" ] || return 0
+  echo "$val" | base64 -d > "$TOKEN_TMP" 2>/dev/null \
+    || fail "$var のbase64 decodeに失敗。値を確認して。"
+  head -c 1 "$TOKEN_TMP" | grep -q '{' \
+    || fail "$var のdecode結果がJSONに見えへん。ローカルで gog auth tokens export <email> して焼き直して。"
+  gog auth tokens import "$TOKEN_TMP" --no-input --force \
+    || fail "$var のインポート失敗。ローカルで再export(gog auth tokens export <email>)して環境変数を焼き直す必要があるかも。"
+  log "トークンインポート ($var): OK"
+  IMPORTED=$((IMPORTED + 1))
+}
+
+IMPORTED=0
+# プライマリ → 接尾辞付き(名前順)の順で処理
+for tv in GOG_TOKEN_EXPORT_B64 $(compgen -v | grep -E '^GOG_TOKEN_EXPORT_B64_' | sort || true); do
+  import_token "$tv"
+done
 rm -f "$TOKEN_TMP"
-log "トークンインポート: OK"
+[ "$IMPORTED" -gt 0 ] || fail "インポートできるトークンが無かった。"
+log "トークンインポート: 合計 ${IMPORTED} 件"
 
 # ---- 5. 検証 ----
 log "アカウント一覧:"
