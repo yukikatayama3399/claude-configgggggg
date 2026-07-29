@@ -56,7 +56,8 @@ Console のクライアント詳細ページの **`+ Add secret`** で、同じ�
 追加時に一度だけ表示される値をコピーし、Console は JSON をくれないので手で組む。
 **クリップボードから直接受け取る**ので、secret をターミナルに打たずに済む
 (シェル履歴にも env にも残らない)。`CLIENT_ID` を自分のものに書き換えて、
-secret をコピーした状態でそのまま貼り付ける:
+secret をコピーした状態でそのまま貼り付ける。生の secret でも、
+このスクリプトが前回出力した b64 でも受け付ける (作り直しに使える):
 
 ```zsh
 python3 - <<'PY'
@@ -64,11 +65,30 @@ import base64, json, subprocess, sys
 
 CLIENT_ID = "<クライアントID>.apps.googleusercontent.com"
 
-secret = subprocess.run(["pbpaste"], capture_output=True, text=True).stdout.strip()
-if not secret or len(secret.split()) != 1 or len(secret) < 20:
-    sys.exit("NG: クリップボードに client secret が入っていないみたい (長さ %d)。"
-             "Console の Add secret で表示された値をコピーしてから再実行して。"
-             % len(secret))
+clip = subprocess.run(["pbpaste"], capture_output=True, text=True).stdout.strip()
+if not clip:
+    sys.exit("NG: クリップボードが空。1Password の secret をコピーするか、"
+             "Console で Add secret し直して。")
+
+try:
+    decoded = json.loads(base64.b64decode(clip, validate=True))
+except Exception:
+    decoded = None
+
+if isinstance(decoded, dict):
+    # 既に b64 が入っている: そこから secret を取り出して作り直す
+    inner = decoded.get("installed") or decoded.get("web") or decoded
+    got = str(inner.get("client_secret") or "").strip() if isinstance(inner, dict) else ""
+    if not got:
+        sys.exit("NG: クリップボードの b64 に client_secret が入っていない。"
+                 "1Password の secret をコピーするか、Console で Add secret し直して。")
+    secret, src = got, "クリップボードの b64"
+elif len(clip.split()) == 1 and len(clip) >= 20:
+    secret, src = clip, "クリップボードの生 secret"
+else:
+    sys.exit("NG: クリップボードの中身が b64 でも secret でもない (長さ %d)。"
+             "1Password の secret をコピーするか、Console で Add secret し直して。"
+             % len(clip))
 
 doc = {"installed": {
     "client_id": CLIENT_ID,
@@ -79,13 +99,17 @@ doc = {"installed": {
 }}
 b64 = base64.b64encode(json.dumps(doc).encode()).decode()
 subprocess.run(["pbcopy"], input=b64, text=True, check=True)
-print("OK: secret ...%s (%d文字) を埋め込んだ b64 (%d文字) をクリップボードに入れた"
-      % (secret[-4:], len(secret), len(b64)))
+print("OK: %s から作成。secret ...%s (%d文字) / b64 %d文字 をクリップボードに入れた"
+      % (src, secret[-4:], len(secret), len(b64)))
 PY
 ```
 
-末尾4文字が Console の表示と一致するか確認できる。検証に失敗した場合は
+secret の末尾4文字が出るので Console の表示と照合できる。検証に失敗した場合は
 クリップボードを書き換えないので、コピーした secret を失わない。
+
+**b64 をターミナルに表示させないこと。** base64 は暗号化ではないので、
+表示した b64 は secret を平文で晒したのと同じ。上のスクリプトは
+クリップボードにだけ書き、標準出力にはマスクした確認行しか出さない。
 
 なお `read -s` で secret を対話入力させる形にはしないこと。複数行を一括で
 貼り付けると `read` が後続の貼り付け行を標準入力として食ってしまい、
