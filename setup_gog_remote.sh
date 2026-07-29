@@ -96,13 +96,13 @@ log "アカウント一覧:"
 gog auth list --no-input || true
 log "auth doctor で健全性チェック:"
 if gog auth doctor --check --no-input; then
-  log "✅ セットアップ完了。例: gog --account yuki.katayama@fout.jp --readonly calendar events --today"
+  log "✅ セットアップ完了。例: gog --account yuki.katayama@fout.jp calendar events --today"
 else
   echo ""
   echo "⚠️  doctor がエラーを報告。上のメッセージを確認して。"
-  echo "   refresh token 失効なら、Mac側で:"
-  echo "     gog auth tokens export --out /tmp/gog_tokens.json"
-  echo "     openssl base64 -A -in /tmp/gog_tokens.json | pbcopy && rm /tmp/gog_tokens.json"
-  echo "   → GOG_TOKEN_EXPORT_B64 を更新して再実行。"
+  echo "   refresh token 失効なら、「正」の Mac 1台だけで:"
+  echo "     bash sync_gog_token.sh --reauth"
+  echo "   → 出力された3つの値で環境変数を焼き直して再実行。"
+  echo "   ※ 複数の端末でバラバラに認証しないこと(詳細は CLAUDE.md)。"
   exit 1
 fi

@@ -16,6 +16,36 @@ Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操�
   (`.claude/hooks/session-start.sh`) が開始時に自動セットアップする。
 - 手動で使う場合: `bash setup_gog_remote.sh`
 
+### 認証は「1台」でしかやらない（重要な運用ルール）
+
+`gog auth add` を叩く端末を**1台に固定**する（=「正」の端末）。
+他の端末・クラウド・CI では**絶対に `gog auth add` を叩かない**。
+必ず「正」の端末で `bash sync_gog_token.sh` を実行し、出力された3値を配る。
+
+```bash
+# 「正」の Mac でだけ実行
+bash sync_gog_token.sh            # 既存トークンを書き出すだけ（安全）
+bash sync_gog_token.sh --reauth   # 認証をやり直してから書き出す
+```
+
+配る先は2箇所あり、**別物なので両方更新が必要**:
+1. Claude Code on the web の環境変数（クラウドセッション用）
+2. GitHub Secrets（Actions を使う場合。`--gh-secrets` で自動 push 可）
+
+バラバラに認証すると壊れる理由:
+- **スコープが縮む**: `gog auth add` の `--services` の既定値は `user` なので、
+  指定を忘れると 22 個あるスコープが最小構成に上書きされる。
+  `sync_gog_token.sh` は現在のスコープ一覧を明示的に渡してこれを防いでいる。
+- **gog のバージョン差**: ローカルとクラウドで版が違うとトークン形式が合わず
+  import が壊れる。`sync_gog_token.sh` は
+  `setup_gog_remote.sh` の `GOG_VERSION` と一致しない場合は中断する。
+- **keyring パスワード不一致**: `GOG_KEYRING_PASSWORD` は全環境で同一必須。
+
+なお「再認証すると他端末のトークンが即失効する」わけではない。
+リフレッシュトークンは同一クライアント×同一アカウントで上限100個
+（現在 2 ユーザー / 上限 100）。端末が数台なら共存する。
+本当のリスクは上記のスコープ縮小とバージョン差。
+
 ### 使い方の基本
 **グローバルフラグはサブコマンドの「前」に置く**（`gog --account ... sheets get ...`）。
 サブコマンドの後ろに置くと `unknown flag` になる。
@@ -25,7 +55,14 @@ Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操�
 - 変更せず意図だけ表示: `-n`（`--dry-run`）
 - 確認プロンプトを出さない: `--no-input`（CI 用）／スキップする: `-y`（`--force`）
 
-安全側に寄せたい時（v0.19.0 に `--readonly` フラグは**無い**ので注意）:
+`--readonly` の注意点:
+- **コマンド実行時のグローバルフラグとしては存在しない。**
+  `gog --readonly calendar events` / `gog calendar events --readonly` は
+  どちらも `unknown flag --readonly` になる。
+- 存在するのは `gog auth add --readonly`（=認可の時点で読み取り専用スコープを取る）だけ。
+  既に書き込みスコープで認証済みのトークンを、実行時に読み取り専用へ落とす用途には使えない。
+
+実行時に安全側へ寄せたい時は代わりにこれを使う:
 - `-n` … 書き込みコマンドを実行せず、やろうとした内容だけ出す
 - `--gmail-no-send` … Gmail の送信をブロック
 - `--disable-commands 'gmail.send,sheets.update'` … コマンド単位で禁止
