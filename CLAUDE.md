@@ -1,5 +1,21 @@
 # claude-configgggggg
 
+## Google Docs では表（テーブル）を一切使わない
+
+Google Docs を作成・更新するときは、**表を絶対に使わない**こと。
+Docs 上では表が読みづらく、markdown インポート時にセル内の装飾（`**太字**` 等）が
+エスケープされて崩れるため。
+
+代わりに使う書き方:
+- 見出し（`##` / `###`）で章立てする
+- 「項目： 値」形式の**箇条書き**にする
+- 補足はネストした箇条書きにする
+- 比較（A案 vs B案）は**表にせず、対象ごとに見出しを立てて箇条書き**で並べる
+- URL は箇条書きの中で `名前 → URL` の形で書く
+
+この方針は既存Docsの書き換え時にも、今後の新規Docs作成時にも常に適用する。
+Sheets（スプレッドシート）は当然表でよい。対象は Docs のみ。
+
 ## Google Workspace 操作は gog を最優先で使う
 
 Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操作は、
