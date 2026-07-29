@@ -54,66 +54,52 @@ Console のクライアント詳細ページの **`+ Add secret`** で、同じ�
 既存シークレットも無効化されないので Mac 側の gog も動き続ける。
 
 追加時に一度だけ表示される値をコピーし、Console は JSON をくれないので手で組む。
-**クリップボードから直接受け取る**ので、secret をターミナルに打たずに済む
-(シェル履歴にも env にも残らない)。`CLIENT_ID` を自分のものに書き換えて、
-secret をコピーした状態でそのまま貼り付ける。生の secret でも、
-このスクリプトが前回出力した b64 でも受け付ける (作り直しに使える):
+これは同梱の `make_gog_credentials_b64.py` がやる:
 
 ```zsh
-python3 - <<'PY'
-import base64, json, subprocess, sys
-
-CLIENT_ID = "<クライアントID>.apps.googleusercontent.com"
-
-clip = subprocess.run(["pbpaste"], capture_output=True, text=True).stdout.strip()
-if not clip:
-    sys.exit("NG: クリップボードが空。1Password の secret をコピーするか、"
-             "Console で Add secret し直して。")
-
-try:
-    decoded = json.loads(base64.b64decode(clip, validate=True))
-except Exception:
-    decoded = None
-
-if isinstance(decoded, dict):
-    # 既に b64 が入っている: そこから secret を取り出して作り直す
-    inner = decoded.get("installed") or decoded.get("web") or decoded
-    got = str(inner.get("client_secret") or "").strip() if isinstance(inner, dict) else ""
-    if not got:
-        sys.exit("NG: クリップボードの b64 に client_secret が入っていない。"
-                 "1Password の secret をコピーするか、Console で Add secret し直して。")
-    secret, src = got, "クリップボードの b64"
-elif len(clip.split()) == 1 and len(clip) >= 20:
-    secret, src = clip, "クリップボードの生 secret"
-else:
-    sys.exit("NG: クリップボードの中身が b64 でも secret でもない (長さ %d)。"
-             "1Password の secret をコピーするか、Console で Add secret し直して。"
-             % len(clip))
-
-doc = {"installed": {
-    "client_id": CLIENT_ID,
-    "client_secret": secret,
-    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-    "token_uri": "https://oauth2.googleapis.com/token",
-    "redirect_uris": ["http://localhost"],
-}}
-b64 = base64.b64encode(json.dumps(doc).encode()).decode()
-subprocess.run(["pbcopy"], input=b64, text=True, check=True)
-print("OK: %s から作成。secret ...%s (%d文字) / b64 %d文字 をクリップボードに入れた"
-      % (src, secret[-4:], len(secret), len(b64)))
-PY
+python3 make_gog_credentials_b64.py
 ```
 
-secret の末尾4文字が出るので Console の表示と照合できる。検証に失敗した場合は
-クリップボードを書き換えないので、コピーした secret を失わない。
+client_id はローカルの gog の credentials.json から自動で拾う (`--client-id` で上書き)。
+client_secret は「クリップボードの生 secret」→「クリップボードにある前回の b64」→
+「プロンプト入力」の順で探す。secret の末尾4文字を表示するので Console のマスク表示と
+照合できる。失敗時はクリップボードを書き換えないので、コピーした secret を失わない。
 
-**b64 をターミナルに表示させないこと。** base64 は暗号化ではないので、
-表示した b64 は secret を平文で晒したのと同じ。上のスクリプトは
-クリップボードにだけ書き、標準出力にはマスクした確認行しか出さない。
+**ファイルに置いて実行すること。ワンライナーで貼り付けて実行する形にしてはいけない。**
+スクリプト本文をコピーした時点でクリップボードが上書きされ、渡したかった secret や
+b64 が消える。ファイルにしておけばコマンドを打つだけなのでクリップボードは secret
+専用に使える。プロンプトのフォールバックは、それでもクリップボードが潰れていた
+場合の保険 (プロンプトは入力待ちで止まるので、そこで Console から secret をコピーして
+貼り付ければよい)。
 
-なお `read -s` で secret を対話入力させる形にはしないこと。複数行を一括で
+リポジトリが手元に無い時は、これでファイルを作ってから実行する:
+
+```zsh
+cat > ~/gog_b64.py <<'PY'
+import base64, getpass, json, subprocess, sys
+CLIENT_ID = "<クライアントID>.apps.googleusercontent.com"
+s = getpass.getpass("client secret (貼り付け可、表示されません): ").strip()
+if len(s.split()) != 1 or len(s) < 20:
+    sys.exit("NG: secret が不正 (長さ %d)" % len(s))
+doc = {"installed": {"client_id": CLIENT_ID, "client_secret": s,
+                     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                     "token_uri": "https://oauth2.googleapis.com/token",
+                     "redirect_uris": ["http://localhost"]}}
+b64 = base64.b64encode(json.dumps(doc).encode()).decode()
+subprocess.run(["pbcopy"], input=b64, text=True, check=True)
+print("OK: secret ...%s (%d文字) / b64 %d文字 をクリップボードに入れた" % (s[-4:], len(s), len(b64)))
+PY
+python3 ~/gog_b64.py
+```
+
+**b64 をターミナルに表示させないこと。** base64 は暗号化ではないので、表示した b64 は
+secret を平文で晒したのと同じ。上のどちらもクリップボードにだけ書き、標準出力には
+マスクした確認行しか出さない。
+
+なお、シェルの `read -s` で secret を受け取る形にはしないこと。複数行を一括で
 貼り付けると `read` が後続の貼り付け行を標準入力として食ってしまい、
-python のコード行が secret として読まれる。ヒアドキュメントなら安全。
+スクリプトのコード行が secret として読まれて残りがコマンドとして実行される。
+入力待ちはスクリプト内 (python の `getpass`) に閉じ込めるのが安全。
 
 **新規クライアントを作るのは最後の手段。** client_id が変わるため
 `GOG_TOKEN_EXPORT_B64` 側の refresh token が無効になり、Mac での再認証と
