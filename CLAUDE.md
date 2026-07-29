@@ -113,11 +113,31 @@ gog --account ... slides replace-text "$PID" "旧" "新"
 gog --account ... slides read-slide "$PID" p        # 読み返し
 ```
 
-**既知のバグ: `slides update-notes` はスピーカーノートが空のスライドで失敗する。**
-既存ノートを消そうとして
+#### スピーカーノート（既知バグと回避策）
+
+**`slides update-notes` はノートが空のスライドで必ず失敗する。**
+既存ノートを消す処理が先に走り、空(長さ0)に対して削除範囲 0〜0 を投げるため
 `Invalid requests[0].deleteText: The startIndex 0 must be less than the endIndex 0`
-になる。空の状態からノートを付ける手段は現状無いので、ノートが必要なら
-手作業で1文字入れてから `update-notes` を使う。
+になる。一度ノートが入っていれば `update-notes` は正常に動く（検証済み）。
+
+**回避策: ノート図形の objectId を直接 `insert-text` で埋める。**
+
+```bash
+# 1) speakerNotesObjectId を取得（通常 i3 だが必ず raw で確認する）
+gog --account ... slides raw "$PID" \
+  | python3 -c "import sys,json;print(json.load(sys.stdin)['slides'][0]['slideProperties']['notesPage']['notesProperties']['speakerNotesObjectId'])"
+
+# 2) その objectId に insert-text（update-notes ではなく insert-text を使う）
+gog --account ... slides insert-text "$PID" i3 "ノート本文"
+
+# 3) 以降は update-notes でも上書きできる
+gog --account ... slides update-notes "$PID" p --notes "差し替え後のノート"
+```
+
+つまり**初回だけ `insert-text`、2回目以降は `update-notes`** でよい。
+一律 `insert-text` で書くのが単純で安全。
+
+フラグ名注意: ノート本文は `--notes` / `--notes-file`。`--text` は `unknown flag`。
 
 前提: この疎通には OAuth プロジェクト側で Slides API が有効である必要がある。
 無効だと `slides list-slides` / `raw` / `insert-text` / `replace-text` が全て
