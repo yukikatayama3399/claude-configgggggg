@@ -17,9 +17,19 @@ Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操�
 - 手動で使う場合: `bash setup_gog_remote.sh`
 
 ### 使い方の基本
-- アカウント指定: `--account yuki.katayama@fout.jp`
-- 読み取り専用にしたい時: `--readonly`
-- JSON 出力: `-j`
+**グローバルフラグはサブコマンドの「前」に置く**（`gog --account ... sheets get ...`）。
+サブコマンドの後ろに置くと `unknown flag` になる。
+
+- アカウント指定: `--account`（`-a`） … `gog --account yuki.katayama@fout.jp ...`
+- JSON 出力: `-j` / TSV 出力: `-p`
+- 変更せず意図だけ表示: `-n`（`--dry-run`）
+- 確認プロンプトを出さない: `--no-input`（CI 用）／スキップする: `-y`（`--force`）
+
+安全側に寄せたい時（v0.19.0 に `--readonly` フラグは**無い**ので注意）:
+- `-n` … 書き込みコマンドを実行せず、やろうとした内容だけ出す
+- `--gmail-no-send` … Gmail の送信をブロック
+- `--disable-commands 'gmail.send,sheets.update'` … コマンド単位で禁止
+- `--enable-commands '...'` … 許可したコマンドだけに制限
 
 ### よく使う例
 ```bash
