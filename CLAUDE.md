@@ -15,6 +15,10 @@ Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操�
 - クラウド(web)セッションでは SessionStart フック
   (`.claude/hooks/session-start.sh`) が開始時に自動セットアップする。
 - 手動で使う場合: `bash setup_gog_remote.sh`
+- 認証が通らない時の切り分けと `GOG_CREDENTIALS_B64` の作り方は README.md 参照。
+  要点: base64 する対象は **Cloud Console からダウンロードした client JSON**。
+  Mac の `~/Library/Application Support/gogcli/credentials.json` は
+  client_secret が keyring 側にあり形式もフラットなので使えない。
 
 ### 使い方の基本
 - アカウント指定: `--account yuki.katayama@fout.jp`

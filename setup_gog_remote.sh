@@ -19,6 +19,58 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 log()  { echo "==> $*"; }
 fail() { echo "!! $*" >&2; exit 1; }
 
+# credentials.json が gog auth credentials set に食わせられる形か検証する。
+# 罠が2つあって、どちらも「JSONとしては妥当なので通ってしまう」タイプ:
+#   1) Mac の gog は既定で client_secret を keyring に入れ、credentials.json 側は
+#      client_id だけになる (gog auth credentials list の SECRET_KEYRING=true)。
+#   2) gog が書く credentials.json はフラット形 {"client_id":...} だが、
+#      gog auth credentials set が受け付けるのは Cloud Console 版の
+#      {"installed":{...}} / {"web":{...}} だけ。自分が書いた形を戻せない。
+# どちらも後段で初めて落ちるので、ここで先に弾く。
+check_credentials_json() {
+  local f="$1"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$f" <<'PY'
+import json, sys
+
+try:
+    with open(sys.argv[1]) as fh:
+        data = json.load(fh)
+except Exception as exc:
+    sys.exit("JSONとして読めない: %s" % exc)
+
+problems = []
+
+inner = None
+for key in ("installed", "web"):
+    section = data.get(key) if isinstance(data, dict) else None
+    if isinstance(section, dict):
+        inner = section
+        break
+
+if inner is None:
+    problems.append("installed / web のラッパーが無い"
+                    "(gog auth credentials set が受け付けない形式)")
+    inner = data if isinstance(data, dict) else {}
+
+missing = [k for k in ("client_id", "client_secret")
+           if not str(inner.get(k) or "").strip()]
+if missing:
+    problems.append("次のキーが空 or 欠落: %s" % ", ".join(missing))
+
+if problems:
+    sys.exit("; ".join(problems))
+PY
+  else
+    # python3 が無い環境向けのフォールバック。
+    # 開き引用符の直後に空白以外の文字が1つ以上あることを要求して、
+    # "" や "   " を空扱いで弾く。
+    grep -qE '"(installed|web)"[[:space:]]*:' "$f" \
+      && grep -qE '"client_id"[[:space:]]*:[[:space:]]*"[[:space:]]*[^[:space:]"]' "$f" \
+      && grep -qE '"client_secret"[[:space:]]*:[[:space:]]*"[[:space:]]*[^[:space:]"]' "$f"
+  fi
+}
+
 # ---- 0. 環境変数チェック ----
 for v in GOG_CREDENTIALS_B64 GOG_TOKEN_EXPORT_B64 GOG_KEYRING_PASSWORD; do
   [ -n "${!v:-}" ] || fail "環境変数 $v が未設定。Claude Code の環境変数設定を確認して。"
@@ -76,7 +128,28 @@ echo "$GOG_CREDENTIALS_B64" | base64 -d > "$CONFIG_DIR/credentials.json"
 head -c 1 "$CONFIG_DIR/credentials.json" | grep -q '{' \
   || fail "credentials.json のdecode結果がJSONに見えへん。B64値を確認して。"
 chmod 600 "$CONFIG_DIR/credentials.json"
-log "credentials.json 復元: $CONFIG_DIR/credentials.json"
+
+if ! CRED_ERR="$(check_credentials_json "$CONFIG_DIR/credentials.json" 2>&1)"; then
+  [ -n "$CRED_ERR" ] && echo "   詳細: $CRED_ERR" >&2
+  cat >&2 <<'EOS'
+!! GOG_CREDENTIALS_B64 の中身が gog に登録できる形になってない。
+
+   よくある原因: Mac 側の gog の credentials.json を base64 した。
+   あのファイルは元の client JSON ではなく gog が書いた別物で、二重にダメ:
+     - client_secret が入っていない (既定で keyring 側に保存される。
+       確認は gog auth credentials list → SECRET_KEYRING が true)
+     - installed/web ラッパーの無いフラット形式で、
+       gog auth credentials set 自体が受け付けない
+
+   対処: Google Cloud Console → APIとサービス → 認証情報 →
+   OAuth 2.0 クライアントID から JSON をダウンロードし直して、
+   そのファイル(installed 形式)をそのまま base64 する:
+     openssl base64 -A -in ~/Downloads/client_secret_XXXX.json | pbcopy
+   → GOG_CREDENTIALS_B64 を更新して再実行。
+EOS
+  exit 1
+fi
+log "credentials.json 復元: $CONFIG_DIR/credentials.json (client_id/client_secret あり)"
 
 gog auth credentials set "$CONFIG_DIR/credentials.json" --no-input \
   || fail "credentials.json の登録(gog auth credentials set)に失敗"
