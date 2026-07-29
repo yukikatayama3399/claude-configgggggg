@@ -18,9 +18,14 @@ Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操�
 
 ### 認証は「1台」でしかやらない（重要な運用ルール）
 
-`gog auth add` を叩く端末を**1台に固定**する（=「正」の端末）。
-他の端末・クラウド・CI では**絶対に `gog auth add` を叩かない**。
-必ず「正」の端末で `bash sync_gog_token.sh` を実行し、出力された3値を配る。
+**「正」の端末 = 会社 Mac**（2026-07-29 決定）。
+
+`gog auth add` を叩くのは会社 Mac だけ。
+**家 Mac・クラウド・CI では絶対に `gog auth add` を叩かない。**
+必ず会社 Mac で `bash sync_gog_token.sh` を実行し、出力された3値を配る。
+
+家 Mac で gog を使いたい場合も、認証はせず
+会社 Mac が出した3値を環境変数として渡す（クラウドと同じ扱いにする）。
 
 ```bash
 # 「正」の Mac でだけ実行

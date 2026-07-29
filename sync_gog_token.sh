@@ -5,9 +5,9 @@
 # 目的: gog の認証を「1台だけ」で行い、その結果を全環境へ配る。
 #
 # 運用ルール(重要):
-#   認証する端末を1台に固定する = この台を「正」とする。
-#   他の端末やクラウドでは絶対に `gog auth add` を叩かない。
-#   必ずこのスクリプトが出力した3つの値をコピーして使う。
+#   「正」の端末 = 会社 Mac (2026-07-29 決定)。
+#   家 Mac・クラウド・CI では絶対に `gog auth add` を叩かない。
+#   必ず会社 Mac でこのスクリプトを実行し、出力された3つの値を配る。
 #
 # 使い方:
 #   bash sync_gog_token.sh              # 既存トークンをそのまま書き出す(安全)
@@ -110,7 +110,8 @@ rm -f "$TOKEN_TMP"
 umask 077
 cat > "$OUT_FILE" <<EOF
 # gog 認証値 — $(date '+%Y-%m-%d %H:%M:%S') / $(hostname) で生成
-# この端末を「正」として運用する。他の端末で gog auth add を叩かないこと。
+# 「正」の端末は会社 Mac。上記ホスト名が会社 Mac でなければ、
+# 認証端末がブレている可能性があるので配布前に確認すること。
 GOG_CREDENTIALS_B64=${CREDENTIALS_B64}
 GOG_TOKEN_EXPORT_B64=${TOKEN_B64}
 GOG_KEYRING_PASSWORD=${GOG_KEYRING_PASSWORD}

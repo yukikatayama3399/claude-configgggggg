@@ -11,7 +11,7 @@ Claude Code から Google Workspace（Sheets / Docs / Slides / Drive / Gmail / C
 |---|---|---|
 | `setup_gog_remote.sh` | クラウド | gog のインストールと認証復元。SessionStart フックが自動実行するので通常は手動実行不要 |
 | `check_gog_apis.sh` | どこでも | 6 API の疎通を一括確認（**読み取り専用・いつでも安全**） |
-| `sync_gog_token.sh` | 「正」の Mac のみ | 認証をやり直し、全環境へ配る値を書き出す |
+| `sync_gog_token.sh` | **会社 Mac のみ** | 認証をやり直し、全環境へ配る値を書き出す |
 
 ### 調子が悪いときの一次切り分け
 
@@ -52,8 +52,9 @@ import が壊れる:
 2. `setup_gog_remote.sh` の `GOG_VERSION`
 3. `sync_gog_token.sh` の `GOG_VERSION_EXPECTED`
 
-## 注意: 認証は1台でしかやらない
+## 注意: 認証は会社 Mac でしかやらない
 
-`gog auth add` を叩く端末は1台に固定する。複数端末でバラバラに認証すると
-スコープが縮んで壊れる（`--services` の既定値が `user` のため）。
+`gog auth add` を叩くのは**会社 Mac だけ**（2026-07-29 決定）。
+家 Mac・クラウド・CI でバラバラに認証するとスコープが縮んで壊れる
+（`--services` の既定値が `user` のため）。
 詳細と理由は CLAUDE.md の「認証は『1台』でしかやらない」を参照。
