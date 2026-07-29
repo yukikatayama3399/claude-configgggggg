@@ -40,6 +40,15 @@ Mac の `~/Library/Application Support/gogcli/credentials.json` は gog が書�
 `setup_gog_remote.sh` はこの2点を復元直後に検証して、後段の
 `gog auth credentials set` や doctor で初めて落ちるのを防いでいる。
 
+**ダウンロードした client JSON は消さずに保管すること (1Password 等)。**
+`gog auth credentials set` すると secret は keyring に移ってファイルからは消えるため、
+**あの JSON が client_secret の唯一の入手元**になる。手元から消すと Console で
+再ダウンロードするしかなく、クライアントの作成時期によっては再ダウンロード自体が
+できず (Google は作成時のみ secret 表示に変更済み) シークレットのローテートが
+必要になる。ローテートしても client_id は変わらないので既存の refresh token は
+そのまま使えるはずだが、`invalid_grant` 系で落ちたら Mac で再認証して
+`gog auth tokens export` からやり直し、`GOG_TOKEN_EXPORT_B64` も焼き直す。
+
 ### gog の設定ファイルの場所
 
 OS で違う (`internal/config/layout.go`)。`gog config path` (別名 `gog config where`)
