@@ -93,17 +93,42 @@ gog --account yuki.katayama@fout.jp docs write <docId> --text "本文"
 | Drive | ✅ 作成・一覧・検索・削除 可 |
 | Gmail | ✅ 可（`gmail labels list`） |
 | Calendar | ✅ 可（`calendar events --today`） |
-| **Slides** | ❌ **不可** |
+| Slides | ✅ 読み書き可（下記の注意点あり） |
 
-**Slides は OAuth プロジェクト側で Slides API が無効**なため、
-`slides list-slides` / `raw` / `insert-text` / `replace-text` 等が全て
-`Slides API is not enabled for this OAuth project` で失敗する。
+### Slides の使い方（2026-07-29 に API 有効化して疎通確認済み）
 
-紛らわしい点: `gog slides create` は **Drive API 経由**なので成功してしまう。
-「空のスライドは作れるが中身を一切書けない」状態なので、
-**Slides 本文生成タスクは gog では現状できない**と判断してよい。
+`slides create` 直後のスライドには、**空のプレースホルダ2個**が入っている:
+`i0` = タイトル、`i1` = サブタイトル。ここに `insert-text` で流し込む。
 
-有効化するには OAuth プロジェクト `317751427169` で Slides API を ON にする。
+注意: **`read-slide` は空のプレースホルダを表示しない**ので、
+「要素が無い」と誤解しやすい。objectId を確実に知るには `slides raw` を見る。
+
+```bash
+PID=<presentationId>
+gog --account ... slides create "タイトル"          # 作成
+gog --account ... slides raw "$PID"                 # objectId を確認(空要素も見える)
+gog --account ... slides list-slides "$PID"         # スライド一覧
+gog --account ... slides insert-text "$PID" i0 "見出し"
+gog --account ... slides replace-text "$PID" "旧" "新"
+gog --account ... slides read-slide "$PID" p        # 読み返し
+```
+
+**既知のバグ: `slides update-notes` はスピーカーノートが空のスライドで失敗する。**
+既存ノートを消そうとして
+`Invalid requests[0].deleteText: The startIndex 0 must be less than the endIndex 0`
+になる。空の状態からノートを付ける手段は現状無いので、ノートが必要なら
+手作業で1文字入れてから `update-notes` を使う。
+
+前提: この疎通には OAuth プロジェクト側で Slides API が有効である必要がある。
+無効だと `slides list-slides` / `raw` / `insert-text` / `replace-text` が全て
+`Slides API is not enabled for this OAuth project` で落ちる。
+紛らわしいのは **`slides create` は Drive API 経由なので無効でも成功する**点で、
+「空のスライドは作れるが中身を書けない」状態になる。
+再度この症状が出たら API 有効化を疑う（手順は下記）。
+
+### API を有効化する手順（Slides は 2026-07-29 に実施済み）
+
+API を追加で有効化したくなったら、OAuth プロジェクト `317751427169` で ON にする。
 **このプロジェクトは @gmail.com 個人アカウント所有**（プロジェクト名 `My First Project`）
 なので、Cloud Console には **@gmail.com でログインして**作業する。
 @fout.jp では `resourcemanager.projects.get` が拒否されて画面すら開けない（実測済み）。
@@ -112,8 +137,10 @@ gog --account yuki.katayama@fout.jp docs write <docId> --text "本文"
 https://console.cloud.google.com/apis/api/slides.googleapis.com/overview?project=317751427169
 ```
 
-API 有効化はプロジェクト側の設定であり、トークンのスコープには既に `slides` が
-含まれているため、**有効化後は再認証も環境変数の更新も不要**。リトライすれば通る。
+API 有効化はプロジェクト側の設定なので、対象スコープを既にトークンが持っていれば
+**有効化後は再認証も環境変数の更新も不要**。リトライすれば通る。
+Slides でこれを実証済み（有効化しただけで、既存トークンのまま書き込みが成功した）。
+付与済みスコープは `gog auth list` で確認できる（現在 22 個）。
 
 ### OAuth 設定の構造（触ると壊れる箇所）
 
