@@ -118,6 +118,30 @@ gog --account ... slides replace-text "$PID" "旧" "新"
 gog --account ... slides read-slide "$PID" p        # 読み返し
 ```
 
+#### 既存スライドへの画像挿入（gog では出来ない・2026-07-30 実測）
+
+**gog には「既存スライドの任意の位置に画像を置く」コマンドが無い。**
+`add-slide` はフルブリードの新規スライド追加、`replace-slide` は
+既に画像があるスライドの差し替えで、どちらもロゴの配置には使えない。
+Slides API の `presentations.batchUpdate` → `createImage` が必要。
+
+`drive upload --replace` での差し替えも**不可**。
+Google ネイティブ形式のファイルは
+`cannot replace content for Google Workspace files` で弾かれるため、
+pptx を編集して同じ fileId に戻す、という逃げ道は使えない
+（新規アップロードなら `--convert-to slides` で別ファイルとして作れる）。
+
+なお `createImage` に渡す URL は Google 側サーバが取得するので
+**公開URLが必要**。Drive のロゴ原本を一時的に公開設定にしなくても、
+そのロゴが既に貼られている別デッキの `contentUrl`
+（`slides raw` で取れる `lh7-rt.googleusercontent.com/...` の署名付きURL）を
+そのまま使い回せる。
+
+参考: HAWK ロゴ原本は Drive の `HAWK Logo` フォルダ
+(`1_MQNSspZ0HtkHsr0LqUvl2GAJzBQw8IM`)。
+横組みは `hawk_logo_col02.png`（余白込み 1484×477 / 実体 1341×406）、
+白背景の資料にはこれ、暗い背景には `hawk_logo_col02_White.png`。
+
 #### スピーカーノート（既知バグと回避策）
 
 **`slides update-notes` はノートが空のスライドで必ず失敗する。**
