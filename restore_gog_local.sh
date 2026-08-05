@@ -82,8 +82,16 @@ log "gog v${GOG_VERSION_ACTUAL}: 配布元と一致"
 # base64 デコード。macOS(BSD) は -d を解さない版があるので -D にフォールバックする。
 # 改行・空白が混ざっていても通るよう、先に除去する。
 b64_decode() {
-  local cleaned
+  local cleaned pad
   cleaned="$(printf '%s' "$1" | tr -d '[:space:]')"
+  # 末尾の '=' パディングは、環境変数設定の画面からコピーすると落ちることがある。
+  # 長さが4の倍数になるよう補う。落ちているのが本当にパディングだけなら
+  # これで元に戻り、中身が欠けている場合は後段の JSON 検証で弾かれる。
+  case $(( ${#cleaned} % 4 )) in
+    2) cleaned="${cleaned}==" ;;
+    3) cleaned="${cleaned}=" ;;
+    1) return 1 ;;   # 4n+1 はどうやっても不正。パディング以外が欠けている。
+  esac
   printf '%s' "$cleaned" | base64 -d 2>/dev/null \
     || printf '%s' "$cleaned" | base64 -D 2>/dev/null
 }
