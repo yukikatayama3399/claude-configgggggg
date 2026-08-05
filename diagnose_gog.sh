@@ -60,41 +60,58 @@ level_of() {  # $1=キー名 → そのキーの最悪レベルを返す(無け�
   echo "$lv"
 }
 
-REFRESH_KEY="$(printf '%s\n' "$DOC" | awk -F'\t' '$2 ~ /^refresh\./ {print $2; exit}')"
+# backend によって必要なものが違う。
+#   file  … GOG_KEYRING_PASSWORD が要る（クラウド Linux）
+#   auto  … macOS Keychain。パスワード環境変数は不要
+BACKEND="$(printf '%s\n' "$DOC" | awk -F'\t' '$2=="keyring.backend"{print $3; exit}')"
 
-KEYRING_PW="$(level_of keyring.password)"
+# 複数アカウントが入っていることがあるので、診断対象の行だけを拾う。
+# 1行目を無条件に取ると別アカウントの結果を見てしまう。
+REFRESH_KEY="$(printf '%s\n' "$DOC" \
+  | awk -F'\t' -v acct="$ACCOUNT" '$2 ~ /^refresh\./ && $2 ~ acct"$" {print $2; exit}')"
+
 KEYRING_OPEN="$(level_of keyring.open)"
 TOKENS="$(level_of tokens)"
 REFRESH="absent"
 [ -n "$REFRESH_KEY" ] && REFRESH="$(level_of "$REFRESH_KEY")"
 
+echo "keyring backend: ${BACKEND:-不明}"
+if printf '%s\n' "$DOC" | grep -q '^\(ok\|warn\|error\)'$'\t''refresh\.'; then
+  echo "アカウント別のリフレッシュ結果:"
+  printf '%s\n' "$DOC" | awk -F'\t' '$2 ~ /^refresh\./ {printf "  %-6s %s\n", $1, $2}'
+fi
+echo ""
+
 verdict() { echo "判定: $1"; shift; printf '対処: %s\n' "$@"; }
 
 # ---- 上流から順に潰す。最初に引っかかったものが真因 ----
 
-# 1) keyring のパスワードが「この実行文脈に」無い
-#    cron / launchd / エージェントから起動すると、対話シェルの環境変数が
-#    引き継がれずここで落ちる。トークンは無傷。最頻の誤診原因。
-if [ -z "${GOG_KEYRING_PASSWORD:-}" ] || [ "$KEYRING_PW" = "error" ]; then
-  verdict "GOG_KEYRING_PASSWORD がこの実行文脈に無い（トークンは無関係）" \
-    "トークンは壊れていない。再認証は不要。" \
-    "対話シェルでは動くのに cron / launchd / Claude Code のルーティンからだけ失敗するなら、ほぼこれ。" \
-    "そのルーティンを起動する環境に GOG_KEYRING_PASSWORD を明示的に渡す。" \
-    "値は全環境で完全に同一であること。"
+# 1〜2) keyring が開けない。開けているなら backend が何であれ問題なし。
+#   GOG_KEYRING_PASSWORD の有無だけを見て犯人扱いしてはいけない。
+#   macOS の backend は auto(Keychain) で、この変数を必要としない。
+if [ "$KEYRING_OPEN" = "error" ]; then
+  case "$BACKEND" in
+    file*)
+      if [ -z "${GOG_KEYRING_PASSWORD:-}" ]; then
+        verdict "GOG_KEYRING_PASSWORD がこの実行文脈に無い（トークンは無関係）" \
+          "トークンは壊れていない。再認証は不要。" \
+          "対話シェルでは動くのに cron / launchd / ルーティンからだけ失敗するなら、ほぼこれ。" \
+          "そのルーティンを起動する環境に GOG_KEYRING_PASSWORD を明示的に渡す。" \
+          "値は全環境で完全に同一であること。"
+      else
+        verdict "file keyring を開けない（パスワード不一致が最有力）" \
+          "設定されている GOG_KEYRING_PASSWORD が他環境と同一か確認する。" \
+          "トークンの生死とは無関係。再認証の前にここを直す。"
+      fi ;;
+    *)
+      verdict "keyring を開けない（backend=${BACKEND:-不明}／トークンの生死とは無関係）" \
+        "macOS なら Keychain へのアクセス拒否を疑う。" \
+        "非対話プロセス（cron / launchd）は login keychain を解錠できないことがある。" \
+        "対話シェルで通るのにルーティンからだけ落ちるなら、ほぼこれ。" \
+        "再認証しても直らない類の問題なので --reauth に逃げないこと。" ;;
+  esac
   echo ""
   echo "!! gog auth add は絶対に叩かないこと（--services 既定が user でスコープが 22 → 最小に潰れる）"
-  exit 1
-fi
-
-# 2) keyring 自体が開けない（パスワード不一致 / バックエンド違い / ファイル破損）
-if [ "$KEYRING_OPEN" = "error" ]; then
-  verdict "keyring を開けない（トークンの生死とは無関係）" \
-    "パスワード不一致が最有力。他環境と同じ GOG_KEYRING_PASSWORD か確認する。" \
-    "バックエンド違いの可能性: gog auth status で backend を確認（クラウドは file）。" \
-    "直らなければ「正」の Mac で bash sync_gog_token.sh（--reauth なし）を実行し、" \
-    "出力された GOG_TOKEN_EXPORT_B64 を gog auth tokens import で焼き直す。"
-  echo ""
-  echo "!! gog auth add は絶対に叩かないこと（スコープが縮む）"
   exit 1
 fi
 
@@ -142,10 +159,35 @@ if [ "$REFRESH" = "error" ]; then
 fi
 
 # 5) 全段クリア
-echo "判定: 正常。認証は生きている。"
+echo "判定: 正常。認証は生きている（対話シェル文脈）。"
 echo ""
 echo "スコープ:"
 "$GOG" auth list 2>/dev/null | sed 's/^/  /'
+echo ""
+
+# ---- 追加検査: cron / launchd 相当の最小環境で再現するか ----
+# ルーティンは対話シェルの環境変数を引き継がない。ここで落ちるなら
+# 「トークン失効」ではなく実行文脈の問題だと確定できる。
+echo "--- cron / launchd 相当（環境変数を落とした最小文脈）で再検査 ---"
+CRON_OUT="$(env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/local/bin:$HOME/bin" \
+    "$GOG" auth doctor --check --no-input 2>&1)"
+# 終了コードだけ見ると取りこぼす。doctor は status 行が error でも 0 を返すことがある。
+CRON_STATUS="$(printf '%s\n' "$CRON_OUT" | awk -F'\t' '$1=="status"{print $2; exit}')"
+CRON_REFRESH="$(printf '%s\n' "$CRON_OUT" \
+  | awk -F'\t' -v acct="$ACCOUNT" '$2 ~ /^refresh\./ && $2 ~ acct"$" {print $1; exit}')"
+
+if [ "$CRON_STATUS" = "ok" ] && [ "${CRON_REFRESH:-ok}" = "ok" ]; then
+  echo "$CRON_OUT" | grep -E "keyring\.open|tokens|refresh\.|status" | sed 's/^/  /'
+  echo ""
+  echo "→ 最小文脈でも通った。実行文脈の問題でもない。"
+else
+  echo "$CRON_OUT" | grep -E "keyring|tokens|refresh\.|status|error" | sed 's/^/  /'
+  echo ""
+  echo "→ **ここで落ちた。これがルーティン失敗の正体。**"
+  echo "   対話シェルでは通るので「トークン失効」ではない。再認証しても直らない。"
+  echo "   ルーティンを起動する環境に、対話シェルと同じ設定を渡すこと"
+  echo "   （macOS Keychain のアクセス許可、GOG_ACCOUNT、PATH など）。"
+fi
 echo ""
 echo "この状態で「トークン失効」と報告してくるルーティンがあれば、それは誤報。"
 echo "報告側の判定ロジックを直すこと（auth 系の失敗を一括で失効と決めつけていないか）。"
