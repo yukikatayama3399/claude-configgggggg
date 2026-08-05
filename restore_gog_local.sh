@@ -108,7 +108,9 @@ assert_json() {
 BACKUP_DIR="${HOME}/.gog_sync/backup_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
-EXPORT_ERR="$(gog auth tokens export --out "${BACKUP_DIR}/tokens_before.json" --overwrite 2>&1)"
+# set -e 下では VAR="$(失敗するコマンド)" の代入自体が非ゼロになりスクリプトが
+# 即死する(if 文の中と違って保護されない)。失敗は下の -s 判定で扱うので || true。
+EXPORT_ERR="$(gog auth tokens export --out "${BACKUP_DIR}/tokens_before.json" --overwrite 2>&1)" || true
 if [ -s "${BACKUP_DIR}/tokens_before.json" ]; then
   chmod 600 "${BACKUP_DIR}/tokens_before.json"
   log "既存トークンを退避: ${BACKUP_DIR}/tokens_before.json"
@@ -127,7 +129,7 @@ case "$(uname -s)" in
   *)      CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/gogcli" ;;
 esac
 mkdir -p "$CONFIG_DIR"
-b64_decode "$GOG_CREDENTIALS_B64" > "${CONFIG_DIR}/credentials.json"
+b64_decode "$GOG_CREDENTIALS_B64" > "${CONFIG_DIR}/credentials.json" || true
 if ! assert_json "${CONFIG_DIR}/credentials.json"; then
   echo "!! credentials.json が完全な JSON になっていない" >&2
   echo "   B64 の文字数    : ${#GOG_CREDENTIALS_B64}" >&2
@@ -148,7 +150,7 @@ log "credentials.json を gog に登録: OK"
 # ---- 4. トークンのインポート ----
 TOKEN_TMP="$(mktemp)"
 trap 'rm -f "$TOKEN_TMP"' EXIT
-b64_decode "$GOG_TOKEN_EXPORT_B64" > "$TOKEN_TMP"
+b64_decode "$GOG_TOKEN_EXPORT_B64" > "$TOKEN_TMP" || true
 if ! assert_json "$TOKEN_TMP"; then
   echo "!! トークンのエクスポートが完全な JSON になっていない" >&2
   echo "   B64 の文字数    : ${#GOG_TOKEN_EXPORT_B64}" >&2
