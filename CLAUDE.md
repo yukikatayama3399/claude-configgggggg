@@ -62,9 +62,14 @@ Slack に誤報し続けていた一方で、同じリフレッシュトーク�
 切り分けは `bash diagnose_gog.sh` を使う。上流から順に潰し、
 最初に引っかかったものが真因:
 
-1. **`GOG_KEYRING_PASSWORD` がその実行文脈に無い** ← 最頻。
+0. **`--account` の書き忘れ（既定アカウントの取り違え）** ← **2026-08-05 の実際の真因**。
+   `403 forbidden: The caller does not have permission` が出る。
+   トークンは無傷。**再認証は不要**で、`--account` を明示すれば直る
+1. **`GOG_KEYRING_PASSWORD` がその実行文脈に無い**（keyring backend が `file` のとき）。
    cron / launchd / エージェント起動だと対話シェルの環境変数が引き継がれない。
-   トークンは無傷なので**再認証は不要**
+   トークンは無傷なので**再認証は不要**。
+   なお **macOS の backend は `auto`（Keychain）でこの変数を必要としない**。
+   `keyring.open` が `ok` なら、この変数が未設定でも問題ない
 2. **keyring が開けない**（パスワード不一致・バックエンド違い）
 3. **その端末にトークンが配られていない** … 失効ではなく import で解決
 4. **本当に `invalid_grant`** … ここで初めて `--reauth` が正当化される
@@ -85,6 +90,27 @@ Slack に誤報し続けていた一方で、同じリフレッシュトーク�
 サブコマンドの後ろに置くと `unknown flag` になる。
 
 - アカウント指定: `--account`（`-a`） … `gog --account yuki.katayama@fout.jp ...`
+
+**`--account` は必ず明示すること。省略してはいけない。**
+会社 Mac には 2 アカウントが登録されており、しかもシェルの `GOG_ACCOUNT` が
+`yuki.katayama3399@gmail.com`（**`gmail` スコープのみ**）を指している。
+`--account` を書かないコマンドは全部そちらで実行され、Sheets / Drive /
+Calendar が `403 forbidden: The caller does not have permission` で落ちる。
+
+```bash
+gog sheets get <ID> "A1:C2" -p                            # → 403 forbidden
+gog --account yuki.katayama@fout.jp sheets get <ID> ...   # → OK
+```
+
+| アカウント | スコープ | 用途 |
+|---|---|---|
+| `yuki.katayama@fout.jp` | 22 個（ads〜youtube） | **通常はこちら** |
+| `yuki.katayama3399@gmail.com` | `gmail` のみ | 個人 Gmail 用。Sheets 等は叩けない |
+
+これは 2026-08-05 に判明した **16 日間続いた「gog トークン失効」誤報の真因**。
+トークンは終始正常で（両アカウントとも refresh 成功）、単に既定アカウントが
+権限不足だっただけだった。`403 forbidden` を認証エラーとして扱い
+「失効」に丸めるロジックがあると、この誤報が再生産される。
 - JSON 出力: `-j` / TSV 出力: `-p`
 - 変更せず意図だけ表示: `-n`（`--dry-run`）
 - 確認プロンプトを出さない: `--no-input`（CI 用）／スキップする: `-y`（`--force`）
