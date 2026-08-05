@@ -53,10 +53,19 @@ if [ "$#" -gt 0 ]; then
   set +a
 fi
 
-for v in GOG_CREDENTIALS_B64 GOG_TOKEN_EXPORT_B64 GOG_KEYRING_PASSWORD; do
+for v in GOG_CREDENTIALS_B64 GOG_TOKEN_EXPORT_B64; do
   [ -n "${!v:-}" ] || fail "環境変数 $v が未設定。Claude Code on the web の環境変数か ~/.gog_sync/*.env から取る。"
 done
-log "環境変数3つ: OK"
+log "credentials / token の2値: OK"
+
+# GOG_KEYRING_PASSWORD は「暗号化ファイル keyring」を使う環境(クラウド/CI)でだけ必須。
+# Mac は既定で macOS キーチェーンを使うので無くても復旧できる。
+if [ -n "${GOG_KEYRING_PASSWORD:-}" ]; then
+  log "GOG_KEYRING_PASSWORD: セット済み"
+else
+  log "GOG_KEYRING_PASSWORD: 未設定。macOS キーチェーンを使う想定で続行する"
+  log "  (doctor が keyring.backend = file と出る環境では必須。その場合は中断されるので設定して再実行)"
+fi
 
 # ---- 1. gog のバージョン一致チェック ----
 command -v gog >/dev/null 2>&1 || fail "gog が見つからない。先に gog をインストールして。"

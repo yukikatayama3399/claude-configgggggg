@@ -54,11 +54,25 @@ if CRON="$(crontab -l 2>/dev/null)"; then
     ok "他方の Mac のパス(/Users/${OTHER_USER}/)への参照は無し"
   fi
   # 参照先ファイルの実在チェック
+  # 注意: crontab には $HOME/... のように変数が入る。展開せずに '/' 以降だけを
+  # 切り出すと "/.claude/..." を拾って必ず「存在しない」になる(誤検知)。
+  # cron はコマンドを sh 経由で走らせるので $HOME は実際には展開される。
   echo ""
   echo "  -- cron が参照しているパスの実在確認 --"
-  echo "$CRON" | grep -oE '/[^ "'"'"']+' | sort -u | while read -r p; do
+  echo "$CRON" \
+    | sed -e "s|\${HOME}|$HOME|g" -e "s|\$HOME|$HOME|g" -e "s|~/|$HOME/|g" \
+    | grep -oE '(^|[[:space:]=])/[^ "'"'"']+' \
+    | sed 's/^[[:space:]=]*//' \
+    | sort -u | while read -r p; do
     case "$p" in
       */) continue ;;
+    esac
+    # ログの出力先はまだ存在しなくても正常(初回実行で作られる)
+    case "$p" in
+      *.log)
+        if [ -e "$p" ]; then ok "存在: $p"
+        else warn "未作成(初回実行で作られる想定): $p"; fi
+        continue ;;
     esac
     if [ -e "$p" ]; then ok "存在: $p"; else bad "存在しない: $p"; fi
   done
@@ -138,16 +152,41 @@ fi
 # ---- 5. cron から環境変数が見えるか ----
 # ここが本命。ターミナルでは動くのに朝だけ失敗する、の典型原因。
 sec "5. cron から見える環境変数"
+
+# keyring のバックエンドによって GOG_KEYRING_PASSWORD が要るかどうかが変わる。
+#   file          … 暗号化ファイル keyring。パスワード必須(クラウド/CI はこれ)
+#   auto/keychain … macOS キーチェーン。パスワードは不要
+KEYRING_BACKEND="$(printf '%s\n' "${DOCTOR_OUT:-}" | awk -F'\t' '$2=="keyring.backend"{print $3}')"
+echo "  keyring バックエンド: ${KEYRING_BACKEND:-不明}"
+case "${KEYRING_BACKEND:-}" in
+  file*) NEED_PASSWORD=1 ;;
+  "")    NEED_PASSWORD=1 ;;   # 判定できないときは要る前提で警告側に倒す
+  *)     NEED_PASSWORD=0 ;;
+esac
+if [ "$NEED_PASSWORD" = "0" ]; then
+  ok "macOS キーチェーンを使うので GOG_KEYRING_PASSWORD は不要"
+fi
+
+echo ""
 echo "  ターミナル(このシェル)での状態:"
 for v in GOG_KEYRING_PASSWORD GOG_CREDENTIALS_B64 GOG_TOKEN_EXPORT_B64; do
   val="${!v:-}"
   # 値そのものは出さない。長さだけ出して「入っているか」を確かめる。
-  if [ -n "$val" ]; then ok "$v: セット済み (${#val} 文字)"; else bad "$v: 未設定"; fi
+  if [ -n "$val" ]; then
+    ok "$v: セット済み (${#val} 文字)"
+  elif [ "$v" = "GOG_KEYRING_PASSWORD" ] && [ "$NEED_PASSWORD" = "0" ]; then
+    ok "$v: 未設定(このバックエンドでは不要)"
+  else
+    # B64 の2つは復旧(restore_gog_local.sh)の時にだけ要る。常時必要ではない。
+    warn "$v: 未設定"
+  fi
 done
 
 echo ""
 echo "  cron に渡っているか(crontab 内の定義を確認):"
-if crontab -l 2>/dev/null | grep -q 'GOG_KEYRING_PASSWORD'; then
+if [ "$NEED_PASSWORD" = "0" ]; then
+  ok "このバックエンドでは crontab への GOG_KEYRING_PASSWORD 受け渡しは不要"
+elif crontab -l 2>/dev/null | grep -q 'GOG_KEYRING_PASSWORD'; then
   ok "crontab 内に GOG_KEYRING_PASSWORD の定義あり"
 else
   bad "crontab 内に GOG_KEYRING_PASSWORD の定義が無い。"
@@ -167,4 +206,9 @@ done
 
 sec "おわり"
 echo "  [NG] が付いた項目を上から順に潰す。"
-echo "  gog が invalid_grant なだけなら restore_gog_local.sh で直る(再認証不要)。"
+echo ""
+echo "  gog が原因なら、多くの場合 restore_gog_local.sh で直る(再認証不要):"
+echo "    ・doctor が invalid_grant   … トークンが死んでいる"
+echo "    ・doctor は通るが実APIが403 … 別の OAuth クライアント/プロジェクトを"
+echo "                                   掴んでいる可能性。config.path が"
+echo "                                   (missing) ならほぼこれ"
