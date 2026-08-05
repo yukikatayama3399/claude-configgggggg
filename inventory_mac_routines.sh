@@ -7,7 +7,8 @@
 # 出したいもの:
 #   ・定義が何個あって、それぞれ何のファイルを持っているか
 #   ・cron に登録されているか（登録が無い＝Claude Code 側のスケジューラ頼み）
-#   ・最後にログが動いたのはいつか（＝実際に生きているか）
+#   ・~/.claude/logs にログがあるか（このルーティン群は Claude Code 内部の
+#     スケジューラで動くため基本残らない。無くても停止の根拠にはならない）
 #   ・gog を --account 無しで呼んでいないか（既定アカウントが個人 Gmail のため事故る）
 #   ・クラウドの Routine と名前が重複していないか（二重実行の検出）
 #
@@ -55,13 +56,13 @@ for entry in "$TASKS_DIR"/*; do
 
   # gog の呼び出し。--account / -a のどちらも無い行があるか
   gog_mark="—"
-  if grep -rq 'gog ' "$entry" 2>/dev/null; then
-    bare="$(grep -rh 'gog ' "$entry" 2>/dev/null \
-            | grep -v -- '--account' | grep -v -- ' -a ' | wc -l | tr -d ' ')"
-    if [ "$bare" != "0" ]; then
-      gog_mark="要確認"; GOG_BARE=$((GOG_BARE+1))
-    else
+  if grep -rq --include='SKILL.md' --include='*.sh' 'gog ' "$entry" 2>/dev/null; then
+    # アカウント指定は --account / -a の両方。-a はバッククォート直後にも現れるので
+    # 直前がスペースであることを前提にしない。
+    if grep -rq --include='SKILL.md' --include='*.sh' -E -- '--account|[^-[:alnum:]]-a[ =]' "$entry" 2>/dev/null; then
       gog_mark="ok"
+    else
+      gog_mark="要確認"; GOG_BARE=$((GOG_BARE+1))
     fi
   fi
 
@@ -70,7 +71,7 @@ for entry in "$TASKS_DIR"/*; do
   if [ -n "$logf" ]; then
     last="$(date -r "$logf" '+%m-%d %H:%M' 2>/dev/null || echo '?')"
   else
-    last="なし"; NO_LOG=$((NO_LOG+1))
+    last="-"; NO_LOG=$((NO_LOG+1))
   fi
 
   # クラウドの Routine と名前が当たるか
@@ -88,8 +89,12 @@ echo "集計"
 echo "=============================================="
 echo "  定義の総数            : $TOTAL"
 echo "  crontab に出てくるもの : $IN_CRON"
-echo "  ログが無いもの         : $NO_LOG"
+echo "  ~/.claude/logs にログ無し : $NO_LOG"
 echo "  gog を素で呼ぶ疑い     : $GOG_BARE"
+echo ""
+echo "  注: このルーティン群は crontab ではなく Claude Code 内部のスケジューラで"
+echo "      発火する(Claude Code 起動中のみ)。ログは ~/.claude/logs に残らないため、"
+echo "      「-」は停止の根拠にならない。実際の発火は Slack DM 等で確認すること。"
 
 # ---- gog を --account 無しで呼んでいる箇所の実物 ----
 echo ""
@@ -97,9 +102,10 @@ echo "=============================================="
 echo "gog を --account 無しで呼んでいる行（実物）"
 echo "=============================================="
 echo "  既定アカウントは個人 Gmail なので、ここに出る行は 403 になりうる。"
+echo "  SKILL.md と *.sh のみを見る(LEARNINGS.md は過去ログなので対象外)。"
 echo ""
-grep -rn 'gog ' "$TASKS_DIR" 2>/dev/null \
-  | grep -v -- '--account' | grep -v -- ' -a ' \
+grep -rn --include='SKILL.md' --include='*.sh' 'gog ' "$TASKS_DIR" 2>/dev/null \
+  | grep -v -E -- '--account|[^-[:alnum:]]-a[ =]' \
   | sed "s|$TASKS_DIR/||" | head -40 \
   || echo "  (該当なし)"
 
