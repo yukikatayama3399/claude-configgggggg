@@ -55,6 +55,48 @@ bash sync_gog_token.sh --reauth   # 認証をやり直してから書き出す
 　 あれは未承認の機微スコープで同意できる**ユーザー数**の上限であって、
 　 リフレッシュトークンの個数上限とは無関係。混同しないこと。
 
+### クラウドは動くのに Mac のルーティンだけ死んでいる時（逆方向の配布）
+
+トークンの配布は Mac → クラウド の一方向しか手順が無かったが、
+**クラウド側だけが生きている状態**（クラウドの Routine は正常、Mac の cron
+ルーティンだけ `invalid_grant` で Google 操作が全部スキップ）が起きる。
+
+原因は、再認証したあと3値をクラウド環境変数と GitHub Secrets には配ったのに、
+**認証した Mac 自身の keyring に戻していない**こと。Mac は古い死んだトークンを
+持ったまま残る。cron は黙って走り続けるので気づきにくい。
+
+この場合は再認証しない。生きている3値を Mac に戻すだけで直る:
+
+```bash
+# 3値は Claude Code on the web の環境変数、または ~/.gog_sync/*.env から取る
+bash restore_gog_local.sh ~/.gog_sync/gog_env_YYYYmmdd_HHMMSS.env
+```
+
+`restore_gog_local.sh` は `gog auth add` を叩かないので「認証は1台だけ」の
+ルールを壊さない。既存トークンは `~/.gog_sync/backup_*/` に退避してから上書きする。
+
+3値そのものが古い（クラウドでも doctor が落ちる）時だけ、会社 Mac で
+`bash sync_gog_token.sh --reauth` → 配布し直す。
+
+### 定期ルーティンが動かない時の切り分け
+
+```bash
+bash diagnose_mac_routines.sh   # 読み取りのみ。何も変更しない
+```
+
+見ている観点と、実際に踏んだ罠:
+
+| 観点 | 症状 |
+|---|---|
+| ユーザー名の食い違い | 家 Mac `FOyuki` / 会社 Mac `yuki`。ランブックや crontab に `/Users/FOyuki/...` が埋まっていると会社 Mac では必ず失敗する |
+| iCloud のプレースホルダ | `.icloud` のまま実体未ダウンロードだと cron からは読めない。`brctl download <dir>` で実体化 |
+| cron の環境変数 | cron は `~/.zshrc` / `~/.zprofile` を読まない。シェルで export しているだけだと `GOG_KEYRING_PASSWORD` が無人実行時に見えず keyring を開けない。crontab 先頭かラッパーで渡す |
+| gog のトークン | `auth doctor` だけでなく実 API まで叩いて確認する（doctor が通っても API が弾かれることがある） |
+
+**クラウドの Routine と Mac の cron ルーティンは別系統**。
+クラウド側（`list_triggers` で見えるもの）は Mac の電源・Claude Code の起動状態と
+無関係に発火する。「朝動かなかった」時はまずどちらの系統の話かを切り分ける。
+
 ### 使い方の基本
 **グローバルフラグはサブコマンドの「前」に置く**（`gog --account ... sheets get ...`）。
 サブコマンドの後ろに置くと `unknown flag` になる。
