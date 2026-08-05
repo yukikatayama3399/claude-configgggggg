@@ -79,27 +79,59 @@ if [ "$GOG_VERSION_ACTUAL" != "$GOG_VERSION_EXPECTED" ]; then
 fi
 log "gog v${GOG_VERSION_ACTUAL}: 配布元と一致"
 
+# base64 デコード。macOS(BSD) は -d を解さない版があるので -D にフォールバックする。
+# 改行・空白が混ざっていても通るよう、先に除去する。
+b64_decode() {
+  local cleaned
+  cleaned="$(printf '%s' "$1" | tr -d '[:space:]')"
+  printf '%s' "$cleaned" | base64 -d 2>/dev/null \
+    || printf '%s' "$cleaned" | base64 -D 2>/dev/null
+}
+
+# デコード結果が「完全な JSON か」を確かめる。先頭1文字だけ見ると、
+# 途中で切れた値(コピペ漏れ)を素通しして gog 側で
+# "unexpected end of JSON input" になる。
+assert_json() {
+  python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$1" 2>/dev/null
+}
+
 # ---- 2. 既存トークンのバックアップ ----
 # 上書きに失敗しても元に戻せるようにしておく。
 BACKUP_DIR="${HOME}/.gog_sync/backup_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
-if gog auth tokens export --out "${BACKUP_DIR}/tokens_before.json" --overwrite >/dev/null 2>&1; then
+EXPORT_ERR="$(gog auth tokens export --out "${BACKUP_DIR}/tokens_before.json" --overwrite 2>&1)"
+if [ -s "${BACKUP_DIR}/tokens_before.json" ]; then
   chmod 600 "${BACKUP_DIR}/tokens_before.json"
   log "既存トークンを退避: ${BACKUP_DIR}/tokens_before.json"
 else
-  log "既存トークンの退避はスキップ(読めるトークンが無い。失効済みなら想定どおり)"
+  # doctor がトークンを読めているのにここで失敗するなら、原因を握り潰さず出す。
+  log "既存トークンを退避できなかった。gog の出力:"
+  printf '%s\n' "$EXPORT_ERR" | sed 's/^/     /'
+  log "(このまま進めても既存トークンは keyring に残る。中断したいなら Ctrl-C)"
 fi
 
 # ---- 3. credentials.json の復元 ----
 # keyring バックエンドはこの Mac の設定のままにする(勝手に file へ倒さない)。
-CONFIG_DIR="${HOME}/.config/gogcli"
+# 置き場所は OS で違う。macOS の gog は ~/Library/Application Support/gogcli を見る。
+case "$(uname -s)" in
+  Darwin) CONFIG_DIR="${HOME}/Library/Application Support/gogcli" ;;
+  *)      CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/gogcli" ;;
+esac
 mkdir -p "$CONFIG_DIR"
-echo "$GOG_CREDENTIALS_B64" | base64 -d > "${CONFIG_DIR}/credentials.json"
-head -c 1 "${CONFIG_DIR}/credentials.json" | grep -q '{' \
-  || fail "credentials.json のdecode結果がJSONに見えない。B64値を確認して。"
+b64_decode "$GOG_CREDENTIALS_B64" > "${CONFIG_DIR}/credentials.json"
+if ! assert_json "${CONFIG_DIR}/credentials.json"; then
+  echo "!! credentials.json が完全な JSON になっていない" >&2
+  echo "   B64 の文字数    : ${#GOG_CREDENTIALS_B64}" >&2
+  echo "   decode後のバイト数: $(wc -c < "${CONFIG_DIR}/credentials.json" | tr -d ' ')" >&2
+  echo "   先頭60文字      : $(head -c 60 "${CONFIG_DIR}/credentials.json")" >&2
+  echo "" >&2
+  echo "   コピペが途中で切れている可能性が高い。環境変数設定の画面で" >&2
+  echo "   値を全選択してからコピーし直して、export をやり直して。" >&2
+  exit 1
+fi
 chmod 600 "${CONFIG_DIR}/credentials.json"
-log "credentials.json 復元: ${CONFIG_DIR}/credentials.json"
+log "credentials.json 復元: ${CONFIG_DIR}/credentials.json ($(wc -c < "${CONFIG_DIR}/credentials.json" | tr -d ' ') バイト)"
 
 gog auth credentials set "${CONFIG_DIR}/credentials.json" --no-input \
   || fail "credentials.json の登録に失敗"
@@ -108,7 +140,15 @@ log "credentials.json を gog に登録: OK"
 # ---- 4. トークンのインポート ----
 TOKEN_TMP="$(mktemp)"
 trap 'rm -f "$TOKEN_TMP"' EXIT
-echo "$GOG_TOKEN_EXPORT_B64" | base64 -d > "$TOKEN_TMP"
+b64_decode "$GOG_TOKEN_EXPORT_B64" > "$TOKEN_TMP"
+if ! assert_json "$TOKEN_TMP"; then
+  echo "!! トークンのエクスポートが完全な JSON になっていない" >&2
+  echo "   B64 の文字数    : ${#GOG_TOKEN_EXPORT_B64}" >&2
+  echo "   decode後のバイト数: $(wc -c < "$TOKEN_TMP" | tr -d ' ')" >&2
+  echo "   コピペが途中で切れている可能性が高い。値をコピーし直して。" >&2
+  exit 1
+fi
+log "トークンJSON: 妥当 ($(wc -c < "$TOKEN_TMP" | tr -d ' ') バイト)"
 gog auth tokens import "$TOKEN_TMP" --no-input --force \
   || fail "トークンのインポート失敗。配布元で再export して3つの値を焼き直す必要があるかも。"
 rm -f "$TOKEN_TMP"
