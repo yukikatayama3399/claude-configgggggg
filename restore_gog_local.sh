@@ -110,7 +110,8 @@ mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
 # set -e 下では VAR="$(失敗するコマンド)" の代入自体が非ゼロになりスクリプトが
 # 即死する(if 文の中と違って保護されない)。失敗は下の -s 判定で扱うので || true。
-EXPORT_ERR="$(gog auth tokens export --out "${BACKUP_DIR}/tokens_before.json" --overwrite 2>&1)" || true
+# tokens export はアカウント(email)の指定が要る。省くと expected "<email>" で落ちる。
+EXPORT_ERR="$(gog auth tokens export "$ACCOUNT" --out "${BACKUP_DIR}/tokens_before.json" --overwrite 2>&1)" || true
 if [ -s "${BACKUP_DIR}/tokens_before.json" ]; then
   chmod 600 "${BACKUP_DIR}/tokens_before.json"
   log "既存トークンを退避: ${BACKUP_DIR}/tokens_before.json"
