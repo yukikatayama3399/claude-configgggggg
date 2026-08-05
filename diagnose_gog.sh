@@ -176,7 +176,9 @@ CRON_STATUS="$(printf '%s\n' "$CRON_OUT" | awk -F'\t' '$1=="status"{print $2; ex
 CRON_REFRESH="$(printf '%s\n' "$CRON_OUT" \
   | awk -F'\t' -v acct="$ACCOUNT" '$2 ~ /^refresh\./ && $2 ~ acct"$" {print $1; exit}')"
 
-if [ "$CRON_STATUS" = "ok" ] && [ "${CRON_REFRESH:-ok}" = "ok" ]; then
+# warn は通過扱い。config.path (missing) だけで status が warn になるため、
+# これを失敗と見なすと誤検知する。落第は error のときだけ。
+if [ "$CRON_STATUS" != "error" ] && [ "${CRON_REFRESH:-ok}" != "error" ]; then
   echo "$CRON_OUT" | grep -E "keyring\.open|tokens|refresh\.|status" | sed 's/^/  /'
   echo ""
   echo "→ 最小文脈でも通った。実行文脈の問題でもない。"
@@ -187,6 +189,34 @@ else
   echo "   対話シェルでは通るので「トークン失効」ではない。再認証しても直らない。"
   echo "   ルーティンを起動する環境に、対話シェルと同じ設定を渡すこと"
   echo "   （macOS Keychain のアクセス許可、GOG_ACCOUNT、PATH など）。"
+fi
+echo ""
+
+# ---- 追加検査: 既定アカウントの取り違え ----
+# --account を明示しないコマンドは GOG_ACCOUNT（無ければ gog の既定）を使う。
+# スコープの狭いアカウントが既定になっていると、Sheets などが権限エラーで落ち、
+# 雑なエラー処理を通ると「トークン失効」と誤報される。
+echo "--- 既定アカウントの確認 ---"
+if [ -n "${GOG_ACCOUNT:-}" ]; then
+  echo "  GOG_ACCOUNT=$GOG_ACCOUNT が設定されている。"
+  echo "  --account を書いていないコマンドは全部このアカウントで実行される。"
+  SCOPES="$("$GOG" auth list 2>/dev/null | awk -F'\t' -v a="$GOG_ACCOUNT" '$1==a{print $3; exit}')"
+  echo "  このアカウントのスコープ: ${SCOPES:-（不明）}"
+  MISSING=""
+  for s in sheets drive calendar docs; do
+    case ",$SCOPES," in *",$s,"*) ;; *) MISSING="$MISSING $s" ;; esac
+  done
+  if [ -n "$MISSING" ]; then
+    echo ""
+    echo "  ⚠️ 不足スコープ:$MISSING"
+    echo "  → このアカウントでは Sheets / Drive などが権限エラーで落ちる。"
+    echo "     ルーティンが --account を明示していないなら、それが失敗の正体。"
+    echo "     対処: ルーティン内のコマンドに --account を明示的に書く"
+    echo "     （例: gog --account yuki.katayama@fout.jp sheets get ...）。"
+    echo "     再認証では直らない。GOG_ACCOUNT を消すだけでも直る場合がある。"
+  fi
+else
+  echo "  GOG_ACCOUNT は未設定。gog の既定アカウントが使われる。"
 fi
 echo ""
 echo "この状態で「トークン失効」と報告してくるルーティンがあれば、それは誤報。"
