@@ -75,6 +75,42 @@ bash restore_gog_local.sh ~/.gog_sync/gog_env_YYYYmmdd_HHMMSS.env
 `restore_gog_local.sh` は `gog auth add` を叩かないので「認証は1台だけ」の
 ルールを壊さない。既存トークンは `~/.gog_sync/backup_*/` に退避してから上書きする。
 
+#### 症状は invalid_grant とは限らない（2026-08-05 実測）
+
+`auth doctor` が **全部 ok なのに実 API だけ 403 forbidden**、という出方もする。
+この時 Mac 側には次の特徴があった:
+
+- `config.path ... (missing)` … `config.json` が無い
+- `auth list` に**個人 @gmail.com アカウントが同居**している
+- fout.jp のトークンの日付がクラウド側より**新しい**（= Mac で単独に
+  `gog auth add` が叩かれた形跡。スコープが縮んでいる可能性）
+- Calendar / Gmail は通るのに Sheets だけ 403
+
+対処は同じで `restore_gog_local.sh` でクラウドの3値を戻すだけでよい。
+
+**重要な罠: import 直後に検証すると 403 のままで「直っていない」と誤認する。**
+`gog auth tokens import` が入れるのは**リフレッシュトークンだけ**なので、
+差し替え前のグラントで取得した**アクセストークンがキャッシュに残っている間
+（最長1時間）は古い権限で API を叩き続ける**。実際、import 直後は 403、
+数分後に同じコマンドが通った。403 が出ても即座に「スコープ不足」「API 無効」と
+断定せず、時間を置いて読み取りを再試行すること。
+
+復旧できたかの確認は読み取りだけでなく書き込みまで見る。使い捨てのコピーを
+作って往復させ、最後にゴミ箱へ捨てるのが安全（既存ファイルを汚さない）:
+
+```bash
+export PATH="$HOME/bin:$PATH"
+A="yuki.katayama@fout.jp"
+NEW=$(gog -a "$A" drive copy <コピー元ID> "gog書き込みテスト_削除可" -j \
+  | python3 -c 'import json,sys;print(json.load(sys.stdin)["file"]["id"])')
+gog -a "$A" sheets update "$NEW" "A1" "書き込みテスト" --no-input
+gog -a "$A" sheets get "$NEW" "A1" -p
+gog -a "$A" drive delete "$NEW" -y --permanent
+```
+
+なお Mac の keyring は **macOS キーチェーン**（`keyring.backend auto`）なので、
+クラウド/CI と違って `GOG_KEYRING_PASSWORD` は不要。cron に渡す必要も無い。
+
 3値そのものが古い（クラウドでも doctor が落ちる）時だけ、会社 Mac で
 `bash sync_gog_token.sh --reauth` → 配布し直す。
 
