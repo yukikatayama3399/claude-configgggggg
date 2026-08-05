@@ -181,7 +181,22 @@ log "実API疎通(Sheets 読み取り):"
 if gog --account "$ACCOUNT" sheets get "$VERIFY_SHEET_ID" "A1:B2"; then
   log "✅ 復旧完了。cron のルーティンは次回発火から Google 系が動く。"
 else
-  fail "doctor は通ったが実APIが弾かれた。スコープ不足かAPI無効化を疑う(CLAUDE.md 参照)。"
+  # ここで 403 が出ても失敗とは限らない。import が入れるのはリフレッシュ
+  # トークンだけで、差し替え前のグラントで取ったアクセストークンが
+  # キャッシュに残っていると、期限(最長1時間)まで古い権限で叩いてしまう。
+  # 実際、会社 Mac で import 直後は 403、数分後に同じコマンドが通った。
+  echo "" >&2
+  echo "⚠️  import は成功したが、直後の実APIは 403 だった。" >&2
+  echo "" >&2
+  echo "   差し替え前のアクセストークンがキャッシュに残っている可能性がある" >&2
+  echo "   (import が入れるのはリフレッシュトークンのみ)。期限切れまで待てば" >&2
+  echo "   新しい権限で取り直される。まず時間を置いて確認して:" >&2
+  echo "" >&2
+  echo "     gog --account $ACCOUNT sheets get $VERIFY_SHEET_ID 'A1:B2'" >&2
+  echo "" >&2
+  echo "   1時間以上経っても 403 のままなら、スコープ不足かAPI無効化を疑う" >&2
+  echo "   (CLAUDE.md の「API を有効化する手順」を参照)。" >&2
+  exit 1
 fi
 
 # ---- 6. cron から見えるかの注意 ----
