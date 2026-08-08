@@ -12,6 +12,18 @@ Claude Code から Google Workspace（Sheets / Docs / Slides / Drive / Gmail / C
 | `setup_gog_remote.sh` | クラウド | gog のインストールと認証復元。SessionStart フックが自動実行するので通常は手動実行不要 |
 | `check_gog_apis.sh` | どこでも | 6 API の疎通を一括確認（**読み取り専用・いつでも安全**） |
 | `sync_gog_token.sh` | **会社 Mac のみ** | 認証をやり直し、全環境へ配る値を書き出す |
+| `diagnose_mac_slow.sh` | **Mac のみ** | Mac が重いときの Claude 起因切り分け（**読み取り専用・いつでも安全**） |
+
+### Mac が重いとき
+
+```bash
+bash diagnose_mac_slow.sh > /tmp/mac_slow.txt 2>&1
+```
+
+常駐セッション数 / MCP サーバのメモリ / `~/.claude` の肥大化 / cron の多重発火 /
+iCloud 同期 / Spotlight インデックスを一括で見て、最後に「疑わしい点」と
+「推奨アクション」を出す。**表示するだけで何も消さない**ので、出力を Claude に
+貼れば対処まで続けられる。
 
 ### 調子が悪いときの一次切り分け
 
