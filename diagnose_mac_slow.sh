@@ -6,14 +6,37 @@
 #   ★ 読み取り専用。何も削除・変更・送信しない。いつ実行しても安全。
 #
 #   使い方（会社Mac / 家Mac のどちらでも、重いと感じている時に実行）:
-#       bash diagnose_mac_slow.sh
-#       bash diagnose_mac_slow.sh > /tmp/mac_slow.txt 2>&1   # 結果を貼り付けたい時
+#       bash diagnose_mac_slow.sh                 # 診断のみ（読み取り専用）
+#       bash diagnose_mac_slow.sh --fix           # 診断＋安全な掃除まで実行
+#       bash diagnose_mac_slow.sh --fix --keep-logs   # 会話ログは消さずに掃除
+#       bash diagnose_mac_slow.sh --fix --days 30     # 会話ログの保持日数を変える(既定60)
 #
-#   最後に「疑わしい点」と「推奨アクション」を自動でまとめる。
-#   推奨アクションは表示するだけで、実行はしない。
+#   診断だけの場合は最後に「疑わしい点」と「推奨アクション」を表示するのみ。
+#   --fix を付けたときだけ、以下の"戻せる/影響が小さい"掃除を実際に行う:
+#     - shell-snapshots の7日超を削除（再生成されるので支障なし）
+#     - 会話ログの60日超を削除（該当セッションは /resume で遡れなくなる）
+#     - ~/.claude を Spotlight / Time Machine から除外
+#   プロセスの kill・MCP 設定変更・cron 変更は --fix でも行わない。
 # ============================================================
 set -uo pipefail
 export LANG=C
+
+MODE="diagnose"
+KEEP_LOGS="no"
+KEEP_DAYS=60
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --fix)       MODE="fix" ;;
+    --keep-logs) KEEP_LOGS="yes" ;;
+    --days)      KEEP_DAYS="${2:-60}"; shift ;;
+    -h|--help)   sed -n '2,25p' "$0"; exit 0 ;;
+    *) echo "不明なオプション: $1（--fix / --keep-logs / --days N が使えます）" >&2; exit 2 ;;
+  esac
+  shift
+done
+case "$KEEP_DAYS" in
+  ''|*[!0-9]*) echo "--days には数値を指定してください（指定値: $KEEP_DAYS）" >&2; exit 2 ;;
+esac
 
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "このスクリプトは macOS 専用です（現在: $(uname -s)）。あなたの Mac 上で実行してください。" >&2
@@ -299,9 +322,87 @@ else
   echo "  重さが続くなら、セクション2・3の上位プロセスに Claude 以外の犯人がいないか確認してください。"
 fi
 
+if [ "$MODE" = "fix" ]; then
+  # ==========================================================
+  # --fix: 安全な掃除だけ実際に実行する
+  #   やること: shell-snapshots(7日超)削除 / 会話ログ(60日超)削除 /
+  #             Spotlight 除外 / Time Machine 除外
+  #   やらないこと: プロセスの kill、MCP 設定の変更、cron の変更
+  #                （どれも意図せぬ副作用があるので人間の判断に残す）
+  # ==========================================================
+  sec "--fix: 掃除を実行"
+  BEFORE_MB="${TOTAL_MB:-0}"
+
+  echo "  [1/4] shell-snapshots（7日より古いもの）"
+  if [ -d "$CLAUDE_DIR/shell-snapshots" ]; then
+    DEL_N="$(find "$CLAUDE_DIR/shell-snapshots" -type f -mtime +7 2>/dev/null | wc -l | tr -d ' ')"
+    find "$CLAUDE_DIR/shell-snapshots" -type f -mtime +7 -delete 2>/dev/null
+    echo "        削除: ${DEL_N} ファイル"
+  else
+    echo "        （ディレクトリなし。スキップ）"
+  fi
+
+  echo "  [2/4] 会話ログ（${KEEP_DAYS}日より古いもの / これより新しいログは残す）"
+  if [ -d "$CLAUDE_DIR/projects" ]; then
+    DEL_N="$(find "$CLAUDE_DIR/projects" -name '*.jsonl' -mtime "+${KEEP_DAYS}" 2>/dev/null | wc -l | tr -d ' ')"
+    DEL_MB="$(find "$CLAUDE_DIR/projects" -name '*.jsonl' -mtime "+${KEEP_DAYS}" -exec du -k {} + 2>/dev/null | awk '{s+=$1} END{printf "%d", (s+0)/1024}')"
+    if [ "$KEEP_LOGS" = "yes" ]; then
+      echo "        --keep-logs 指定のためスキップ（該当 ${DEL_N} ファイル / 約 ${DEL_MB}MB）"
+    else
+      find "$CLAUDE_DIR/projects" -name '*.jsonl' -mtime "+${KEEP_DAYS}" -delete 2>/dev/null
+      echo "        削除: ${DEL_N} ファイル / 約 ${DEL_MB}MB（該当セッションは /resume で遡れなくなります）"
+    fi
+  else
+    echo "        （ディレクトリなし。スキップ）"
+  fi
+
+  echo "  [3/4] Spotlight から ~/.claude を除外"
+  touch "$CLAUDE_DIR/.metadata_never_index" 2>/dev/null \
+    && echo "        .metadata_never_index を設置: OK" \
+    || echo "        .metadata_never_index の設置に失敗"
+  if mdutil -i off "$CLAUDE_DIR" >/dev/null 2>&1; then
+    echo "        mdutil -i off: OK"
+  else
+    echo "        mdutil は sudo が必要（未実行）。効かせるには: sudo mdutil -i off ~/.claude"
+  fi
+
+  echo "  [4/4] Time Machine から ~/.claude を除外"
+  if tmutil addexclusion "$CLAUDE_DIR" >/dev/null 2>&1; then
+    echo "        tmutil addexclusion: OK"
+  else
+    echo "        tmutil は sudo が必要（未実行）。効かせるには: sudo tmutil addexclusion ~/.claude"
+  fi
+
+  AFTER_MB="$(du -sm "$CLAUDE_DIR" 2>/dev/null | awk '{print $1}')"
+  echo
+  echo "  ~/.claude: ${BEFORE_MB}MB → ${AFTER_MB}MB"
+
+  cat <<'EOS'
+
+▼ ここから先は自動でやりません（副作用があるため手動判断）
+
+  # --- 裏に残った Claude Code セッションを畳む ----------------------
+  #   走行中の cron ルーティンを巻き込む恐れがあるので、PID を見て個別に落とす
+  ps -Ao pid,pcpu,rss,etime,command | grep '[c]laude'
+  #   kill <PID>
+
+  # --- 使っていない MCP サーバを外す（メモリに一番効く） ------------
+  claude mcp list
+  #   ~/.claude.json / ~/.claude/settings.json / プロジェクトの .mcp.json を見直す
+
+  # --- cron ルーティンの多重発火を防ぐ ------------------------------
+  crontab -l
+  #   同時刻に集中しているならジッター（数分ずらし）を入れる
+EOS
+  echo
+  echo "掃除後にもう一度 'bash diagnose_mac_slow.sh' を流すと、残っている要因が分かります。"
+  exit 0
+fi
+
 cat <<'EOS'
 
-▼ 推奨アクション（表示のみ。実行はしていません。必要なものだけ手で流してください）
+▼ 推奨アクション（表示のみ。実行はしていません）
+   安全な 2〜5 は 'bash diagnose_mac_slow.sh --fix' で一括実行できます。
 
   # --- 1. 裏に残った Claude Code セッションを畳む -------------------
   #   まず何が動いているか確認してから、不要な PID だけ落とす

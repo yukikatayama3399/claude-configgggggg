@@ -12,18 +12,28 @@ Claude Code から Google Workspace（Sheets / Docs / Slides / Drive / Gmail / C
 | `setup_gog_remote.sh` | クラウド | gog のインストールと認証復元。SessionStart フックが自動実行するので通常は手動実行不要 |
 | `check_gog_apis.sh` | どこでも | 6 API の疎通を一括確認（**読み取り専用・いつでも安全**） |
 | `sync_gog_token.sh` | **会社 Mac のみ** | 認証をやり直し、全環境へ配る値を書き出す |
-| `diagnose_mac_slow.sh` | **Mac のみ** | Mac が重いときの Claude 起因切り分け（**読み取り専用・いつでも安全**） |
+| `diagnose_mac_slow.sh` | **Mac のみ** | Mac が重いときの Claude 起因切り分け（既定は**読み取り専用**、`--fix` で掃除も実行） |
 
 ### Mac が重いとき
 
 ```bash
-bash diagnose_mac_slow.sh > /tmp/mac_slow.txt 2>&1
+bash diagnose_mac_slow.sh --fix        # 診断 → そのまま安全な掃除まで
+bash diagnose_mac_slow.sh              # 診断だけ（何も消さない）
 ```
 
 常駐セッション数 / MCP サーバのメモリ / `~/.claude` の肥大化 / cron の多重発火 /
-iCloud 同期 / Spotlight インデックスを一括で見て、最後に「疑わしい点」と
-「推奨アクション」を出す。**表示するだけで何も消さない**ので、出力を Claude に
-貼れば対処まで続けられる。
+iCloud 同期 / Spotlight インデックスを一括で見て、「疑わしい点」を出す。
+
+`--fix` が実際にやるのはこれだけ（いずれも戻せる、または再生成される）:
+
+- `shell-snapshots` の7日超を削除
+- 会話ログ（`projects/*.jsonl`）の60日超を削除 … 該当セッションは `/resume` で遡れなくなる。
+  消したくないなら `--fix --keep-logs`、日数を変えるなら `--fix --days 30`
+- `~/.claude` を Spotlight / Time Machine から除外（`mdutil` / `tmutil` は sudo 必要。
+  未実行ならコマンドを表示する）
+
+プロセスの kill・MCP 設定の変更・cron の変更は `--fix` でも**やらない**
+（走行中のルーティンを巻き込むため）。該当したときにコマンドだけ提示する。
 
 ### 調子が悪いときの一次切り分け
 
