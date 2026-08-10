@@ -1,0 +1,667 @@
+[
+{
+"row": 141,
+"no": "140",
+"name": "LifeGroup"
+},
+{
+"row": 143,
+"no": "142",
+"name": "PIKAプロダクション"
+},
+{
+"row": 144,
+"no": "143",
+"name": "SNS WINNER BOOST"
+},
+{
+"row": 145,
+"no": "144",
+"name": "まじすけ株式会社"
+},
+{
+"row": 146,
+"no": "145",
+"name": "ジャパンコンサルティング株式会社"
+},
+{
+"row": 147,
+"no": "146",
+"name": "ハロクリ"
+},
+{
+"row": 148,
+"no": "147",
+"name": "マイコム（株式会社Coadex）"
+},
+{
+"row": 149,
+"no": "148",
+"name": "株式会社LOCAL CORE"
+},
+{
+"row": 150,
+"no": "149",
+"name": "株式会社REGALI（LEEEP）"
+},
+{
+"row": 151,
+"no": "150",
+"name": "株式会社sharecoto"
+},
+{
+"row": 152,
+"no": "151",
+"name": "株式会社サブスパイア（U-KOMI）"
+},
+{
+"row": 366,
+"no": "365",
+"name": "3MINUTES"
+},
+{
+"row": 367,
+"no": "366",
+"name": "44prod"
+},
+{
+"row": 368,
+"no": "367",
+"name": "8n株式会社"
+},
+{
+"row": 369,
+"no": "368",
+"name": "ASTERISK"
+},
+{
+"row": 370,
+"no": "369",
+"name": "BEAURA株式会社"
+},
+{
+"row": 371,
+"no": "370",
+"name": "BRIDGE SNSアカウントコンサルティング"
+},
+{
+"row": 372,
+"no": "371",
+"name": "CARTA"
+},
+{
+"row": 373,
+"no": "372",
+"name": "Cross Propworks"
+},
+{
+"row": 374,
+"no": "373",
+"name": "CyberAgent"
+},
+{
+"row": 375,
+"no": "374",
+"name": "CyberBuzz"
+},
+{
+"row": 376,
+"no": "375",
+"name": "D2C&Co.株式会社（旧SUPER STUDIO）"
+},
+{
+"row": 377,
+"no": "376",
+"name": "ECキャスティング"
+},
+{
+"row": 378,
+"no": "377",
+"name": "ENTUM"
+},
+{
+"row": 379,
+"no": "378",
+"name": "Embedsocial Japan株式会社（EmbedSocial）"
+},
+{
+"row": 380,
+"no": "379",
+"name": "FIS株式会社"
+},
+{
+"row": 381,
+"no": "380",
+"name": "FrontSupport"
+},
+{
+"row": 382,
+"no": "381",
+"name": "GANGAN株式会社"
+},
+{
+"row": 383,
+"no": "382",
+"name": "GAOOPLUS"
+},
+{
+"row": 384,
+"no": "383",
+"name": "GENESISONE"
+},
+{
+"row": 385,
+"no": "384",
+"name": "GLOBAL LINK JAPAN, Inc."
+},
+{
+"row": 386,
+"no": "385",
+"name": "GMOトライハッチ株式会社"
+},
+{
+"row": 387,
+"no": "386",
+"name": "HORIPRO DIGITAL ENTERTAINMENT"
+},
+{
+"row": 388,
+"no": "387",
+"name": "HUITMORE"
+},
+{
+"row": 389,
+"no": "388",
+"name": "Hakuhodo DY holdings"
+},
+{
+"row": 390,
+"no": "389",
+"name": "KETER"
+},
+{
+"row": 391,
+"no": "390",
+"name": "LMND（レモネード）"
+},
+{
+"row": 392,
+"no": "391",
+"name": "Li:start"
+},
+{
+"row": 393,
+"no": "392",
+"name": "Licore"
+},
+{
+"row": 394,
+"no": "393",
+"name": "MUGENDAI"
+},
+{
+"row": 395,
+"no": "394",
+"name": "MUSCAT Group"
+},
+{
+"row": 396,
+"no": "395",
+"name": "Members"
+},
+{
+"row": 397,
+"no": "396",
+"name": "NEIT株式会社"
+},
+{
+"row": 398,
+"no": "397",
+"name": "Native Story株式会社（nagosta!）"
+},
+{
+"row": 399,
+"no": "398",
+"name": "Naviプラスレビュー"
+},
+{
+"row": 400,
+"no": "399",
+"name": "Nuts&Chip"
+},
+{
+"row": 401,
+"no": "400",
+"name": "ProjectHoldings"
+},
+{
+"row": 402,
+"no": "401",
+"name": "Reve"
+},
+{
+"row": 403,
+"no": "402",
+"name": "RichLink（株式会社リッチリンク）"
+},
+{
+"row": 404,
+"no": "403",
+"name": "SEPTENI"
+},
+{
+"row": 405,
+"no": "404",
+"name": "SHUTTLEROCK"
+},
+{
+"row": 406,
+"no": "405",
+"name": "Shuttlerock for EC"
+},
+{
+"row": 407,
+"no": "406",
+"name": "Social Pit"
+},
+{
+"row": 408,
+"no": "407",
+"name": "SocialWire"
+},
+{
+"row": 409,
+"no": "408",
+"name": "Studio Candy Foxx"
+},
+{
+"row": 410,
+"no": "409",
+"name": "Talema."
+},
+{
+"row": 411,
+"no": "410",
+"name": "Trenders"
+},
+{
+"row": 412,
+"no": "411",
+"name": "Unity株式会社"
+},
+{
+"row": 413,
+"no": "412",
+"name": "VARK SHORTS Corporate Plan"
+},
+{
+"row": 414,
+"no": "413",
+"name": "WWS"
+},
+{
+"row": 415,
+"no": "414",
+"name": "Wave"
+},
+{
+"row": 416,
+"no": "415",
+"name": "Weeva"
+},
+{
+"row": 417,
+"no": "416",
+"name": "comnico"
+},
+{
+"row": 418,
+"no": "417",
+"name": "groove"
+},
+{
+"row": 419,
+"no": "418",
+"name": "malna（マルナ）"
+},
+{
+"row": 420,
+"no": "419",
+"name": "ulysses"
+},
+{
+"row": 421,
+"no": "420",
+"name": "upd8"
+},
+{
+"row": 422,
+"no": "421",
+"name": "アイランド株式会社（Foodist Navi）"
+},
+{
+"row": 423,
+"no": "422",
+"name": "アウモ株式会社（aumoマイビジネス）"
+},
+{
+"row": 424,
+"no": "423",
+"name": "アシモト"
+},
+{
+"row": 425,
+"no": "424",
+"name": "アットファンズ・マーケティング"
+},
+{
+"row": 426,
+"no": "425",
+"name": "アールエフキャリア株式会社"
+},
+{
+"row": 427,
+"no": "426",
+"name": "ウェブ担さん"
+},
+{
+"row": 428,
+"no": "427",
+"name": "エッジニア合同会社（＃foodicle）"
+},
+{
+"row": 429,
+"no": "428",
+"name": "エッセンシャルショート"
+},
+{
+"row": 430,
+"no": "429",
+"name": "オンラインアシスタント フジ子さん"
+},
+{
+"row": 431,
+"no": "430",
+"name": "キナバル株式会社"
+},
+{
+"row": 432,
+"no": "431",
+"name": "ココナラアシスト"
+},
+{
+"row": 433,
+"no": "432",
+"name": "コードスリーコネクト"
+},
+{
+"row": 434,
+"no": "433",
+"name": "ゴールデンモンキー"
+},
+{
+"row": 435,
+"no": "434",
+"name": "スタッツ株式会社"
+},
+{
+"row": 436,
+"no": "435",
+"name": "セレブギフト"
+},
+{
+"row": 437,
+"no": "436",
+"name": "ソーシャル・アイディー株式会社（旅アトリーチ）"
+},
+{
+"row": 438,
+"no": "437",
+"name": "タイムチケット"
+},
+{
+"row": 439,
+"no": "438",
+"name": "トーフアナリティクス（Tofu Analytics）"
+},
+{
+"row": 440,
+"no": "439",
+"name": "ドリップ（Drip）"
+},
+{
+"row": 441,
+"no": "440",
+"name": "ハイブリッドバンク"
+},
+{
+"row": 442,
+"no": "441",
+"name": "ファンベスト（Fanvest）"
+},
+{
+"row": 443,
+"no": "442",
+"name": "フォロワー1万人つくるくん for TikTok"
+},
+{
+"row": 444,
+"no": "443",
+"name": "プロレスリングシバター"
+},
+{
+"row": 445,
+"no": "444",
+"name": "ルートキャスティング"
+},
+{
+"row": 446,
+"no": "445",
+"name": "有限会社Frida"
+},
+{
+"row": 447,
+"no": "446",
+"name": "有限会社サイバーウェーブ"
+},
+{
+"row": 448,
+"no": "447",
+"name": "株式会社AGES"
+},
+{
+"row": 449,
+"no": "448",
+"name": "株式会社D2C・グループ"
+},
+{
+"row": 450,
+"no": "449",
+"name": "株式会社GO RIDE"
+},
+{
+"row": 451,
+"no": "450",
+"name": "株式会社GOLD CAST"
+},
+{
+"row": 452,
+"no": "451",
+"name": "株式会社Gushcloud Japan"
+},
+{
+"row": 453,
+"no": "452",
+"name": "株式会社IW"
+},
+{
+"row": 454,
+"no": "453",
+"name": "株式会社L by T"
+},
+{
+"row": 455,
+"no": "454",
+"name": "株式会社One's Pal"
+},
+{
+"row": 456,
+"no": "455",
+"name": "株式会社PRIZMA"
+},
+{
+"row": 457,
+"no": "456",
+"name": "株式会社Phlox"
+},
+{
+"row": 458,
+"no": "457",
+"name": "株式会社Proteinum"
+},
+{
+"row": 459,
+"no": "458",
+"name": "株式会社RATEL"
+},
+{
+"row": 460,
+"no": "459",
+"name": "株式会社Refine"
+},
+{
+"row": 461,
+"no": "460",
+"name": "株式会社RetaAgora"
+},
+{
+"row": 462,
+"no": "461",
+"name": "株式会社ReviCo（ReviCo）"
+},
+{
+"row": 463,
+"no": "462",
+"name": "株式会社Tsun"
+},
+{
+"row": 464,
+"no": "463",
+"name": "株式会社UnReact"
+},
+{
+"row": 465,
+"no": "464",
+"name": "株式会社ZIK"
+},
+{
+"row": 466,
+"no": "465",
+"name": "株式会社maipple"
+},
+{
+"row": 467,
+"no": "466",
+"name": "株式会社moovy"
+},
+{
+"row": 468,
+"no": "467",
+"name": "株式会社wonderX"
+},
+{
+"row": 469,
+"no": "468",
+"name": "株式会社ふたつぶ"
+},
+{
+"row": 470,
+"no": "469",
+"name": "株式会社アイサーチマーケティングジャパン"
+},
+{
+"row": 471,
+"no": "470",
+"name": "株式会社アングルクリエイト"
+},
+{
+"row": 472,
+"no": "471",
+"name": "株式会社カンナート（TORICOM）"
+},
+{
+"row": 473,
+"no": "472",
+"name": "株式会社カンマン"
+},
+{
+"row": 474,
+"no": "473",
+"name": "株式会社ココウェル"
+},
+{
+"row": 475,
+"no": "474",
+"name": "株式会社ココチエ"
+},
+{
+"row": 476,
+"no": "475",
+"name": "株式会社サウスポー（第２広報室）"
+},
+{
+"row": 477,
+"no": "476",
+"name": "株式会社シーザスターズ（SOTORECIPE KITCHEN）"
+},
+{
+"row": 478,
+"no": "477",
+"name": "株式会社チャージ"
+},
+{
+"row": 479,
+"no": "478",
+"name": "株式会社デジタルホールディングス"
+},
+{
+"row": 480,
+"no": "479",
+"name": "株式会社トラエル"
+},
+{
+"row": 481,
+"no": "480",
+"name": "株式会社パルスメント"
+},
+{
+"row": 482,
+"no": "481",
+"name": "株式会社ラントリップ（Runtrip）"
+},
+{
+"row": 483,
+"no": "482",
+"name": "株式会社リファインド（Influencer Marketing Tokyo）"
+},
+{
+"row": 484,
+"no": "483",
+"name": "株式会社リブテラス"
+},
+{
+"row": 485,
+"no": "484",
+"name": "株式会社レゾラム（Lesolam）"
+},
+{
+"row": 486,
+"no": "485",
+"name": "株式会社最強"
+},
+{
+"row": 487,
+"no": "486",
+"name": "株式会社美手紙"
+}
+]
