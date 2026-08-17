@@ -94,25 +94,69 @@ miwataさん所有の共有アタックリストには一切書き込まない�
   - クラウドセッションでは gog を使う（`gog --account yuki.katayama@fout.jp sheets append ...`）
 - Slack MCP（S級通知・全媒体ブロック通知。自分宛DM）
 
-## 実行環境の制約（2026-08-17 実測）
+## クラウド実行（2026-08-17 に疎通確認済み）
 
-**このルーティンは会社Mac（Claude in Chrome あり）でしか完走しない。**
+このルーティンは Claude Code on the web のクラウド Routine として登録済み。
+Mac の起動状態に依存せず発火する。
 
-Claude Code on the web のクラウドセッションで動かそうとすると、
-ステップ1の収集が**ネットワークegressポリシーで全滅**する:
+- Routine ID: `trig_01Q8Xqaxpd4jW9tYPWxd21og`
+- cron: `7 0 * * 1-5`（UTC）= 平日 09:07 JST
+- 発火のたびに**新規セッション**が立ち、デフォルトブランチ
+  `claude/awesome-gauss-fyg4nw` をクローンする。
+  そこに `.claude/hooks/session-start.sh` があるので gog は自動セットアップされる
 
-| ドメイン | クラウドからの到達性 |
+### ネットワーク設定（この設定が消えると収集が全滅する）
+
+環境 `Default`（`env_01XFS6mDoxh5dpWpLnUPVqK2`）の **Network access = Custom**。
+`Allowed domains` に以下を登録し、
+**「Also include default list of common package managers」にチェックを入れてある**。
+
+```
+xn--pckua2a7gp15o89zb.com
+*.xn--pckua2a7gp15o89zb.com
+jp.stanby.com
+*.stanby.com
+jp.indeed.com
+```
+
+チェックを外すと既定の Trusted ドメイン（`googleapis.com` を含む）ごと遮断され、
+収集どころか gog の Sheets 書き込みまで止まる。Custom は「追加」ではなく
+「置き換え＋チェックで既定を足し戻す」挙動である点に注意。
+
+設定場所は claude.ai/code のメッセージ欄の上にあるクラウドアイコン →
+環境にホバー → 歯車。**設定ページからは辿れず、直URLも無い。**
+
+### WebFetch は使えない。curl を使う
+
+同じ許可設定でも挙動が割れる（実測）:
+
+| 手段 | 結果 |
 |---|---|
-| `xn--pckua2a7gp15o89zb.com`（求人ボックス） | ❌ `EGRESS_BLOCKED` |
-| `jp.stanby.com`（スタンバイ） | ❌ `EGRESS_BLOCKED` |
-| `jp.indeed.com` | ❌ `EGRESS_BLOCKED` |
-| `web_search` | ✅ 動くが、本日新着の絞り込みができず社名も取れないため収集の代替にならない |
+| `curl`（Bash） | ✅ 200。求人ボックス・スタンバイとも取得できる |
+| `WebFetch` | ❌ `EGRESS_BLOCKED` のまま |
+| `jp.indeed.com` | ⚠️ curl で 403（Indeed側のbot検知。egress遮断ではない）→ 実質使えない |
 | gog（Sheets 読み書き） | ✅ 動く |
 
-つまりクラウドでは**書き込みだけでき、収集ができない**。
-クラウドRoutine化したい場合は、環境のネットワークポリシーで上記ドメインを
-許可リストに追加する必要がある（Claude Code on the web の環境設定で変更する。
-参照: https://code.claude.com/docs/en/claude-code-on-the-web ）。
+収集は必ず Bash + curl で行う。WebFetch の結果を見て
+「ブロックされている」と判断しないこと。
 
-この制約は「CAPTCHA検出時は当日スキップ」とは別物。
-ポリシーによる遮断なので**毎日必ず失敗する**。リトライしても回復しない。
+### 検証済みの収集手順
+
+```bash
+UA='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36'
+B='https://xn--pckua2a7gp15o89zb.com/Meta%E5%BA%83%E5%91%8A%E9%81%8B%E7%94%A8%E3%81%AE%E4%BB%95%E4%BA%8B'
+curl -sS --max-time 30 -A "$UA" "$B?e=1&u=1&f=9&pg=1" -o page1.html
+```
+
+- URLの形は `/<キーワード>の仕事?e=1&u=1&f=9`（キーワードはURLエンコード）
+- **語間にスペースを入れると 301 になる。**「Meta広告 運用」ではなく「Meta広告運用」と繋げる
+- ページングは `&pg=N`。1ページ25件。実測では3ページで打ち止め（56社ユニーク）
+- **ページ間に重複がある**（p1∩p2 = 9社）ので、実行内で必ず名寄せする
+
+抽出は文書順に `p-result_title_link` → `p-result_companyName` が並ぶ構造を利用する
+（`p-result_new` があれば新着）。抽出0件ならセレクタ変更を疑い、
+**憶測で埋めずに「要メンテ」と報告して止まる**こと。
+
+### 2026-08-17 の実測ベースライン
+求人ボックス1ページ目25件 → ledger 93社と突合 → **新規11社**。
+桁が大きく違う日は収集かdedupのどちらかが壊れている。
