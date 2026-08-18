@@ -1,0 +1,516 @@
+<title>資金は金融へ動いたか</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --paper:#eef0f2; --card:#fbfbfc; --card-2:#f4f5f7;
+  --ink:#14171b; --ink-2:#4d545d; --ink-3:#7b838d;
+  --rule:#dcdfe4; --rule-2:#c6cad1;
+  --accent:#184f95; --accent-soft:#e3ecf8;
+  --pos:#2a78d6; --neg:#e34948;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300;
+  --ref:#8d949d;
+  --grid:#e6e8ec;
+  --shadow:0 1px 2px rgba(20,23,27,.05), 0 8px 24px -18px rgba(20,23,27,.35);
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --paper:#0e0f11; --card:#1a1a19; --card-2:#212220;
+    --ink:#f3f3f0; --ink-2:#aeb2b6; --ink-3:#82878d;
+    --rule:#2c2d2c; --rule-2:#3a3b3a;
+    --accent:#3987e5; --accent-soft:#152840;
+    --pos:#3987e5; --neg:#e66767;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300;
+    --ref:#7d838a;
+    --grid:#282928;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -20px rgba(0,0,0,.9);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --paper:#0e0f11; --card:#1a1a19; --card-2:#212220;
+  --ink:#f3f3f0; --ink-2:#aeb2b6; --ink-3:#82878d;
+  --rule:#2c2d2c; --rule-2:#3a3b3a;
+  --accent:#3987e5; --accent-soft:#152840;
+  --pos:#3987e5; --neg:#e66767;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300;
+  --ref:#7d838a;
+  --grid:#282928;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -20px rgba(0,0,0,.9);
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+  font-weight:400; line-height:1.75; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px 96px}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+.num{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+
+/* ---------- header ---------- */
+header.top{padding:56px 0 28px;border-bottom:1px solid var(--rule-2)}
+.eyebrow{
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);margin:0 0 20px;display:flex;flex-wrap:wrap;gap:8px 18px
+}
+h1{
+  font-family:"Shippori Mincho B1","Hiragino Mincho ProN",serif;font-weight:700;
+  font-size:clamp(36px,6.2vw,62px);line-height:1.18;letter-spacing:.01em;
+  margin:0 0 18px;text-wrap:balance;
+}
+.standfirst{max-width:62ch;font-size:16.5px;color:var(--ink-2);margin:0 0 30px}
+.standfirst strong{color:var(--ink);font-weight:500}
+
+/* ticker tape */
+.tape{display:grid;grid-template-columns:repeat(6,1fr);border-top:1px solid var(--rule);border-left:1px solid var(--rule);margin-top:4px}
+@media(max-width:820px){.tape{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:520px){.tape{grid-template-columns:repeat(3,1fr)}}
+.tape .t{
+  padding:11px 12px 12px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  display:flex;flex-direction:column;gap:2px;min-width:0;
+}
+.tape .sym{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--ink-2)}
+.tape .val{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:500;font-variant-numeric:tabular-nums}
+.up{color:var(--pos)} .down{color:var(--neg)}
+.tip .tv.up,.tip .tv.down,.legend .lval.up,.legend .lval.down{color:var(--ink)}
+
+/* ---------- verdict ---------- */
+section{padding:44px 0;border-bottom:1px solid var(--rule)}
+.kicker{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 10px;display:block
+}
+h2{
+  font-family:"Shippori Mincho B1",serif;font-weight:700;font-size:clamp(22px,3vw,29px);
+  line-height:1.35;margin:0 0 10px;text-wrap:balance
+}
+.lede{max-width:64ch;color:var(--ink-2);font-size:15.5px;margin:0 0 26px}
+.lede strong{color:var(--ink);font-weight:500}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:0 0 28px}
+.tile{background:var(--card);border:1px solid var(--rule);border-radius:3px;padding:18px 18px 16px;box-shadow:var(--shadow)}
+.tile .lab{font-size:12.5px;color:var(--ink-2);margin:0 0 6px;letter-spacing:.02em}
+.tile .big{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:34px;font-weight:500;line-height:1.05;letter-spacing:-.02em}
+.tile .sub{font-size:11.5px;color:var(--ink-3);margin-top:7px;font-family:"IBM Plex Mono",monospace}
+
+.verdict{display:grid;grid-template-columns:1fr;gap:0;border:1px solid var(--rule);border-radius:3px;overflow:hidden;background:var(--card)}
+@media(min-width:760px){.verdict{grid-template-columns:1fr 1fr}}
+.verdict > div{padding:20px 22px}
+.verdict > div + div{border-top:1px solid var(--rule)}
+@media(min-width:760px){.verdict > div + div{border-top:0;border-left:1px solid var(--rule)}}
+.vhead{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.badge{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;letter-spacing:.1em;
+  padding:3px 8px;border-radius:2px;text-transform:uppercase
+}
+.badge.yes{background:var(--accent-soft);color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent)}
+.badge.no{background:color-mix(in srgb,var(--neg) 12%,transparent);color:var(--neg);border:1px solid color-mix(in srgb,var(--neg) 35%,transparent)}
+.vtitle{font-weight:700;font-size:15.5px}
+.verdict p{margin:0;font-size:14.5px;color:var(--ink-2)}
+
+/* ---------- chart shell ---------- */
+.card{background:var(--card);border:1px solid var(--rule);border-radius:3px;box-shadow:var(--shadow);padding:20px 18px 16px}
+.chartbox{position:relative;overflow-x:auto}
+svg.chart{display:block;width:100%;height:auto;min-width:560px;touch-action:pan-y}
+.axis text{font-family:"IBM Plex Mono",monospace;font-size:11px;fill:var(--ink-3)}
+.gridline{stroke:var(--grid);stroke-width:1}
+.zeroline{stroke:var(--rule-2);stroke-width:1.5}
+.serieline{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.refline{fill:none;stroke:var(--ref);stroke-width:2;stroke-dasharray:5 4}
+.endlab{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:600;fill:var(--ink)}
+.annot{font-family:"IBM Plex Mono",monospace;font-size:11px;fill:var(--ink-2)}
+.annotline{stroke:var(--rule-2);stroke-width:1;stroke-dasharray:3 3}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 8px;margin:14px 0 0;padding:0;list-style:none}
+.legend li{
+  display:flex;align-items:center;gap:8px;padding:6px 11px 6px 9px;border:1px solid var(--rule);
+  border-radius:2px;background:var(--card-2);font-size:12.5px;cursor:default
+}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 0 2px var(--card)}
+.dash{width:14px;height:0;border-top:2px dashed var(--ref);flex:none}
+.legend .lsym{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:12px;letter-spacing:.04em}
+.legend .lval{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:12.5px;margin-left:2px;color:var(--ink)}
+.legend .lname{color:var(--ink-3);font-size:11.5px}
+@media(max-width:560px){.legend .lname{display:none}}
+
+.tip{
+  position:absolute;pointer-events:none;opacity:0;transition:opacity .1s;z-index:5;
+  background:var(--card);border:1px solid var(--rule-2);border-radius:3px;padding:9px 11px;
+  box-shadow:0 4px 18px -6px rgba(0,0,0,.3);font-size:12px;min-width:150px
+}
+.tip .tdate{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3);margin-bottom:6px;letter-spacing:.04em}
+.tip .trow{display:flex;align-items:center;gap:7px;line-height:1.7}
+.tip .trow .tk{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:11.5px;min-width:34px}
+.tip .trow .tv{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;margin-left:auto;padding-left:14px;font-size:12px;color:var(--ink)}
+
+/* ---------- bars ---------- */
+.barpanels{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:820px){.barpanels{grid-template-columns:1fr 1fr}}
+.panelhead{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--rule)}
+.panelhead h3{font-family:"Shippori Mincho B1",serif;font-size:16px;font-weight:700;margin:0}
+.panelhead .ph-sub{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+.grouplab{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink-3);margin:16px 0 7px;padding-bottom:4px;border-bottom:1px dotted var(--rule-2)
+}
+.grouplab:first-of-type{margin-top:0}
+.bar{display:grid;grid-template-columns:46px 1fr 58px;align-items:center;gap:10px;padding:3px 0;border-radius:2px}
+.bar:hover{background:var(--card-2)}
+.bar .bsym{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--ink-2)}
+.track{position:relative;height:16px}
+.track .zero{position:absolute;top:-2px;bottom:-2px;width:1px;background:var(--rule-2)}
+.track .fill{position:absolute;top:0;height:16px;background:var(--pos);border-radius:0 4px 4px 0}
+.track .fill.neg{background:var(--neg);border-radius:4px 0 0 4px}
+.bar .bval{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:12.5px;text-align:right}
+
+/* ---------- table ---------- */
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:13px}
+th,td{padding:9px 14px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--rule)}
+th{
+  font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:500;background:var(--card-2);position:sticky;top:0
+}
+th:first-child,td:first-child{text-align:left}
+td.sym{font-family:"IBM Plex Mono",monospace;font-weight:600;letter-spacing:.04em}
+td.nm{text-align:left;color:var(--ink-2);font-size:12.5px}
+td.n{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+tbody tr:hover{background:var(--card-2)}
+tbody tr.grpstart td{border-top:1px solid var(--rule-2)}
+tr:last-child td{border-bottom:0}
+
+/* ---------- notes ---------- */
+.notes{display:grid;grid-template-columns:1fr;gap:22px}
+@media(min-width:760px){.notes{grid-template-columns:1fr 1fr}}
+.note h4{font-size:14px;margin:0 0 7px;font-weight:700}
+.note p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.8}
+.note ul{margin:0;padding-left:1.15em;font-size:13.5px;color:var(--ink-2);line-height:1.8}
+.note li{margin-bottom:5px}
+footer{padding:30px 0 0;font-size:12px;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;line-height:1.9}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">
+    <span>2026-05-18 → 2026-08-17</span><span>64 営業日</span><span>終値・配当除く</span><span>米大手銀行 / 投資銀行 12 銘柄</span>
+  </p>
+  <h1>資金は金融へ動いたか</h1>
+  <p class="standfirst">
+    仮説は「最近、金融・バリュー株に資金が移動しているのではないか」。
+    米メガバンク4行・投資銀行2社に、金融セクターETF・地銀ETF・市場全体・バリュー／グロースの
+    ベンチマークを並べ、直近3ヶ月の値動きを<strong>同じ起点=0%に揃えて</strong>比べた。
+    結論から言うと、3ヶ月では仮説はきれいに当たっている。ただし<strong>直近1ヶ月は逆に回っている</strong>。
+  </p>
+  <div class="tape" id="tape"></div>
+</header>
+
+<section>
+  <span class="kicker">Verdict</span>
+  <h2>3ヶ月では当たり、直近1ヶ月では外れ</h2>
+  <p class="lede">
+    銀行6銘柄を均等加重したバスケットは3ヶ月で <strong>+16.9%</strong>、同期間の S&amp;P500 は <strong>+4.6%</strong>。
+    スタイル面でもバリューがグロースを <strong>9.5pt</strong> 上回った。資金移動の痕跡としては十分に大きい。
+  </p>
+  <div class="tiles" id="tiles"></div>
+  <div class="verdict">
+    <div>
+      <div class="vhead"><span class="badge yes">支持</span><span class="vtitle">3ヶ月スパン</span></div>
+      <p>銀行・投資銀行の全6銘柄が S&amp;P500 を上回り、最下位の GS(+11.1%) ですら市場の2倍以上。
+         金融セクターETF(XLF)は市場を +6.7pt、バリューはグロースを +9.5pt 上回った。
+         個別銘柄の物色ではなく、セクター／スタイル単位で資金が入っている形。</p>
+    </div>
+    <div>
+      <div class="vhead"><span class="badge no">失速</span><span class="vtitle">直近1ヶ月</span></div>
+      <p>7/29 にバリュー超過は +15.3pt でピークを打ち、そこから <strong>-5.8pt</strong> 縮んだ。
+         直近1ヶ月では QQQ(+5.0%) が XLF(+2.4%) を上回り、GS はマイナス。
+         「金融へのローテーション」は3ヶ月の大半で起きたが、8月に入って巻き戻している。</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="kicker">Chart 01 — Indexed performance</span>
+  <h2>同じ起点に揃えた3ヶ月の値動き</h2>
+  <p class="lede">
+    2026-05-18 の終値を 0% とした累積騰落率。灰色の破線は S&amp;P500(SPY)。
+    6銘柄すべてが破線の上を走り、6月上旬と7月中旬に2段階で差が開いている。
+  </p>
+  <div class="card">
+    <div class="chartbox"><svg class="chart" id="c1" role="img" aria-label="米大手銀行6銘柄とS&amp;P500の3ヶ月累積騰落率"></svg><div class="tip" id="t1"></div></div>
+    <ul class="legend" id="l1"></ul>
+  </div>
+</section>
+
+<section>
+  <span class="kicker">Chart 02 — Rotation spread</span>
+  <h2>ローテーションの強さと、その巻き戻し</h2>
+  <p class="lede">
+    仮説を直接ぶつける2本。<strong>バリュー − グロース</strong>(IWD−IWF) と <strong>金融 − 市場全体</strong>(XLF−SPY) の累積差。
+    上向きなら資金が金融・バリューへ寄っている。どちらも7月末にピークを打ち、そこから明確に縮んでいる。
+  </p>
+  <div class="card">
+    <div class="chartbox"><svg class="chart" id="c2" role="img" aria-label="バリュー超過リターンと金融セクター超過リターンの推移"></svg><div class="tip" id="t2"></div></div>
+    <ul class="legend" id="l2"></ul>
+  </div>
+</section>
+
+<section>
+  <span class="kicker">Chart 03 — Two windows</span>
+  <h2>期間を切ると景色が変わる</h2>
+  <p class="lede">
+    左が3ヶ月、右が直近1ヶ月。並び順は左(3ヶ月)の成績順で固定してある。
+    右で順位が総崩れになっているのが、この仮説にとって一番重要な情報。
+  </p>
+  <div class="barpanels">
+    <div class="card">
+      <div class="panelhead"><h3>3ヶ月</h3><span class="ph-sub">05-18 → 08-17</span></div>
+      <div id="b3"></div>
+    </div>
+    <div class="card">
+      <div class="panelhead"><h3>直近1ヶ月</h3><span class="ph-sub">07-17 → 08-17</span></div>
+      <div id="b1"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="kicker">Data</span>
+  <h2>全12銘柄</h2>
+  <p class="lede">ボラティリティは日次対数リターンの年率換算、最大DDは期間内の終値ベース。</p>
+  <div class="tablewrap"><table id="tbl">
+    <thead><tr><th>銘柄</th><th>名称</th><th>08-17 終値</th><th>3ヶ月</th><th>1ヶ月</th><th>年率ボラ</th><th>最大DD</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+</section>
+
+<section style="border-bottom:0">
+  <span class="kicker">How to read this</span>
+  <h2>読み方と注意点</h2>
+  <div class="notes">
+    <div class="note">
+      <h4>この図が言えること</h4>
+      <ul>
+        <li>金融が買われたのは事実。ただし主役は<strong>メガバンク(BAC +26.0%, JPM +20.0%)</strong>で、投資銀行(GS +11.1%, MS +13.2%)はむしろ見劣りする。「投資銀行に資金が向かった」とは言いにくい。</li>
+        <li>XLF の年率ボラ 13.3% は SPY の 13.7% とほぼ同じ。上げ方が静かで、最大DDも -2.1% と浅い。急騰ではなく<strong>じわ買い</strong>の形。</li>
+        <li>バリュー(IWD)は最大DD -2.4%、グロース(IWF)は -11.4%。3ヶ月のバリュー優位の相当部分は「グロースが6月と7月末に2度叩かれた」ことの裏返しでもある。</li>
+      </ul>
+    </div>
+    <div class="note">
+      <h4>この図が言えないこと</h4>
+      <ul>
+        <li><strong>値動きは資金フローそのものではない</strong>。実際の資金移動を見るならETFのフローデータや投資部門別売買が要る。ここにあるのは価格だけ。</li>
+        <li>3ヶ月という窓の取り方に結果が強く依存する。7/29 で切れば仮説は圧勝、8/17 まで伸ばすと勢いは半減している。</li>
+        <li>配当を含まない価格リターン。銀行株は配当利回りが高いため、トータルリターンで見ると差はもう少し開く方向。</li>
+        <li>7/14 前後の GS の急騰・急落や 7/29 の C の下落など、決算由来の個別要因が混ざっている。</li>
+      </ul>
+    </div>
+  </div>
+  <footer>
+    出典: Google Finance 日次終値 (GOOGLEFINANCE) ／ 取得 2026-08-18<br>
+    起点 2026-05-18 = 0% ／ 全系列 64 営業日で欠損なし ／ 銀行バスケットは JPM・BAC・C・WFC・GS・MS の均等加重
+  </footer>
+</section>
+
+</div>
+<script id="payload" type="application/json">{"dates":["2026-05-15","2026-05-18","2026-05-19","2026-05-20","2026-05-21","2026-05-22","2026-05-26","2026-05-27","2026-05-28","2026-05-29","2026-06-01","2026-06-02","2026-06-03","2026-06-04","2026-06-05","2026-06-08","2026-06-09","2026-06-10","2026-06-11","2026-06-12","2026-06-15","2026-06-16","2026-06-17","2026-06-18","2026-06-22","2026-06-23","2026-06-24","2026-06-25","2026-06-26","2026-06-29","2026-06-30","2026-07-01","2026-07-02","2026-07-06","2026-07-07","2026-07-08","2026-07-09","2026-07-10","2026-07-13","2026-07-14","2026-07-15","2026-07-16","2026-07-17","2026-07-20","2026-07-21","2026-07-22","2026-07-23","2026-07-24","2026-07-27","2026-07-28","2026-07-29","2026-07-30","2026-07-31","2026-08-03","2026-08-04","2026-08-05","2026-08-06","2026-08-07","2026-08-10","2026-08-11","2026-08-12","2026-08-13","2026-08-14","2026-08-17"],"base":"2026-05-18","last":"2026-08-17","m1":"2026-07-17","norm":{"JPM":[-0.97,0.0,-1.67,0.42,0.75,1.88,2.0,-0.48,-1.33,-0.47,-1.38,0.08,0.04,3.38,3.87,3.45,3.98,2.8,4.24,6.65,6.21,10.11,10.88,8.14,10.23,11.11,10.88,11.44,9.42,9.53,8.85,11.09,11.22,12.3,12.8,9.94,11.55,11.88,11.24,14.02,15.36,14.11,13.42,12.68,14.8,15.79,16.35,17.45,18.45,18.81,14.62,16.67,16.98,17.26,18.88,19.46,18.48,18.88,19.64,20.39,21.43,20.74,20.65,20.03],"BAC":[-1.81,0.0,0.02,1.07,1.58,2.19,2.98,0.81,0.16,1.8,1.62,3.53,3.37,6.87,6.19,5.8,7.36,7.6,8.82,10.51,10.22,12.13,11.52,10.87,13.18,14.24,13.89,14.8,14.18,14.18,12.41,15.13,15.86,18.17,18.09,15.01,16.89,17.72,17.38,19.59,21.5,21.31,20.87,19.2,20.77,21.56,20.89,22.41,22.57,23.54,20.48,21.78,22.21,23.26,24.09,24.78,24.28,24.62,25.98,26.26,27.86,26.44,27.22,26.04],"C":[0.83,0.0,-1.99,1.97,2.3,2.19,3.64,2.43,1.85,2.85,5.46,7.23,6.14,10.41,8.22,8.88,10.06,8.96,12.79,14.23,15.36,16.81,17.46,16.87,19.0,18.43,17.3,18.44,15.81,16.4,14.34,14.48,14.35,17.52,15.0,12.24,14.02,15.02,14.95,8.87,10.2,7.6,5.68,5.15,8.52,8.04,7.74,7.99,8.73,8.22,3.86,8.1,8.2,9.12,11.81,12.44,9.32,10.29,10.46,10.91,12.39,13.33,13.82,13.15],"WFC":[-1.28,0.0,0.24,1.94,2.08,2.73,4.24,2.34,3.07,4.26,3.76,6.82,5.8,9.75,10.18,8.86,10.26,10.22,10.8,12.59,11.79,14.36,12.69,10.53,12.73,13.12,13.35,13.94,12.76,12.29,11.12,15.56,14.98,17.59,17.22,15.05,16.86,17.2,17.88,14.68,17.67,18.42,17.67,16.08,17.98,16.2,15.89,16.05,17.35,16.81,12.77,14.87,16.24,18.18,18.85,19.9,17.78,17.32,17.68,17.59,19.58,18.48,19.43,17.71],"GS":[0.22,0.0,-1.86,3.78,4.42,5.32,5.09,5.3,6.55,8.37,10.8,12.49,10.0,15.45,9.76,10.42,9.05,5.8,9.43,12.3,13.72,15.25,16.14,15.87,16.91,15.65,13.79,12.55,7.74,7.8,6.87,7.74,7.89,11.51,10.21,8.8,11.58,11.5,10.52,20.46,21.74,15.76,12.56,11.48,14.71,16.04,13.56,12.14,10.76,9.19,3.63,8.29,7.61,8.53,11.27,12.05,9.11,9.85,9.31,9.3,9.6,10.17,9.83,11.09],"MS":[-0.09,0.0,-1.61,2.64,4.06,4.33,4.71,4.63,5.76,7.95,9.51,11.57,9.06,13.28,9.98,10.15,9.11,7.25,10.36,11.08,13.12,14.6,16.75,15.82,17.85,17.3,14.1,14.71,10.04,9.88,8.49,9.95,11.02,15.26,15.23,13.17,15.28,15.36,14.74,18.15,18.61,13.33,11.84,9.47,12.3,13.39,11.67,11.31,11.35,9.8,5.42,9.01,9.2,9.62,12.64,13.28,10.93,12.27,11.75,11.61,12.95,13.33,12.8,13.24],"XLF":[-1.24,0.0,-1.24,-0.15,-0.02,0.39,0.21,-0.62,-0.91,-0.31,-0.6,-0.54,-1.68,0.87,1.08,0.44,1.39,0.95,1.7,3.09,3.52,5.04,4.46,3.54,3.79,4.14,3.83,3.3,3.54,3.83,3.61,5.88,7.5,8.5,8.33,6.24,7.34,7.67,8.37,8.58,9.32,9.68,8.74,8.31,8.45,8.33,7.9,8.83,9.93,11.33,9.55,10.17,10.05,10.9,11.87,12.1,11.73,11.33,11.73,11.71,11.94,12.6,12.41,11.29],"KRE":[-1.4,0.0,-0.53,1.84,1.9,2.13,3.5,2.44,2.4,2.49,0.57,2.39,-0.06,3.03,3.31,3.59,4.89,5.48,6.52,8.08,6.35,6.73,4.76,5.59,5.99,7.66,8.91,10.09,10.67,10.06,10.2,12.16,10.45,11.25,10.53,7.98,9.91,10.45,10.6,10.42,11.57,14.72,12.91,11.73,11.87,11.31,10.64,11.5,11.19,13.06,12.16,11.75,11.98,13.46,14.61,13.87,12.62,12.21,11.94,13.09,13.93,14.47,14.74,13.94],"SPY":[0.07,0.0,-0.67,0.35,0.55,0.95,1.62,1.6,2.16,2.41,2.69,2.83,2.11,2.5,-0.15,0.08,-0.22,-1.79,-0.12,0.42,2.19,1.58,0.31,1.1,0.78,-0.69,-0.73,-0.59,-1.31,0.32,1.1,0.96,0.83,1.71,1.23,0.91,1.77,2.21,1.42,1.78,2.19,1.63,0.63,0.47,1.3,1.19,-0.06,0.04,0.06,0.3,-1.24,0.41,1.13,2.57,4.42,4.22,4.05,4.69,4.65,4.32,4.58,5.31,5.1,4.61],"QQQ":[0.43,0.0,-0.62,1.03,1.22,1.65,3.46,3.34,4.21,4.59,5.22,5.71,5.43,4.92,-0.12,1.44,0.28,-1.73,1.59,2.19,5.4,3.4,2.36,4.92,4.54,1.1,0.67,1.49,0.09,2.58,4.32,2.73,0.95,2.4,0.5,0.79,2.47,2.78,0.83,1.96,1.68,0.01,-1.49,-1.39,0.44,-0.08,-1.97,-3.07,-3.37,-4.31,-6.25,-3.16,-2.53,-0.82,2.55,1.62,1.24,2.43,2.12,1.78,2.52,3.71,3.57,3.4],"IWD":[-0.21,0.0,-0.41,0.49,0.87,1.57,2.42,2.26,2.3,2.27,2.06,2.86,2.85,3.59,1.61,1.98,2.36,1.1,3.06,4.07,4.78,4.42,3.31,4.09,4.67,3.56,3.58,5.05,4.34,4.33,4.19,4.82,6.08,6.26,6.48,5.39,5.89,6.09,6.43,5.89,6.28,7.22,6.6,6.14,6.35,6.38,5.81,6.69,7.34,8.33,7.24,7.75,8.23,9.27,10.3,10.08,10.08,10.7,11.02,10.85,10.79,11.19,11.13,10.29],"IWF":[0.22,0.0,-0.83,0.45,0.47,0.73,1.26,1.3,2.43,3.02,3.76,3.38,2.04,2.2,-1.14,-0.9,-1.68,-3.55,-2.04,-2.01,0.21,-0.6,-2.01,-0.73,-1.89,-3.46,-3.57,-4.83,-4.08,-1.71,0.06,-0.87,-2.37,-0.89,-2.22,-1.85,-0.64,-0.12,-2.02,-0.7,-0.42,-2.34,-3.8,-3.73,-2.23,-2.56,-4.44,-5.2,-5.62,-6.14,-8.1,-5.37,-4.66,-2.6,0.16,-0.17,-0.48,0.4,0.06,-0.4,0.26,1.26,0.96,0.79]},"basket":[-0.52,0.0,-1.15,1.97,2.53,3.11,3.78,2.5,2.68,4.13,4.96,6.95,5.74,9.86,8.03,7.93,8.3,7.1,9.41,11.23,11.74,13.88,14.24,13.02,14.98,14.97,13.88,14.31,11.66,11.68,10.35,12.33,12.55,15.39,14.76,12.37,14.36,14.78,14.45,15.96,17.51,15.09,13.67,12.34,14.85,15.17,14.35,14.56,14.87,14.39,10.13,13.12,13.41,14.33,16.26,16.98,14.98,15.54,15.8,16.01,17.3,17.08,17.29,16.88],"spreadVG":[-0.43,0.0,0.42,0.04,0.4,0.84,1.16,0.96,-0.13,-0.75,-1.7,-0.52,0.81,1.39,2.75,2.88,4.04,4.65,5.1,6.08,4.57,5.02,5.32,4.82,6.56,7.02,7.15,9.88,8.42,6.04,4.13,5.69,8.45,7.15,8.7,7.24,6.53,6.21,8.45,6.59,6.7,9.56,10.4,9.87,8.58,8.94,10.25,11.89,12.96,14.47,15.34,13.12,12.89,11.87,10.14,10.25,10.56,10.3,10.96,11.25,10.53,9.93,10.17,9.5],"spreadFM":[-1.31,0.0,-0.57,-0.5,-0.57,-0.56,-1.41,-2.22,-3.07,-2.72,-3.29,-3.37,-3.79,-1.63,1.23,0.36,1.61,2.74,1.82,2.67,1.33,3.46,4.15,2.44,3.01,4.83,4.56,3.89,4.85,3.51,2.51,4.92,6.67,6.79,7.1,5.33,5.57,5.46,6.95,6.8,7.13,8.05,8.11,7.84,7.15,7.14,7.96,8.79,9.87,11.03,10.79,9.76,8.92,8.33,7.45,7.88,7.68,6.64,7.08,7.39,7.36,7.29,7.31,6.68],"rows":[{"t":"JPM","name":"JPモルガン・チェース","grp":"bank","px":360.96,"r3":20.03,"r1":5.82,"vol":21.5,"dd":-3.5},{"t":"BAC","name":"バンク・オブ・アメリカ","grp":"bank","px":63.89,"r3":26.04,"r1":4.28,"vol":18.5,"dd":-2.7},{"t":"C","name":"シティグループ","grp":"bank","px":138.51,"r3":13.15,"r1":7.07,"vol":29.2,"dd":-12.7},{"t":"WFC","name":"ウェルズ・ファーゴ","grp":"bank","px":87.54,"r3":17.71,"r1":0.03,"vol":23.5,"dd":-4.8},{"t":"GS","name":"ゴールドマン・サックス","grp":"ib","px":1051.31,"r3":11.09,"r1":-1.31,"vol":38.9,"dd":-14.9},{"t":"MS","name":"モルガン・スタンレー","grp":"ib","px":218.21,"r3":13.24,"r1":1.26,"vol":30.3,"dd":-11.1},{"t":"XLF","name":"金融セクターETF","grp":"etf","px":57.58,"r3":11.29,"r1":2.35,"vol":13.3,"dd":-2.1},{"t":"KRE","name":"地銀ETF","grp":"etf","px":77.39,"r3":13.94,"r1":0.91,"vol":18.7,"dd":-3.7},{"t":"SPY","name":"S&P500","grp":"mkt","px":772.67,"r3":4.61,"r1":3.95,"vol":13.7,"dd":-4.5},{"t":"QQQ","name":"ナスダック100","grp":"mkt","px":729.87,"r3":3.4,"r1":4.97,"vol":25.7,"dd":-11.3},{"t":"IWD","name":"ラッセル1000 バリュー","grp":"style","px":256.62,"r3":10.29,"r1":3.46,"vol":11.0,"dd":-2.4},{"t":"IWF","name":"ラッセル1000 グロース","grp":"style","px":125.08,"r3":0.79,"r1":4.77,"vol":20.8,"dd":-11.4}]}</script>
+<script>
+(function(){
+"use strict";
+var D = JSON.parse(document.getElementById('payload').textContent);
+var NS = 'http://www.w3.org/2000/svg';
+var css = getComputedStyle(document.documentElement);
+function V(n){ return css.getPropertyValue(n).trim(); }
+function el(n,a){ var e=document.createElementNS(NS,n); for(var k in a) e.setAttribute(k,a[k]); return e; }
+function fmt(v,d){ d = (d===undefined?1:d); return (v>0?'+':'') + v.toFixed(d); }
+function md(s){ return s.slice(5).replace('-','/'); }
+var byT = {}; D.rows.forEach(function(r){ byT[r.t]=r; });
+
+/* ---------------- ticker tape ---------------- */
+(function(){
+  var box = document.getElementById('tape');
+  D.rows.forEach(function(r){
+    var d = document.createElement('div'); d.className='t';
+    d.innerHTML = '<span class="sym">'+r.t+'</span><span class="val '+(r.r3>=0?'up':'down')+'">'+fmt(r.r3)+'%</span>';
+    box.appendChild(d);
+  });
+})();
+
+/* ---------------- stat tiles ---------------- */
+(function(){
+  var box = document.getElementById('tiles');
+  var t = [
+    ['銀行株バスケット (6銘柄・均等加重)', D.basket[D.basket.length-1], '3ヶ月 / JPM BAC C WFC GS MS'],
+    ['S&P500 (SPY)', byT.SPY.r3, '3ヶ月 / 同じ期間の市場全体'],
+    ['バリュー超過 (IWD − IWF)', D.spreadVG[D.spreadVG.length-1], '3ヶ月 / 単位は pt', true],
+    ['金融超過 (XLF − SPY)', D.spreadFM[D.spreadFM.length-1], '3ヶ月 / 単位は pt', true]
+  ];
+  t.forEach(function(x){
+    var d = document.createElement('div'); d.className='tile';
+    d.innerHTML = '<p class="lab">'+x[0]+'</p><div class="big '+(x[1]>=0?'up':'down')+'">'+fmt(x[1])+(x[3]?'pt':'%')+'</div><div class="sub">'+x[2]+'</div>';
+    box.appendChild(d);
+  });
+})();
+
+/* ---------------- line chart ---------------- */
+function lineChart(cfg){
+  var svg = document.getElementById(cfg.svg), tip = document.getElementById(cfg.tip);
+  var W=960, H=cfg.h||420, pl=46, pr=72, pt=16, pb=32;
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  var n = D.dates.length, iw = W-pl-pr, ih = H-pt-pb;
+  var all = [];
+  cfg.series.forEach(function(s){ all = all.concat(s.vals); });
+  if(cfg.ref) all = all.concat(cfg.ref.vals);
+  var lo = Math.min.apply(null,all), hi = Math.max.apply(null,all);
+  var step = cfg.step||5;
+  lo = Math.floor(lo/step)*step; hi = Math.ceil(hi/step)*step;
+  function X(i){ return pl + i*iw/(n-1); }
+  function Y(v){ return pt + ih - (v-lo)/(hi-lo)*ih; }
+
+  for(var g=lo; g<=hi+1e-9; g+=step){
+    svg.appendChild(el('line',{x1:pl,x2:W-pr,y1:Y(g),y2:Y(g),class:(Math.abs(g)<1e-9?'zeroline':'gridline')}));
+    var tx = el('text',{x:pl-9,y:Y(g)+4,'text-anchor':'end'}); tx.setAttribute('class','axis');
+    tx.textContent = (g>0?'+':'')+g+(cfg.unit||'%'); svg.appendChild(tx);
+  }
+  var ax = el('g',{class:'axis'});
+  [0,13,26,39,52,n-1].forEach(function(i){
+    var t = el('text',{x:X(i),y:H-10,'text-anchor':(i===0?'start':(i===n-1?'end':'middle'))});
+    t.textContent = md(D.dates[i]); ax.appendChild(t);
+  });
+  svg.appendChild(ax);
+
+  function path(vals){ var p=''; for(var i=0;i<n;i++) p += (i?'L':'M')+X(i).toFixed(1)+' '+Y(vals[i]).toFixed(1); return p; }
+  if(cfg.ref) svg.appendChild(el('path',{d:path(cfg.ref.vals),class:'refline'}));
+  cfg.series.forEach(function(s){ svg.appendChild(el('path',{d:path(s.vals),class:'serieline',stroke:V(s.color)})); });
+
+  /* end labels with collision resolution */
+  var labs = cfg.series.map(function(s){ return {y:Y(s.vals[n-1]), t:s.k, c:s.color}; });
+  if(cfg.ref) labs.push({y:Y(cfg.ref.vals[n-1]), t:cfg.ref.k, c:null});
+  labs.sort(function(a,b){ return a.y-b.y; });
+  for(var i=1;i<labs.length;i++) if(labs[i].y - labs[i-1].y < 14) labs[i].y = labs[i-1].y + 14;
+  var over = labs.length? labs[labs.length-1].y - (pt+ih) : 0;
+  if(over>0) labs.forEach(function(L){ L.y -= over; });
+  labs.forEach(function(L){
+    var g = el('g',{});
+    g.appendChild(el('circle',{cx:W-pr+13,cy:L.y-4,r:4,fill:L.c?V(L.c):V('--ref'),stroke:V('--card'),'stroke-width':2}));
+    var t = el('text',{x:W-pr+22,y:L.y,class:'endlab'}); t.textContent = L.t; g.appendChild(t);
+    svg.appendChild(g);
+  });
+
+  if(cfg.annot) cfg.annot.forEach(function(a){
+    svg.appendChild(el('line',{x1:X(a.i),x2:X(a.i),y1:pt,y2:pt+ih,class:'annotline'}));
+    var t = el('text',{x:X(a.i)+(a.flip?-7:7),y:pt+13,class:'annot','text-anchor':a.flip?'end':'start'});
+    t.textContent = a.text; svg.appendChild(t);
+  });
+
+  /* hover layer */
+  var cross = el('line',{x1:0,x2:0,y1:pt,y2:pt+ih,stroke:V('--rule-2'),'stroke-width':1,opacity:0});
+  svg.appendChild(cross);
+  var dots = el('g',{opacity:0}); svg.appendChild(dots);
+  var hit = el('rect',{x:pl,y:pt,width:iw,height:ih,fill:'transparent'});
+  svg.appendChild(hit);
+  var series = cfg.series.concat(cfg.ref?[{k:cfg.ref.k,vals:cfg.ref.vals,color:'--ref',name:cfg.ref.name}]:[]);
+
+  function show(e){
+    var r = svg.getBoundingClientRect(), sc = r.width/W;
+    var x = (e.clientX - r.left)/sc;
+    var i = Math.round((x-pl)/iw*(n-1)); i = Math.max(0,Math.min(n-1,i));
+    cross.setAttribute('x1',X(i)); cross.setAttribute('x2',X(i)); cross.setAttribute('opacity',1);
+    while(dots.firstChild) dots.removeChild(dots.firstChild);
+    series.forEach(function(s){
+      dots.appendChild(el('circle',{cx:X(i),cy:Y(s.vals[i]),r:4.5,fill:V(s.color),stroke:V('--card'),'stroke-width':2}));
+    });
+    dots.setAttribute('opacity',1);
+    var rows = series.slice().sort(function(a,b){ return b.vals[i]-a.vals[i]; }).map(function(s){
+      return '<div class="trow"><span class="dot" style="background:'+V(s.color)+'"></span><span class="tk">'+s.k+'</span>'+
+             '<span class="tv '+(s.vals[i]>=0?'up':'down')+'">'+fmt(s.vals[i],2)+(cfg.unit||'%')+'</span></div>';
+    }).join('');
+    tip.innerHTML = '<div class="tdate">'+D.dates[i]+'</div>'+rows;
+    tip.style.opacity = 1;
+    var left = X(i)*sc + 16;
+    if(left + tip.offsetWidth > r.width) left = X(i)*sc - tip.offsetWidth - 16;
+    tip.style.left = Math.max(0,left)+'px';
+    tip.style.top = Math.max(0, (pt+6)*sc) + 'px';
+  }
+  function hide(){ tip.style.opacity=0; cross.setAttribute('opacity',0); dots.setAttribute('opacity',0); }
+  svg.addEventListener('pointermove', show);
+  svg.addEventListener('pointerleave', hide);
+
+  /* legend */
+  var ul = document.getElementById(cfg.legend);
+  series.forEach(function(s){
+    var li = document.createElement('li');
+    var mark = (s.color==='--ref') ? '<span class="dash"></span>' : '<span class="dot" style="background:'+V(s.color)+'"></span>';
+    li.innerHTML = mark + '<span class="lsym">'+s.k+'</span><span class="lname">'+s.name+'</span>'+
+                   '<span class="lval '+(s.vals[n-1]>=0?'up':'down')+'">'+fmt(s.vals[n-1])+(cfg.unit||'%')+'</span>';
+    ul.appendChild(li);
+  });
+}
+
+var BANKS = [['JPM','--s1'],['BAC','--s2'],['C','--s3'],['WFC','--s4'],['GS','--s5'],['MS','--s6']];
+lineChart({
+  svg:'c1', tip:'t1', legend:'l1', h:430, step:5,
+  series: BANKS.map(function(b){ return {k:b[0], color:b[1], name:byT[b[0]].name, vals:D.norm[b[0]]}; }),
+  ref: {k:'SPY', name:'S&P500', vals:D.norm.SPY}
+});
+lineChart({
+  svg:'c2', tip:'t2', legend:'l2', h:330, step:3, unit:'pt',
+  series: [
+    {k:'VAL−GRO', color:'--s1', name:'IWD − IWF', vals:D.spreadVG},
+    {k:'FIN−MKT', color:'--s2', name:'XLF − SPY', vals:D.spreadFM}
+  ],
+  annot: [{i:D.spreadVG.indexOf(Math.max.apply(null,D.spreadVG)), text:'7/29 ピーク +15.3pt', flip:true}]
+});
+
+/* ---------------- bars ---------------- */
+var GROUPS = [['bank','メガバンク'],['ib','投資銀行'],['etf','業種ETF'],['mkt','市場全体'],['style','スタイル']];
+function bars(mount, key){
+  var box = document.getElementById(mount);
+  var vals = D.rows.map(function(r){ return r[key]; });
+  var lo = Math.min(0, Math.min.apply(null,vals)), hi = Math.max.apply(null,vals);
+  var span = hi-lo, z = (0-lo)/span*100;
+  var order = D.rows.slice().sort(function(a,b){ return b.r3-a.r3; });
+  GROUPS.forEach(function(g){
+    var rows = order.filter(function(r){ return r.grp===g[0]; });
+    if(!rows.length) return;
+    var h = document.createElement('div'); h.className='grouplab'; h.textContent = g[1]; box.appendChild(h);
+    rows.forEach(function(r){
+      var v = r[key], w = Math.abs(v)/span*100;
+      var d = document.createElement('div'); d.className='bar';
+      d.title = r.t+' '+r.name+' — 終値 '+r.px.toFixed(2)+' / 年率ボラ '+r.vol+'% / 最大DD '+r.dd+'%';
+      d.innerHTML = '<span class="bsym">'+r.t+'</span>'+
+        '<span class="track"><span class="zero" style="left:'+z+'%"></span>'+
+        '<span class="fill'+(v<0?' neg':'')+'" style="left:'+(v<0? z-w : z)+'%;width:'+Math.max(w,0.6)+'%"></span></span>'+
+        '<span class="bval '+(v>=0?'up':'down')+'">'+fmt(v)+'%</span>';
+      box.appendChild(d);
+    });
+  });
+}
+bars('b3','r3'); bars('b1','r1');
+
+/* ---------------- table ---------------- */
+(function(){
+  var tb = document.querySelector('#tbl tbody'), prev=null;
+  D.rows.slice().sort(function(a,b){ return b.r3-a.r3; }).sort(function(a,b){
+    var o = ['bank','ib','etf','mkt','style'];
+    return o.indexOf(a.grp)-o.indexOf(b.grp);
+  }).forEach(function(r){
+    var tr = document.createElement('tr');
+    if(prev && prev!==r.grp) tr.className='grpstart';
+    prev = r.grp;
+    tr.innerHTML = '<td class="sym">'+r.t+'</td><td class="nm">'+r.name+'</td>'+
+      '<td class="n">'+r.px.toFixed(2)+'</td>'+
+      '<td class="n '+(r.r3>=0?'up':'down')+'">'+fmt(r.r3)+'%</td>'+
+      '<td class="n '+(r.r1>=0?'up':'down')+'">'+fmt(r.r1)+'%</td>'+
+      '<td class="n">'+r.vol.toFixed(1)+'%</td>'+
+      '<td class="n">'+r.dd.toFixed(1)+'%</td>';
+    tb.appendChild(tr);
+  });
+})();
+})();
+</script>
