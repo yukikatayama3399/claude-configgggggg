@@ -1,0 +1,15 @@
+{
+  "autoMode": {
+    "environment": [
+      "$defaults",
+      "Organization: FOUT (fout.jp). Primary use of Claude Code: software development plus Google Workspace automation and sales operations (HAWK の商談準備・顧客管理・議事録・提案書).",
+      "Source control: github.com/yukikatayama3399 and all repos under it. Repository visibility: private unless stated otherwise in the conversation.",
+      "Cloud provider(s): Google Cloud (OAuth project 317751427169) for the Google Workspace APIs only. No AWS/Azure infrastructure is managed from here.",
+      "Key internal services: gogcli (gog) is the sanctioned CLI for Google Workspace — Sheets, Docs, Slides, Drive, Gmail, Calendar — acting as yuki.katayama@fout.jp. Read commands (sheets get / docs cat / drive ls / drive search / calendar events / gmail search / slides raw) are routine, expected, and internal; they are not exfiltration.",
+      "Trusted internal domains: *.fout.jp, and the Google Workspace tenant for fout.jp (docs.google.com, drive.google.com, sheets.google.com, calendar.google.com, mail.google.com) accessed as yuki.katayama@fout.jp.",
+      "Sensitive data locations & audiences: customer-facing documents and sales prospect records held in the team's Google Drive. Their audience is fout.jp staff via Google Workspace and this private repository only — never a public repo, gist, paste service, or third-party API.",
+      "Secrets management: credentials reach this environment through session environment variables and CI secrets. Their values must never be printed into the transcript, written to a file in the repo, or committed.",
+      "Additional context: this repo is configuration and automation scripts, not a production service. There is no production deploy target, no IaC, and no CI/CD pipeline that ships customer-facing code from it."
+    ]
+  }
+}

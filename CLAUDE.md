@@ -195,3 +195,75 @@ Cloud Console の「対象」画面にある2つのボタンは**どちらも押
 会社の情シスポリシー次第では問題になり得るし、
 fout.jp 側でサードパーティアプリのアクセスが制限されると一斉に止まる。
 恒久運用するなら会社側プロジェクトへの移設を検討する余地がある。
+
+## 許可プロンプトを減らす設定（auto モード向け）
+
+### この環境の前提（auto モードの分類器向けコンテキスト）
+
+Claude Code の auto モードは、分類器がデフォルトで
+**「作業ディレクトリと、そのリポジトリのリモート」しか信頼しない**。
+それ以外は全部「外部＝データ流出先候補」として扱われるので、
+社内の当たり前の操作でも止まる。分類器は CLAUDE.md も読むため、
+ここに環境を書いておくと誤検知が減る。
+
+- **組織**: FOUT（fout.jp）。用途はソフトウェア開発に加えて、
+  Google Workspace 自動化と営業オペレーション（HAWK の商談準備・顧客管理・議事録・提案書）。
+- **ソース管理**: `github.com/yukikatayama3399` 配下。特記なき限り private。
+- **クラウド**: Google Cloud（OAuth プロジェクト 317751427169）を
+  Google Workspace API のためだけに使用。AWS/Azure のインフラはここから触らない。
+- **主要な社内サービス**: gogcli（`gog`）が Google Workspace
+  （Sheets / Docs / Slides / Drive / Gmail / Calendar）への正規の CLI で、
+  `yuki.katayama@fout.jp` として動作する。
+  読み取り系（`sheets get` / `docs cat` / `drive ls` / `drive search` /
+  `calendar events` / `gmail search` / `slides raw`）は日常業務であって流出ではない。
+- **信頼する社内ドメイン**: `*.fout.jp`、および
+  `yuki.katayama@fout.jp` としてアクセスする fout.jp の Google Workspace テナント。
+- **機微データの所在と共有先**: 社内 Google Drive 上の顧客関連ドキュメントと営業リード情報。
+  共有先は Google Workspace 上の fout.jp 社内とこの private リポジトリのみ。
+  **public リポジトリ / gist / paste サービス / サードパーティ API には出さない。**
+  （具体的なフォルダ名・ファイル名はここには書かない。リポジトリに
+  顧客データの棚卸しを残さないため。分類器への効果はこの粒度で十分。）
+- **シークレット管理**: 認証情報はセッション環境変数と CI シークレットで供給される。
+  **値をトランスクリプトに出力したり、リポジトリ内のファイルに書いたり、コミットしたりしない。**
+- **その他**: このリポジトリは設定と自動化スクリプトであって本番サービスではない。
+  本番デプロイ先も IaC も、顧客向けコードを出す CI/CD も無い。
+
+### 設定ファイルの置き場所（重要：3箇所で役割が違う）
+
+| 置き場所 | 何を書くか | 効く範囲 |
+|---|---|---|
+| `.claude/settings.json`（このリポジトリ） | `permissions.allow` の読み取り系許可リスト | クラウド・ローカル両方 ✅ |
+| `CLAUDE.md`（このファイル） | 上の「環境の前提」 | クラウド・ローカル両方 ✅ |
+| `~/.claude/settings.json` | `autoMode.environment` | **ユーザー設定と managed settings のみ** |
+
+**`autoMode` はプロジェクトの `.claude/settings.json` からは読まれない。**
+リポジトリ側が勝手に自分を信頼させるのを防ぐため、意図的に無視される
+（v2.1.207 以降は `.claude/settings.local.json` も対象外）。
+なのでリポジトリに `automode-settings.json` として定義を置き、
+`apply_automode_settings.sh` で `~/.claude/settings.json` へ写す方式にしている。
+
+```bash
+bash apply_automode_settings.sh          # マージ（会社 Mac では一度だけでよい）
+bash apply_automode_settings.sh --check  # 差分確認のみ
+claude auto-mode config                  # 実効ルールを確認
+```
+
+### 注意: Claude 自身はこのマージを実行できない
+
+`apply_automode_settings.sh` の実行と `automode-settings.json` の編集は、
+auto モードの分類器が **「エージェントが自分の権限・監督設定を変更する」**
+カテゴリとしてブロックする（仕様どおりの挙動）。
+**このスクリプトは人間が実行すること。** Claude に代行させようとしても止まる。
+
+### モードについて（調査結果 2026-08-19 / v2.1.235）
+
+- クラウド（claude.ai/code）で選べるのは **Accept edits / Plan / Auto** のみ。
+  `bypassPermissions` と `dontAsk` は Web では選べず、
+  設定ファイルに書いても**黙って無視される**。
+  つまり **`auto` がクラウドで最もゆるいモード**。
+- ローカル CLI なら `claude --dangerously-skip-permissions` で
+  `bypassPermissions` が使える（コンテナ/VM 内に限る）。
+- 逆に確認を挟みたい操作は `permissions.ask` に書く。
+  ask ルールは分類器より先に評価され、auto モードでも必ず止まる。
+- ブロックされた履歴は `/permissions` の **Recently denied** タブで確認でき、
+  `r` で再試行マークを付けられる。

@@ -1,4 +1,58 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(gog * sheets get *)",
+      "Bash(gog * sheets metadata *)",
+      "Bash(gog * docs cat *)",
+      "Bash(gog * docs info *)",
+      "Bash(gog * drive ls *)",
+      "Bash(gog * drive search *)",
+      "Bash(gog * drive get *)",
+      "Bash(gog * drive download *)",
+      "Bash(gog * calendar events *)",
+      "Bash(gog * calendar event *)",
+      "Bash(gog * calendar calendars *)",
+      "Bash(gog * gmail search *)",
+      "Bash(gog * gmail thread *)",
+      "Bash(gog * gmail get *)",
+      "Bash(gog * gmail messages *)",
+      "Bash(gog * gmail labels list *)",
+      "Bash(gog * slides raw *)",
+      "Bash(gog * slides list-slides *)",
+      "Bash(gog * slides read-slide *)",
+      "Bash(gog auth list *)",
+      "Bash(gog auth doctor *)",
+      "Bash(gog auth status *)",
+
+      "mcp__Gmail__get_*",
+      "mcp__Gmail__list_*",
+      "mcp__Gmail__search_*",
+
+      "mcp__Google_Calendar__get_*",
+      "mcp__Google_Calendar__list_*",
+      "mcp__Google_Calendar__search_*",
+      "mcp__Google_Calendar__suggest_time",
+
+      "mcp__Google_Drive__get_*",
+      "mcp__Google_Drive__list_*",
+      "mcp__Google_Drive__search_*",
+      "mcp__Google_Drive__read_*",
+      "mcp__Google_Drive__download_*",
+
+      "mcp__Slack__slack_read_*",
+      "mcp__Slack__slack_search_*",
+      "mcp__Slack__slack_list_*",
+      "mcp__Slack__slack_get_*",
+
+      "mcp__github__get_*",
+      "mcp__github__list_*",
+      "mcp__github__search_*",
+      "mcp__github__issue_read",
+      "mcp__github__pull_request_read",
+      "mcp__github__actions_list",
+      "mcp__github__actions_get"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
