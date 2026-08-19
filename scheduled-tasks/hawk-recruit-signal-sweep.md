@@ -227,3 +227,57 @@ Haiku は使わない。求人媒体（doda/マイナビ/Indeed等）のURLを�
 精度を上げるなら環境のネットワーク設定を **Network access = Full** にする。
 そうすればフォームページを直接読んで判定できる。
 ただし Full は任意ドメインへの接続を許すので、その是非は運用側の判断。
+
+## 【根本原因】定期実行セッションにはリポジトリが無い（2026-08-19 特定）
+
+日次スイープが3回連続で「収集は成功、書き込みゼロ」で終わっていた原因。
+
+`create_trigger` で作った Routine の発火セッションは**リポジトリをクローンしない**。
+決定的な証拠はスクラッチパッドのパス:
+
+| セッション種別 | scratchpad パス |
+|---|---|
+| 通常のクラウドセッション | `/tmp/claude-0/-home-user-claude-configgggggg/...` |
+| Routine 発火セッション | `/tmp/claude-0/**-home-user**/...` |
+
+リポジトリが無い → `.claude/settings.json` が無い → SessionStart フックが動かない →
+`gog` が入らない。収集（curl）は動くのに Sheets 書き込みだけ死ぬ、という症状と一致する。
+
+`create_trigger` には `source_url` 相当のパラメータが無いので、
+**Routine のプロンプト側で gog を自前ブートストラップする**しかない。
+
+### ブートストラップ（両ルーティンの先頭に埋め込み済み。実測で動作確認）
+```bash
+set -e
+if ! command -v gog >/dev/null 2>&1 && [ ! -x "$HOME/bin/gog" ]; then
+  T=$(mktemp -d)
+  curl -fsSL -o "$T/g.tgz" \
+    https://github.com/openclaw/gogcli/releases/download/v0.19.0/gogcli_0.19.0_linux_amd64.tar.gz
+  tar -xzf "$T/g.tgz" -C "$T"
+  mkdir -p "$HOME/bin"; install -m 0755 "$T/gog" "$HOME/bin/gog"; rm -rf "$T"
+fi
+export PATH="$HOME/bin:$PATH"
+export GOG_KEYRING_BACKEND=file
+gog auth keyring file --no-input >/dev/null 2>&1 || true
+mkdir -p "$HOME/.config/gogcli"
+echo "$GOG_CREDENTIALS_B64" | base64 -d > "$HOME/.config/gogcli/credentials.json"
+chmod 600 "$HOME/.config/gogcli/credentials.json"
+gog auth credentials set "$HOME/.config/gogcli/credentials.json" --no-input
+TT=$(mktemp); echo "$GOG_TOKEN_EXPORT_B64" | base64 -d > "$TT"
+gog auth tokens import "$TT" --no-input --force; rm -f "$TT"
+gog auth doctor --check --no-input
+```
+
+成立する根拠（いずれも2026-08-19に実測）:
+- 認証用の3環境変数（`GOG_CREDENTIALS_B64` / `GOG_TOKEN_EXPORT_B64` / `GOG_KEYRING_PASSWORD`）は
+  **環境レベル**の設定なので、リポジトリが無い発火セッションにも渡る
+- GitHub リリースからの取得は Custom の egress 下でも通る（`http=200`、11MB）
+- 取得したバイナリはリポジトリ同梱版と同一（`v0.19.0 b25a3c0`）
+
+なお bash 呼び出しごとにシェル状態は引き継がれないので、
+**以降の全 bash で `export PATH="$HOME/bin:$PATH"` を先頭に付ける**必要がある。
+
+### 副次的に判明した収集側のバグ
+発火セッションが「SNS広告運用」のURLエンコードを手打ちして誤り、
+別クエリを叩いていた。**エンコードは必ず `python3 -c "import urllib.parse..."` で行う**
+ようプロンプトに明記した。
