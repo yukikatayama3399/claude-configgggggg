@@ -195,3 +195,33 @@ Cloud Console の「対象」画面にある2つのボタンは**どちらも押
 会社の情シスポリシー次第では問題になり得るし、
 fout.jp 側でサードパーティアプリのアクセスが制限されると一斉に止まる。
 恒久運用するなら会社側プロジェクトへの移設を検討する余地がある。
+
+### カレンダーの色（colorId）— 解除できないという既知バグ
+
+`gog calendar update --event-color` で**色を付けるのは可能**（1〜11）。
+だが**既定色に戻す（解除する）ことはどちらの経路でもできない**（2026-08-22 実測）。
+
+| 経路 | 挙動 |
+|---|---|
+| `gog calendar update ... --event-color=` | **exit 0 で成功したように見えるが、色は変わらない**（黙って無視） |
+| `--event-color=0` / `--event-color=none` | `color ID must be 1-11` で拒否（こちらは正直） |
+| MCP `mcp__Google_Calendar__update_event` の `colorId: ""` | `Request contains an invalid argument.` で拒否 |
+
+ヘルプには `Event color ID (1-11, or empty to clear)` と書いてあるが**嘘**。
+一番危ないのは1行目で、**成功したと報告しながら何もしていない**。
+色を書いたら必ず読み返して検証すること（`routines/color_sweep.py` はそう実装してある）。
+
+回避策は無い。「色なし」に戻したい予定は Google カレンダー UI で手作業。
+自動化側では「色を付けない」＝触らない、と定義して、色が残っている分は報告に出す。
+
+### 定期実行（クラウド Routine）セッションの前提
+
+`routines/README.md` を参照。要点だけ:
+
+- **リポジトリがクローンされない** → SessionStart フックが動かず `gog` が無い。
+  Routine のプロンプト冒頭に gog ブートストラップを必ず入れる
+- **シェル状態が引き継がれない** → 全 bash 呼び出しの先頭に `export PATH="$HOME/bin:$PATH"`
+- **MCP コネクタが載らない**（MCP 経由で作った Routine の場合）→ Slack 送信ができない。
+  通知は「Slack があれば Slack、無ければ gog で自分宛メール」の二段構えにする
+- Mac ローカルの scheduled-tasks は **Claude Code 起動中しか発火しない**。
+  落ちたら「開始できませんでした」が出る。確実に回したいものはクラウド Routine に置く
