@@ -11,6 +11,11 @@ Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操�
 - gog はスコープに sheets / docs / drive(full) 等を保有しており、
   Drive 権限があれば他人所有ファイルにも読み書きできる（検証済み）。
 
+なお 2026-08-22 から Google 公式の **`gws` (Google Workspace CLI) も併設**している。
+既定は引き続き gog（このファイルの手順とスキルが gog 前提のため）で、
+**gog に無い API メソッドを叩きたいときだけ gws を使う**。
+使い方と認証の仕組みは末尾の「gws (Google 公式 Google Workspace CLI)」を参照。
+
 ### セットアップ
 - クラウド(web)セッションでは SessionStart フック
   (`.claude/hooks/session-start.sh`) が開始時に自動セットアップする。
@@ -176,6 +181,27 @@ Slides でこれを実証済み（有効化しただけで、既存トークン�
 | 公開ステータス | **本番環境** | ❌ 変えない |
 | ユーザーの種類 | **外部** | ❌ 変えない |
 
+### 使っている OAuth クライアント（2026-08-22 確認）
+
+プロジェクト `317751427169` にはデスクトップクライアントが2つある。
+**gog が使っているのは `gog-fout`**（client_id は `317751427169-bdbna2uqsh...`、
+2026-06-04 作成）。もう1つの `gog`（2026-05-28 作成）は使っていない。
+どちらか分からなくなったら:
+
+```bash
+grep -o '"client_id"[^,]*' "$HOME/Library/Application Support/gogcli/credentials.json"
+```
+
+**クライアント シークレットは触らない。**
+- `gog-fout` には既にシークレットが2本ある（2026-07-29 作成、両方「有効」）。
+  **Google の上限は2本**なので、追加するには既存のどれかを無効化→削除が必要。
+- どちらが gog の使っている値かは Console では判別できない（マスク表示のみ）。
+  当てで消すと gog の refresh が壊れる。**消すな。**
+- Google は既存クライアントの **secret の表示・ダウンロードを廃止**した。
+  よって「既存の secret を取り出して他のツールに渡す」ことはできない。
+  gws に別途 secret が必要になったら、**新しいクライアントを作る**方が安全
+  （ローテーションではなく新規作成。`gws auth login` は会社 Mac で1回だけ）。
+
 Cloud Console の「対象」画面にある2つのボタンは**どちらも押してはいけない**:
 
 - **「テストに戻る」** … 押すとテスト中に戻り、
@@ -195,3 +221,89 @@ Cloud Console の「対象」画面にある2つのボタンは**どちらも押
 会社の情シスポリシー次第では問題になり得るし、
 fout.jp 側でサードパーティアプリのアクセスが制限されると一斉に止まる。
 恒久運用するなら会社側プロジェクトへの移設を検討する余地がある。
+
+## gws (Google 公式 Google Workspace CLI)
+
+2026-08-22 導入・**疎通確認済み**（クラウドセッションで `drive.files.list` が通った）。
+`@googleworkspace/cli`（Rust 製バイナリ、コマンド名は `gws`）。
+Google Discovery Service を実行時に読んでコマンドを生成するので、
+**Workspace の API メソッドはひと通り叩ける**のが gog との一番の差。
+
+### gog と gws の使い分け
+
+| 用途 | 使うもの |
+|---|---|
+| 日常の Sheets / Docs / Slides / Drive / Gmail / Calendar 操作 | **gog**（既定。手順もスキルもこちら前提） |
+| gog にサブコマンドが無い API・メソッド（admin, chat, forms, script など） | **gws** |
+| 生の API レスポンス（JSON）をそのまま扱いたい | **gws** |
+
+### コマンドの形（gog と違う）
+
+gog はフラグ指向、**gws は「サービス → リソース → メソッド」＋ JSON パラメータ**。
+
+```bash
+gws <service> <resource> [sub-resource] <method> --params '<JSON>'
+
+gws drive files list  --params '{"pageSize":10,"fields":"files(id,name)"}'
+gws sheets spreadsheets values get --params '{"spreadsheetId":"<ID>","range":"タブ名!A1:C3"}'
+gws docs documents get --params '{"documentId":"<docId>"}'
+gws gmail users labels list --params '{"userId":"me"}'
+gws calendar events list --params '{"calendarId":"primary","maxResults":5}'
+```
+
+引数が分からないときはスキーマを引く: `gws schema drive.files.list`
+書き込み系のボディは `--json '<JSON>'`。実行せず内容だけ見るなら `--dry-run`。
+ページングは `--page-all`（NDJSON、既定10ページまで）。
+
+`+` 始まりのヘルパーもある: `gws gmail +send` / `gws sheets +read` /
+`gws calendar +agenda` / `gws drive +upload` など。
+
+### 認証は gog のトークンを流用している（新規認証しない）
+
+`setup_gws_remote.sh` が gog の refresh token を authorized_user 形式に組み直して
+`~/.config/gws/credentials.json` に置く。**クラウドで `gws auth login` は絶対に叩かない**
+（「認証は1台でしかやらない」ルールは gws にもそのまま効く）。
+
+- スコープは gog と同一（現在 22 サービス分）
+- client_secret は `GOG_CREDENTIALS_B64` の中に入っている（2026-08-22 実測）。
+  Mac のディスク上のコピーからは gog が secret を keychain に抜いているため、
+  **Mac で `setup_gws_remote.sh` は失敗するが、クラウドでは成功する**。
+  Mac でも動かしたいなら Cloud Console で新しいクライアントを作る
+  （既存クライアントのシークレットは触らない。理由は上記）
+- 失効したら直すのは 1 箇所。「正」の Mac で `bash sync_gog_token.sh --reauth`
+- 状態確認: `gws auth status`（`token_valid` / `scopes` / `enabled_apis` が JSON で出る）
+- 疎通確認: `bash check_gws_apis.sh`（読み取り専用）
+
+**gws も SessionStart フックで自動セットアップされる**（gog と同じ扱い）。
+セッション開始ログの `[session-start] gws setup: OK` / `FAILED` で状態が分かる。
+FAILED なら `bash setup_gws_remote.sh` を手で叩いてエラーを読む。
+
+Mac で使うときは**リポジトリのクローン内で** `bash setup_gws_remote.sh` を叩く。
+環境変数が無い端末では、ローカルの gog から直接トークンをもらう。
+会社 Mac には gog のアカウントが 2 つ（`@fout.jp` / `@gmail.com`）入っているので、
+スクリプトはアカウントを明示して取り出す（既定 `@fout.jp`、`GWS_ACCOUNT` で変更可）。
+
+gog は client_secret を keyring に退避することがあり、その場合 gog 管理下の
+`credentials.json` にも token export にも入っていない（会社 Mac は実際にこの状態）。
+候補は `GWS_CLIENT_SECRET_JSON` → `~/.gog_sync/gog_env_*.env` →
+gog 管理下の credentials.json → token export の順に見る。
+どこにも無ければ Cloud Console で**同じ OAuth クライアントに「シークレットを追加」**し
+（Google は既存 secret の表示・DL を廃止した）、`GWS_CLIENT_SECRET=<値>` で渡す。
+クラウドはこれをセッション環境変数に入れておけばよい。
+**古いシークレットは無効化しないこと**（gog がそれで動いている）。
+対象クライアントは gog の client_id で判別する。
+
+環境変数 `GWS_CREDENTIALS_B64` があればそちらが優先される。
+会社 Mac で `gws auth export --unmasked` した値を配れば gog と独立した認証にできるが、
+その場合は**認証が2系統に増える**ので通常はやらない。
+
+### 注意点
+
+- API の有効/無効は OAuth プロジェクト側の設定なので、**gog と gws で共通**。
+  Slides のように無効だと `not enabled` で落ちるのも同じ（有効化手順は上記）。
+- Linux 用バイナリは `bin/gws_<version>_linux_amd64.tar.gz` として同梱しており、
+  クラウドではダウンロード不要（gog と同じ方式）。Mac では npm から取る。
+  バージョンを上げるときは tarball と `setup_gws_remote.sh` の `GWS_VERSION` の
+  **2箇所を同時に**揃える。
+- gws は 100+ の Agent Skills を配布しているが、このリポジトリには入れていない
+  （必要になったら `npx skills add https://github.com/googleworkspace/cli`）。
