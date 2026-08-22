@@ -6,7 +6,7 @@ Claude Code から Google Workspace（Sheets / Docs / Slides / Drive / Gmail / C
 | CLI | 実体 | 位置づけ |
 |---|---|---|
 | `gog` | [gogcli](https://github.com/openclaw/gogcli) | **既定**。運用手順・スキルがこちら前提で書かれている |
-| `gws` | [Google 公式 Google Workspace CLI](https://github.com/googleworkspace/cli) | 追加導入。Discovery 由来で全 API を叩けるので gog に無いメソッド用 |
+| `gws` | [Google 公式 Google Workspace CLI](https://github.com/googleworkspace/cli) | 追加導入（2026-08-22 疎通確認済み）。Discovery 由来で全 API を叩けるので gog に無いメソッド用 |
 
 **認証は 1 つだけ。** `gws` は `gog` の refresh token を流用するので、
 gws のために新しく OAuth 認証を取る必要はない（詳細は下記）。
@@ -48,7 +48,17 @@ bash setup_gws_remote.sh
 
 セッション開始時のログに `[session-start] gws setup: OK` / `FAILED` が出る。
 
-### Mac で使う場合
+### Mac で使う場合（現状は失敗する）
+
+**先に結論**: client_secret はクラウドへ配っている `GOG_CREDENTIALS_B64` の中にあり、
+Mac のディスク上のコピーからは gog が keychain へ抜いてしまっている。
+そのため **Mac では `setup_gws_remote.sh` は client_secret が見つからず失敗する**
+（クラウドでは成功する。2026-08-22 実測）。
+Mac でも使いたいなら Cloud Console で新しい OAuth クライアントを作るのが安全
+（既存クライアントのシークレットは触らない。CLAUDE.md 参照）。
+
+以下は手順の記録:
+
 
 **リポジトリのクローン内で**実行すること（`~` で叩いても見つからない）。
 Mac には `GOG_*_B64` 環境変数が無いので、スクリプトは

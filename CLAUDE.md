@@ -224,7 +224,8 @@ fout.jp 側でサードパーティアプリのアクセスが制限されると
 
 ## gws (Google 公式 Google Workspace CLI)
 
-2026-08-22 導入。`@googleworkspace/cli`（Rust 製バイナリ、コマンド名は `gws`）。
+2026-08-22 導入・**疎通確認済み**（クラウドセッションで `drive.files.list` が通った）。
+`@googleworkspace/cli`（Rust 製バイナリ、コマンド名は `gws`）。
 Google Discovery Service を実行時に読んでコマンドを生成するので、
 **Workspace の API メソッドはひと通り叩ける**のが gog との一番の差。
 
@@ -264,6 +265,11 @@ gws calendar events list --params '{"calendarId":"primary","maxResults":5}'
 （「認証は1台でしかやらない」ルールは gws にもそのまま効く）。
 
 - スコープは gog と同一（現在 22 サービス分）
+- client_secret は `GOG_CREDENTIALS_B64` の中に入っている（2026-08-22 実測）。
+  Mac のディスク上のコピーからは gog が secret を keychain に抜いているため、
+  **Mac で `setup_gws_remote.sh` は失敗するが、クラウドでは成功する**。
+  Mac でも動かしたいなら Cloud Console で新しいクライアントを作る
+  （既存クライアントのシークレットは触らない。理由は上記）
 - 失効したら直すのは 1 箇所。「正」の Mac で `bash sync_gog_token.sh --reauth`
 - 状態確認: `gws auth status`（`token_valid` / `scopes` / `enabled_apis` が JSON で出る）
 - 疎通確認: `bash check_gws_apis.sh`（読み取り専用）
