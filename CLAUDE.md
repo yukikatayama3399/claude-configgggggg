@@ -256,6 +256,11 @@ Mac で使うときは**リポジトリのクローン内で** `bash setup_gws_r
 会社 Mac には gog のアカウントが 2 つ（`@fout.jp` / `@gmail.com`）入っているので、
 スクリプトはアカウントを明示して取り出す（既定 `@fout.jp`、`GWS_ACCOUNT` で変更可）。
 
+gog は client_secret を keyring に退避することがあり、その場合 gog 管理下の
+`credentials.json` には入っていない。スクリプトは token export 側の client 情報を
+使うが、どちらにも無ければ Cloud Console から落とした OAuth クライアント JSON を
+`GWS_CLIENT_SECRET_JSON=<path>` で渡す。
+
 環境変数 `GWS_CREDENTIALS_B64` があればそちらが優先される。
 会社 Mac で `gws auth export --unmasked` した値を配れば gog と独立した認証にできるが、
 その場合は**認証が2系統に増える**ので通常はやらない。

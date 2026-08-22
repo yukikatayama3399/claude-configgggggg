@@ -1,18 +1,27 @@
 #!/usr/bin/env python3
-"""gog の credentials.json と token export から gws 用の credentials.json を作る。
+"""gog の認証情報から gws 用の credentials.json (authorized_user 形式) を作る。
 
 gws (Google Workspace CLI) は yup-oauth2 の authorized_user 形式を受け付けるので、
 gog が既に持っている refresh token をそのまま流用できる。これにより
 「認証は会社 Mac 1台でしかやらない」という運用ルールを崩さずに gws が使える。
 
-  usage: gws_credentials_from_gog.py <gog_credentials.json> <gog_token_export.json> \
-             <account_email> <out_path>
+  usage: gws_credentials_from_gog.py --account <email> --token <token_export.json>
+                                     --out <out.json> [<client_source.json> ...]
 
-秘密情報は一切標準出力に出さない(エラーメッセージにも載せない)。
-gog のバージョンで export の JSON 構造が変わっても拾えるように、
-キー名の候補を広めに取り、最後は "1//" 始まりの文字列を探す。
+client_id / client_secret の在り処は環境によって違う:
+  - gog が管理している credentials.json は **client_secret が抜かれている**
+    ことがある(keyring に退避される。gog auth credentials list の
+    SECRET_KEYRING=true がその状態)
+  - その場合は token export 側に client 情報が入っている
+そのため複数のファイルを候補として受け取り、**client_id と client_secret の
+両方が揃っているファイル**を1つ選ぶ。片方ずつ別のファイルから拾うと、
+別プロジェクトの client_id と secret を混ぜてしまうのでやらない。
+候補は指定順に見て、最後に token export を見る。
+
+秘密情報は標準出力にもエラーメッセージにも出さない。
 """
 
+import argparse
 import json
 import os
 import sys
@@ -26,12 +35,12 @@ def die(msg):
     sys.exit(f"!! {msg}")
 
 
-def load(path, label):
+def load(path):
     try:
         with open(path) as f:
             return json.load(f)
-    except Exception as e:
-        die(f"{label} を JSON として読めない ({path}): {e}")
+    except Exception:
+        return None
 
 
 def walk_dicts(obj):
@@ -87,6 +96,29 @@ def subtree_size(obj):
     return 1
 
 
+def pick_client(sources):
+    """client_id と client_secret が両方揃っているファイルから両方を取る。
+
+    戻り値: (client_id, client_secret, 採用したパス)
+    """
+    for path, data in sources:
+        if data is None:
+            continue
+        cid = find_by_key(data, CLIENT_ID_KEYS)
+        sec = find_by_key(data, CLIENT_SECRET_KEYS)
+        if cid and sec:
+            return cid, sec, path
+    checked = ", ".join(p for p, _ in sources) or "(候補なし)"
+    die("client_id と client_secret の両方が入っているファイルが無い。\n"
+        f"   確認した候補: {checked}\n"
+        "   gog が client_secret を keyring に退避していると、管理下の\n"
+        "   credentials.json には入っていない(gog auth credentials list の\n"
+        "   SECRET_KEYRING=true がその状態)。その場合は Cloud Console の\n"
+        "   OAuth クライアント(Desktop app)の JSON を落として渡す:\n"
+        "     GWS_CLIENT_SECRET_JSON=~/Downloads/client_secret_....json \\\n"
+        "       bash setup_gws_remote.sh")
+
+
 def pick_refresh_token(tok, account):
     """account のトークンを選ぶ。
 
@@ -119,21 +151,30 @@ def pick_refresh_token(tok, account):
 
 
 def main():
-    if len(sys.argv) != 5:
-        die(__doc__.strip().splitlines()[-1] if __doc__ else "引数が足りない")
-    cred_path, tok_path, account, out_path = sys.argv[1:5]
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument("--account", required=True)
+    ap.add_argument("--token", required=True, help="gog auth tokens export の出力")
+    ap.add_argument("--out", required=True)
+    ap.add_argument("--verbose", action="store_true",
+                    help="client 情報をどのファイルから採用したかを出す(値は出さない)")
+    ap.add_argument("client_sources", nargs="*",
+                    help="client_id/client_secret の候補ファイル")
+    a = ap.parse_args()
 
-    creds = load(cred_path, "gog の credentials.json")
-    # Desktop app の JSON は {"installed": {...}} だが、{"web": {...}} や
-    # フラットな形もありうるので、キー名で探す。
-    client_id = find_by_key(creds, CLIENT_ID_KEYS)
-    client_secret = find_by_key(creds, CLIENT_SECRET_KEYS)
-    if not client_id or not client_secret:
-        die(f"{cred_path} から client_id / client_secret を取り出せない")
+    tok = load(a.token)
+    if tok is None:
+        die(f"token export を JSON として読めない: {a.token}")
 
-    refresh = pick_refresh_token(load(tok_path, "gog の token export"), account)
+    # client 情報の候補: 指定されたファイル → 最後に token export 自身。
+    sources = [(p, load(p)) for p in a.client_sources]
+    sources.append((a.token, tok))
+    client_id, client_secret, used = pick_client(sources)
+    if a.verbose:
+        print(f"    client 情報の採用元: {used}")
 
-    fd = os.open(out_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    refresh = pick_refresh_token(tok, a.account)
+
+    fd = os.open(a.out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as f:
         json.dump({
             "type": "authorized_user",

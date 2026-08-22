@@ -96,22 +96,43 @@ elif [ -n "${GOG_CREDENTIALS_B64:-}" ] && [ -n "${GOG_TOKEN_EXPORT_B64:-}" ]; th
   # (2) クラウドセッション: setup_gog_remote.sh と同じ環境変数を使う
   b64_env_to_file GOG_CREDENTIALS_B64  "$WORK_DIR/gog_credentials.json" || exit 1
   b64_env_to_file GOG_TOKEN_EXPORT_B64 "$WORK_DIR/gog_token.json"       || exit 1
-  python3 "$BUILDER" "$WORK_DIR/gog_credentials.json" "$WORK_DIR/gog_token.json" \
-      "$ACCOUNT" "$CRED_FILE" || fail "gog の環境変数から credentials.json を組めなかった"
+  python3 "$BUILDER" --account "$ACCOUNT" --token "$WORK_DIR/gog_token.json" \
+      --out "$CRED_FILE" --verbose \
+      ${GWS_CLIENT_SECRET_JSON:+"$GWS_CLIENT_SECRET_JSON"} \
+      "$WORK_DIR/gog_credentials.json" \
+    || fail "gog の環境変数から credentials.json を組めなかった"
   log "credentials: gog の環境変数から生成($ACCOUNT / 新規認証なし)"
 
 elif command -v gog >/dev/null 2>&1; then
   # (3) ローカルの gog から直接もらう(会社 Mac など)
+  # gog が管理している credentials.json は client_secret が抜かれていることが
+  # あるので、候補を複数渡して「両方揃っているファイル」を選ばせる。
   CRED_PATH="$(gog auth status -j 2>/dev/null \
     | grep -o '"credentials_path"[[:space:]]*:[[:space:]]*"[^"]*"' \
     | sed 's/.*:[[:space:]]*"//; s/"$//')"
-  [ -n "$CRED_PATH" ] && [ -f "$CRED_PATH" ] \
-    || fail "gog の credentials.json の場所が特定できない: ${CRED_PATH:-(空)}"
   # mktemp -d の中に作るので --overwrite は不要だが、再実行に備えて付けておく。
   gog auth tokens export "$ACCOUNT" --out "$WORK_DIR/gog_token.json" --overwrite >/dev/null \
     || fail "gog auth tokens export に失敗($ACCOUNT)。gog auth list で確認して。"
-  python3 "$BUILDER" "$CRED_PATH" "$WORK_DIR/gog_token.json" \
-      "$ACCOUNT" "$CRED_FILE" || fail "ローカルの gog から credentials.json を組めなかった"
+
+  # 候補集め。set -e 下では `[ test ] && cmd` を文の最後に置くと
+  # テストが偽になった時点でスクリプトが落ちるので if で書く。
+  CLIENT_SOURCES=()
+  # 明示指定(Cloud Console から落とした元の client_secret JSON など)が最優先
+  if [ -n "${GWS_CLIENT_SECRET_JSON:-}" ]; then
+    CLIENT_SOURCES+=("$GWS_CLIENT_SECRET_JSON")
+  fi
+  if [ -n "$CRED_PATH" ] && [ -f "$CRED_PATH" ]; then
+    CLIENT_SOURCES+=("$CRED_PATH")
+  fi
+  for c in "$HOME/.config/gogcli/credentials.json" \
+           "$HOME/Library/Application Support/gogcli/credentials.json"; do
+    if [ -f "$c" ]; then
+      CLIENT_SOURCES+=("$c")
+    fi
+  done
+  python3 "$BUILDER" --account "$ACCOUNT" --token "$WORK_DIR/gog_token.json" \
+      --out "$CRED_FILE" --verbose ${CLIENT_SOURCES+"${CLIENT_SOURCES[@]}"} \
+    || fail "ローカルの gog から credentials.json を組めなかった"
   log "credentials: ローカルの gog から生成($ACCOUNT / 新規認証なし)"
 
 else

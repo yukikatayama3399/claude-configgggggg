@@ -68,6 +68,22 @@ bash check_gws_apis.sh
 GWS_ACCOUNT=yuki.katayama3399@gmail.com bash setup_gws_remote.sh
 ```
 
+#### client_secret の在り処に注意
+
+gog は **client_secret を keyring に退避する**ことがある
+（`gog auth credentials list` の `SECRET_KEYRING` が `true` の状態）。
+この場合 gog 管理下の `credentials.json` には secret が入っていないので、
+スクリプトは `gog auth tokens export` の出力側にある client 情報を使う。
+`client_id` と `client_secret` は**同じファイルから対で**取る
+（別プロジェクトの id と secret を混ぜないため）。
+
+どちらにも secret が無いと止まる。その場合は Cloud Console から
+OAuth クライアント（Desktop app）の JSON を落として渡す:
+
+```bash
+GWS_CLIENT_SECRET_JSON=~/Downloads/client_secret_xxx.json bash setup_gws_remote.sh
+```
+
 前提として、以下3つの環境変数がセッションに登録済みであること:
 
 - `GOG_CREDENTIALS_B64` … credentials.json (client_id) の base64
