@@ -37,13 +37,15 @@ bash check_gws_apis.sh   # gws 側
 ## クラウドセッションでの自動セットアップ
 
 `.claude/hooks/session-start.sh`（SessionStart フック）が
-セッション開始時に `setup_gog_remote.sh` と `setup_gws_remote.sh` を実行するため、
-**手動実行は不要**。手動でやるなら:
+セッション開始時に `setup_gog_remote.sh` を実行するため、**gog は手動実行不要**。
+
+**gws はまだフックに入っていない**ので、使う前に一度だけ叩く:
 
 ```bash
-bash setup_gog_remote.sh
 bash setup_gws_remote.sh
 ```
+
+フックにも入れたい場合は下記「gws をフックに組み込む」を参照。
 
 前提として、以下3つの環境変数がセッションに登録済みであること:
 
@@ -84,6 +86,47 @@ gog とは独立した認証に切り替えられる（通常は不要）。
 
 `setup_gws_remote.sh` の `GWS_VERSION` で固定している。上げるときはこの1箇所。
 （gog と違い npm 経由で取るので、リポジトリにバイナリは同梱していない）
+
+### gws をフックに組み込む
+
+毎セッション自動で入れたいなら `.claude/hooks/session-start.sh` の
+「PATH を通す」ブロックの手前に以下を足し、PATH 行を差し替える。
+（`hooks/session-start-gws.patch` に同じ差分を置いてある: `git apply hooks/session-start-gws.patch`）
+
+```bash
+# gws セットアップ(冪等)。gog と同じく失敗してもセッションはブロックしない。
+if bash "$CLAUDE_PROJECT_DIR/setup_gws_remote.sh"; then
+  echo "[session-start] gws setup: OK"
+else
+  echo "[session-start] gws setup: FAILED (setup_gws_remote.sh を手動実行してエラー確認を)" >&2
+fi
+```
+
+```bash
+# PATH 行の差し替え(gws は $HOME/.local/bin に入る)
+echo 'export PATH="$HOME/bin:$HOME/.local/bin:$PATH"' >> "$CLAUDE_ENV_FILE"
+echo 'export GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE="$HOME/.config/gws/credentials.json"' >> "$CLAUDE_ENV_FILE"
+```
+
+なお `$HOME/.local/bin` は既定で PATH に入っている環境が多く、
+その場合 PATH 行を触らなくても `gws` は見つかる。
+
+### 権限ルール（任意）
+
+セットアップ/疎通確認スクリプトは認証系の環境変数に触るため、
+auto モードの分類器に止められることがある。毎回止められるのが煩わしければ
+`.claude/settings.json` に足しておく:
+
+```json
+"permissions": {
+  "allow": [
+    "Bash(bash setup_gog_remote.sh:*)",
+    "Bash(bash check_gog_apis.sh:*)",
+    "Bash(bash setup_gws_remote.sh:*)",
+    "Bash(bash check_gws_apis.sh:*)"
+  ]
+}
+```
 
 ## gog バイナリ
 

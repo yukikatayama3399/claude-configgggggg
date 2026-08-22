@@ -247,6 +247,10 @@ gws calendar events list --params '{"calendarId":"primary","maxResults":5}'
 - 状態確認: `gws auth status`（`token_valid` / `scopes` / `enabled_apis` が JSON で出る）
 - 疎通確認: `bash check_gws_apis.sh`（読み取り専用）
 
+**gws は SessionStart フックに入っていない**（gog だけが自動セットアップされる）。
+クラウドセッションで gws を使う前に一度 `bash setup_gws_remote.sh` を叩くこと。
+フックに入れる差分は `hooks/session-start-gws.patch` に置いてある。
+
 環境変数 `GWS_CREDENTIALS_B64` があればそちらが優先される。
 会社 Mac で `gws auth export --unmasked` した値を配れば gog と独立した認証にできるが、
 その場合は**認証が2系統に増える**ので通常はやらない。
