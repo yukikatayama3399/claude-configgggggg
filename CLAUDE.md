@@ -11,6 +11,11 @@ Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操�
 - gog はスコープに sheets / docs / drive(full) 等を保有しており、
   Drive 権限があれば他人所有ファイルにも読み書きできる（検証済み）。
 
+なお 2026-08-22 から Google 公式の **`gws` (Google Workspace CLI) も併設**している。
+既定は引き続き gog（このファイルの手順とスキルが gog 前提のため）で、
+**gog に無い API メソッドを叩きたいときだけ gws を使う**。
+使い方と認証の仕組みは末尾の「gws (Google 公式 Google Workspace CLI)」を参照。
+
 ### セットアップ
 - クラウド(web)セッションでは SessionStart フック
   (`.claude/hooks/session-start.sh`) が開始時に自動セットアップする。
@@ -195,3 +200,62 @@ Cloud Console の「対象」画面にある2つのボタンは**どちらも押
 会社の情シスポリシー次第では問題になり得るし、
 fout.jp 側でサードパーティアプリのアクセスが制限されると一斉に止まる。
 恒久運用するなら会社側プロジェクトへの移設を検討する余地がある。
+
+## gws (Google 公式 Google Workspace CLI)
+
+2026-08-22 導入。`@googleworkspace/cli`（Rust 製バイナリ、コマンド名は `gws`）。
+Google Discovery Service を実行時に読んでコマンドを生成するので、
+**Workspace の API メソッドはひと通り叩ける**のが gog との一番の差。
+
+### gog と gws の使い分け
+
+| 用途 | 使うもの |
+|---|---|
+| 日常の Sheets / Docs / Slides / Drive / Gmail / Calendar 操作 | **gog**（既定。手順もスキルもこちら前提） |
+| gog にサブコマンドが無い API・メソッド（admin, chat, forms, script など） | **gws** |
+| 生の API レスポンス（JSON）をそのまま扱いたい | **gws** |
+
+### コマンドの形（gog と違う）
+
+gog はフラグ指向、**gws は「サービス → リソース → メソッド」＋ JSON パラメータ**。
+
+```bash
+gws <service> <resource> [sub-resource] <method> --params '<JSON>'
+
+gws drive files list  --params '{"pageSize":10,"fields":"files(id,name)"}'
+gws sheets spreadsheets values get --params '{"spreadsheetId":"<ID>","range":"タブ名!A1:C3"}'
+gws docs documents get --params '{"documentId":"<docId>"}'
+gws gmail users labels list --params '{"userId":"me"}'
+gws calendar events list --params '{"calendarId":"primary","maxResults":5}'
+```
+
+引数が分からないときはスキーマを引く: `gws schema drive.files.list`
+書き込み系のボディは `--json '<JSON>'`。実行せず内容だけ見るなら `--dry-run`。
+ページングは `--page-all`（NDJSON、既定10ページまで）。
+
+`+` 始まりのヘルパーもある: `gws gmail +send` / `gws sheets +read` /
+`gws calendar +agenda` / `gws drive +upload` など。
+
+### 認証は gog のトークンを流用している（新規認証しない）
+
+`setup_gws_remote.sh` が gog の refresh token を authorized_user 形式に組み直して
+`~/.config/gws/credentials.json` に置く。**クラウドで `gws auth login` は絶対に叩かない**
+（「認証は1台でしかやらない」ルールは gws にもそのまま効く）。
+
+- スコープは gog と同一（現在 22 サービス分）
+- 失効したら直すのは 1 箇所。「正」の Mac で `bash sync_gog_token.sh --reauth`
+- 状態確認: `gws auth status`（`token_valid` / `scopes` / `enabled_apis` が JSON で出る）
+- 疎通確認: `bash check_gws_apis.sh`（読み取り専用）
+
+環境変数 `GWS_CREDENTIALS_B64` があればそちらが優先される。
+会社 Mac で `gws auth export --unmasked` した値を配れば gog と独立した認証にできるが、
+その場合は**認証が2系統に増える**ので通常はやらない。
+
+### 注意点
+
+- API の有効/無効は OAuth プロジェクト側の設定なので、**gog と gws で共通**。
+  Slides のように無効だと `not enabled` で落ちるのも同じ（有効化手順は上記）。
+- npm 経由で入れているため、リポジトリにバイナリは同梱していない。
+  バージョンは `setup_gws_remote.sh` の `GWS_VERSION` で固定。
+- gws は 100+ の Agent Skills を配布しているが、このリポジトリには入れていない
+  （必要になったら `npx skills add https://github.com/googleworkspace/cli`）。
