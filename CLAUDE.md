@@ -251,6 +251,11 @@ gws calendar events list --params '{"calendarId":"primary","maxResults":5}'
 クラウドセッションで gws を使う前に一度 `bash setup_gws_remote.sh` を叩くこと。
 フックに入れる差分は `hooks/session-start-gws.patch` に置いてある。
 
+Mac で使うときは**リポジトリのクローン内で** `bash setup_gws_remote.sh` を叩く。
+環境変数が無い端末では、ローカルの gog から直接トークンをもらう。
+会社 Mac には gog のアカウントが 2 つ（`@fout.jp` / `@gmail.com`）入っているので、
+スクリプトはアカウントを明示して取り出す（既定 `@fout.jp`、`GWS_ACCOUNT` で変更可）。
+
 環境変数 `GWS_CREDENTIALS_B64` があればそちらが優先される。
 会社 Mac で `gws auth export --unmasked` した値を配れば gog と独立した認証にできるが、
 その場合は**認証が2系統に増える**ので通常はやらない。

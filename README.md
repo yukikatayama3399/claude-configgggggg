@@ -19,7 +19,8 @@ gws のために新しく OAuth 認証を取る必要はない（詳細は下記
 |---|---|---|
 | `setup_gog_remote.sh` | クラウド | gog のインストールと認証復元。SessionStart フックが自動実行するので通常は手動実行不要 |
 | `check_gog_apis.sh` | どこでも | gog で 6 API の疎通を一括確認（**読み取り専用・いつでも安全**） |
-| `setup_gws_remote.sh` | クラウド | gws のインストールと認証生成。SessionStart フックが自動実行 |
+| `setup_gws_remote.sh` | クラウド / Mac | gws のインストールと認証生成（gog のトークンを流用） |
+| `gws_credentials_from_gog.py` | — | 上記から呼ばれる。gog のトークンを gws 形式に組み直す |
 | `check_gws_apis.sh` | どこでも | gws で 6 API の疎通を一括確認（**読み取り専用・いつでも安全**） |
 | `sync_gog_token.sh` | **会社 Mac のみ** | 認証をやり直し、全環境へ配る値を書き出す |
 
@@ -47,6 +48,26 @@ bash setup_gws_remote.sh
 
 フックにも入れたい場合は下記「gws をフックに組み込む」を参照。
 
+### Mac で使う場合
+
+**リポジトリのクローン内で**実行すること（`~` で叩いても見つからない）。
+Mac には `GOG_*_B64` 環境変数が無いので、スクリプトは
+ローカルの gog から直接トークンをもらう（`gog auth tokens export`）。
+
+```bash
+cd path/to/claude-configgggggg
+bash setup_gws_remote.sh
+bash check_gws_apis.sh
+```
+
+会社 Mac には gog のアカウントが 2 つ（`@fout.jp` と `@gmail.com`）入っているため、
+スクリプトは**アカウントを指定して**トークンを取り出す。既定は `@fout.jp`。
+別アカウントで作るなら:
+
+```bash
+GWS_ACCOUNT=yuki.katayama3399@gmail.com bash setup_gws_remote.sh
+```
+
 前提として、以下3つの環境変数がセッションに登録済みであること:
 
 - `GOG_CREDENTIALS_B64` … credentials.json (client_id) の base64
@@ -72,7 +93,9 @@ gws --help                           # サービス一覧
 ### 認証（新規に取らない）
 
 `setup_gws_remote.sh` は **gog の refresh token を authorized_user 形式に組み直して**
-`~/.config/gws/credentials.json` に置く。つまり:
+`~/.config/gws/credentials.json` に置く（実際の組み立ては `gws_credentials_from_gog.py`）。
+入手元は上から順に、`GWS_CREDENTIALS_B64` → `GOG_*_B64` 環境変数 → ローカルの gog。
+つまり:
 
 - クラウドで `gws auth login` を叩く必要はない（叩いてはいけない）
 - gog と同じ 22 スコープをそのまま使う
