@@ -86,20 +86,42 @@ gog は **client_secret を keyring に退避する**ことがある
 3. gog 管理下の `credentials.json`
 4. token export
 
-全部に secret が無いと止まる。その場合は Cloud Console
-（**@gmail.com でログイン**、プロジェクト `317751427169`）の「認証情報」から
-OAuth クライアント（Desktop app）の JSON をダウンロードして渡す:
+全部に secret が無いと止まる。**会社 Mac は実際にこの状態**（secret は
+macOS keychain の中だけ）。この場合は Cloud Console で secret を追加する。
+
+Google は既存 OAuth クライアントの **secret の表示・ダウンロードを廃止**したので、
+既存の値を取り出すことはできない。代わりに同じクライアントに 2 本目を発行する:
+
+1. Cloud Console（**@gmail.com でログイン**、プロジェクト `317751427169`）
+   → 認証情報 → 対象のデスクトップクライアント
+2. 「クライアント シークレット」の「シークレットを追加」
+3. 表示された値をコピー（表示は 1 回だけ）
+4. **古いシークレットは無効化しない**（gog がそれを使っているので消すと gog が死ぬ）
+
+どのクライアントが対象かは gog が使っている client_id で判別する:
 
 ```bash
-# ローカル実行時: 落としたファイルの実際のパスを渡す
-GWS_CLIENT_SECRET_JSON=<落としたJSONのパス> bash setup_gws_remote.sh
-
-# クラウド用: base64 にしてセッション環境変数に入れておけば恒久的に効く
-openssl base64 -A -in <落としたJSONのパス>   # → GWS_CLIENT_SECRET_JSON_B64 に設定
+grep -o '"client_id"[^,]*' "$HOME/Library/Application Support/gogcli/credentials.json"
 ```
 
-`GWS_CLIENT_SECRET_JSON_B64` を環境変数に入れておけば、
-gog 側の配布値に secret が無くてもクラウドで gws が動く。
+渡し方:
+
+```bash
+GWS_CLIENT_SECRET=<追加したシークレット> bash setup_gws_remote.sh
+```
+
+クラウドではセッション環境変数 `GWS_CLIENT_SECRET` に入れておけば恒久的に効く。
+`--verbose` 相当の出力に `client_id:` が出るので、Cloud Console 側の
+クライアントと一致しているか目で確認できる（client_id は秘密ではない）。
+
+手元に OAuth クライアントの JSON がある場合は、そのまま渡してもよい:
+
+```bash
+GWS_CLIENT_SECRET_JSON=<JSONのパス> bash setup_gws_remote.sh
+openssl base64 -A -in <JSONのパス>
+```
+
+（後者の出力を環境変数 `GWS_CLIENT_SECRET_JSON_B64` に入れればクラウドでも使える）
 
 （macOS の keychain から secret を読む経路は実装していない。
 Claude Code の権限ガードに引っかかるうえ、キーチェーンの許可プロンプトと

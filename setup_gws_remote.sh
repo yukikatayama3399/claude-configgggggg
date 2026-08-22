@@ -14,9 +14,13 @@
 #   3. ローカルの gog 本体          … 会社 Mac など、gog が認証済みの端末
 #
 # client_secret が上のどこにも無い場合(gog が keyring に退避している)は、
-# Cloud Console の OAuth クライアント JSON を渡す:
-#   GWS_CLIENT_SECRET_JSON=<パス>       … ローカル実行時
-#   GWS_CLIENT_SECRET_JSON_B64=<base64> … クラウドの環境変数に入れる場合
+# Cloud Console で同じ OAuth クライアントに「シークレットを追加」して渡す:
+#   GWS_CLIENT_SECRET=<シークレット文字列>  … これが一番簡単(推奨)
+#   GWS_CLIENT_SECRET_JSON=<JSONのパス>     … 手元にクライアント JSON がある場合
+#   GWS_CLIENT_SECRET_JSON_B64=<base64>     … 同じものをクラウドの環境変数で渡す場合
+# 注意: Google は既存クライアントの secret の表示・ダウンロードを廃止したため、
+# 通常は「シークレットを追加」で新しい値を発行することになる。
+# 古い secret を無効化しなければ gog 側はそのまま動く。
 #
 # 使い方:
 #   bash setup_gws_remote.sh                       # 既定 @fout.jp

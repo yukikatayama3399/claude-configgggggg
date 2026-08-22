@@ -12,13 +12,21 @@ client_id / client_secret の在り処は環境によって違う:
   - gog が管理している credentials.json は **client_secret が抜かれている**
     ことがある(keyring に退避される。gog auth credentials list の
     SECRET_KEYRING=true がその状態)
-  - その場合は token export 側に client 情報が入っている
-そのため複数のファイルを候補として受け取り、**client_id と client_secret の
-両方が揃っているファイル**を1つ選ぶ。片方ずつ別のファイルから拾うと、
-別プロジェクトの client_id と secret を混ぜてしまうのでやらない。
-候補は指定順に見て、最後に token export を見る。
+  - その場合は token export 側に client 情報が入っていることがある
+  - どこにも無い場合は Cloud Console で同じ OAuth クライアントに
+    「シークレットを追加」して、環境変数 GWS_CLIENT_SECRET で渡す
+    (Google は既存クライアントの secret の表示・ダウンロードを廃止した)
 
-秘密情報は標準出力にもエラーメッセージにも出さない。
+ファイルから取る場合は **client_id と client_secret が両方揃っているファイル**を
+1つ選ぶ。片方ずつ別のファイルから拾うと、別プロジェクトの client_id と secret を
+混ぜてしまうのでやらない。候補は指定順に見て、最後に token export を見る。
+
+環境変数:
+  GWS_CLIENT_SECRET … secret を直接渡す(client_id は候補ファイルから拾う)
+  GWS_CLIENT_ID     … client_id も明示したい場合
+
+秘密情報は標準出力にもエラーメッセージにも出さない
+(client_id は秘密ではないので --verbose で表示する)。
 """
 
 import argparse
@@ -97,10 +105,34 @@ def subtree_size(obj):
 
 
 def pick_client(sources):
-    """client_id と client_secret が両方揃っているファイルから両方を取る。
+    """client_id と client_secret を決める。
 
-    戻り値: (client_id, client_secret, 採用したパス)
+    環境変数 GWS_CLIENT_SECRET があればそれを secret として使い、
+    client_id は候補ファイルから拾う。Google は既存 OAuth クライアントの
+    secret の表示・ダウンロードを廃止したため、Cloud Console の
+    「シークレットを追加」で発行した値を直接渡す用途。
+    **同じクライアントに追加した secret でなければ動かない**(client_id と
+    対になっていないと invalid_client になる)。
+
+    それが無い場合は、client_id と client_secret が両方揃っているファイルから
+    両方を取る(片方ずつ別ファイルから拾って混ぜない)。
+
+    戻り値: (client_id, client_secret, 採用元の説明)
     """
+    env_secret = os.environ.get("GWS_CLIENT_SECRET", "").strip()
+    if env_secret:
+        env_id = os.environ.get("GWS_CLIENT_ID", "").strip()
+        if env_id:
+            return env_id, env_secret, "GWS_CLIENT_SECRET + GWS_CLIENT_ID"
+        for path, data in sources:
+            if data is None:
+                continue
+            cid = find_by_key(data, CLIENT_ID_KEYS)
+            if cid:
+                return cid, env_secret, f"GWS_CLIENT_SECRET (client_id は {path})"
+        die("GWS_CLIENT_SECRET は渡されたが、client_id が見つからない。\n"
+            "   GWS_CLIENT_ID も一緒に渡すか、gog の credentials.json を候補に渡して。")
+
     for path, data in sources:
         if data is None:
             continue
@@ -113,12 +145,15 @@ def pick_client(sources):
         f"   確認した候補: {checked}\n"
         "   gog が client_secret を keyring に退避していると、管理下の\n"
         "   credentials.json には入っていない(gog auth credentials list の\n"
-        "   SECRET_KEYRING=true がその状態)。入手先は2つ:\n"
+        "   SECRET_KEYRING=true がその状態)。入手先は3つ:\n"
         "   (a) ~/.gog_sync/gog_env_*.env … sync_gog_token.sh の出力。\n"
         "       setup_gws_remote.sh が自動で見るので、あれば何もしなくてよい。\n"
-        "   (b) Cloud Console の OAuth クライアント(Desktop app)の JSON を\n"
-        "       ダウンロードして、その実際のパスを渡す:\n"
-        "         GWS_CLIENT_SECRET_JSON=<落としたJSONのパス> bash setup_gws_remote.sh")
+        "   (b) Cloud Console で同じ OAuth クライアントに\n"
+        "       「シークレットを追加」して、表示された値を渡す(推奨):\n"
+        "         GWS_CLIENT_SECRET=<追加したシークレット> bash setup_gws_remote.sh\n"
+        "       (古いシークレットを無効化しなければ gog はそのまま動く)\n"
+        "   (c) 手元に OAuth クライアントの JSON があればそのパスを渡す:\n"
+        "         GWS_CLIENT_SECRET_JSON=<JSONのパス> bash setup_gws_remote.sh")
 
 
 def pick_refresh_token(tok, account):
@@ -173,6 +208,9 @@ def main():
     client_id, client_secret, used = pick_client(sources)
     if a.verbose:
         print(f"    client 情報の採用元: {used}")
+        # client_id は秘密ではない。Cloud Console のどのクライアントを
+        # 使っているかを目で照合できるように出す。
+        print(f"    client_id: {client_id}")
 
     refresh = pick_refresh_token(tok, a.account)
 

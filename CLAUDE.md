@@ -260,9 +260,11 @@ gog は client_secret を keyring に退避することがあり、その場合 
 `credentials.json` にも token export にも入っていない（会社 Mac は実際にこの状態）。
 候補は `GWS_CLIENT_SECRET_JSON` → `~/.gog_sync/gog_env_*.env` →
 gog 管理下の credentials.json → token export の順に見る。
-どこにも無ければ Cloud Console から OAuth クライアント（Desktop app）の JSON を
-落として `GWS_CLIENT_SECRET_JSON=<path>`（クラウドなら
-`GWS_CLIENT_SECRET_JSON_B64=<base64>` を環境変数に）で渡す。
+どこにも無ければ Cloud Console で**同じ OAuth クライアントに「シークレットを追加」**し
+（Google は既存 secret の表示・DL を廃止した）、`GWS_CLIENT_SECRET=<値>` で渡す。
+クラウドはこれをセッション環境変数に入れておけばよい。
+**古いシークレットは無効化しないこと**（gog がそれで動いている）。
+対象クライアントは gog の client_id で判別する。
 
 環境変数 `GWS_CREDENTIALS_B64` があればそちらが優先される。
 会社 Mac で `gws auth export --unmasked` した値を配れば gog と独立した認証にできるが、
