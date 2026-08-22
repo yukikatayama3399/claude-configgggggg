@@ -20,9 +20,20 @@ else
   echo "[session-start] gog setup: FAILED (環境変数未設定 or refresh token失効の可能性。setup_gog_remote.sh を手動実行してエラー確認を)" >&2
 fi
 
-# gog を $HOME/bin に入れているので、セッション全体で PATH を通す。
+# gws セットアップ(冪等)。gog と同じく失敗してもセッションはブロックしない。
+# gws は gog の refresh token を流用するので、追加の環境変数は要らない。
+if bash "$CLAUDE_PROJECT_DIR/setup_gws_remote.sh"; then
+  echo "[session-start] gws setup: OK"
+else
+  echo "[session-start] gws setup: FAILED (setup_gws_remote.sh を手動実行してエラー確認を)" >&2
+fi
+
+# gog は $HOME/bin、gws は $HOME/.local/bin に入れているので PATH を通す。
+# gws の認証情報の場所もセッション全体で見えるようにしておく。
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-  echo 'export PATH="$HOME/bin:$PATH"' >> "$CLAUDE_ENV_FILE"
+  echo 'export PATH="$HOME/bin:$HOME/.local/bin:$PATH"' >> "$CLAUDE_ENV_FILE"
+  echo 'export GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE="$HOME/.config/gws/credentials.json"' >> "$CLAUDE_ENV_FILE"
+  echo 'export GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND=file' >> "$CLAUDE_ENV_FILE"
 fi
 
 exit 0
