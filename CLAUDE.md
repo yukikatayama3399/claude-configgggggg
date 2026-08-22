@@ -257,9 +257,12 @@ Mac で使うときは**リポジトリのクローン内で** `bash setup_gws_r
 スクリプトはアカウントを明示して取り出す（既定 `@fout.jp`、`GWS_ACCOUNT` で変更可）。
 
 gog は client_secret を keyring に退避することがあり、その場合 gog 管理下の
-`credentials.json` には入っていない。スクリプトは token export 側の client 情報を
-使うが、どちらにも無ければ Cloud Console から落とした OAuth クライアント JSON を
-`GWS_CLIENT_SECRET_JSON=<path>` で渡す。
+`credentials.json` にも token export にも入っていない（会社 Mac は実際にこの状態）。
+候補は `GWS_CLIENT_SECRET_JSON` → `~/.gog_sync/gog_env_*.env` →
+gog 管理下の credentials.json → token export の順に見る。
+どこにも無ければ Cloud Console から OAuth クライアント（Desktop app）の JSON を
+落として `GWS_CLIENT_SECRET_JSON=<path>`（クラウドなら
+`GWS_CLIENT_SECRET_JSON_B64=<base64>` を環境変数に）で渡す。
 
 環境変数 `GWS_CREDENTIALS_B64` があればそちらが優先される。
 会社 Mac で `gws auth export --unmasked` した値を配れば gog と独立した認証にできるが、

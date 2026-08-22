@@ -86,13 +86,20 @@ gog は **client_secret を keyring に退避する**ことがある
 3. gog 管理下の `credentials.json`
 4. token export
 
-全部に secret が無いと止まる。その場合は Cloud Console から
-OAuth クライアント（Desktop app）の JSON をダウンロードして、
-**その実際のパス**を渡す:
+全部に secret が無いと止まる。その場合は Cloud Console
+（**@gmail.com でログイン**、プロジェクト `317751427169`）の「認証情報」から
+OAuth クライアント（Desktop app）の JSON をダウンロードして渡す:
 
 ```bash
+# ローカル実行時: 落としたファイルの実際のパスを渡す
 GWS_CLIENT_SECRET_JSON=<落としたJSONのパス> bash setup_gws_remote.sh
+
+# クラウド用: base64 にしてセッション環境変数に入れておけば恒久的に効く
+openssl base64 -A -in <落としたJSONのパス>   # → GWS_CLIENT_SECRET_JSON_B64 に設定
 ```
+
+`GWS_CLIENT_SECRET_JSON_B64` を環境変数に入れておけば、
+gog 側の配布値に secret が無くてもクラウドで gws が動く。
 
 （macOS の keychain から secret を読む経路は実装していない。
 Claude Code の権限ガードに引っかかるうえ、キーチェーンの許可プロンプトと

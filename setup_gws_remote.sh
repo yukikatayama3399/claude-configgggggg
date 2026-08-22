@@ -13,6 +13,11 @@
 #   2. GOG_CREDENTIALS_B64 + GOG_TOKEN_EXPORT_B64  … クラウド(web)セッション
 #   3. ローカルの gog 本体          … 会社 Mac など、gog が認証済みの端末
 #
+# client_secret が上のどこにも無い場合(gog が keyring に退避している)は、
+# Cloud Console の OAuth クライアント JSON を渡す:
+#   GWS_CLIENT_SECRET_JSON=<パス>       … ローカル実行時
+#   GWS_CLIENT_SECRET_JSON_B64=<base64> … クラウドの環境変数に入れる場合
+#
 # 使い方:
 #   bash setup_gws_remote.sh                       # 既定 @fout.jp
 #   GWS_ACCOUNT=other@example.com bash setup_gws_remote.sh
@@ -109,6 +114,15 @@ gws --version >/dev/null 2>&1 || fail "gws が実行できない"
 # ---- 2. credentials.json の用意 ----
 mkdir -p "$CONFIG_DIR"
 chmod 700 "$CONFIG_DIR"
+
+# Cloud Console から落とした OAuth クライアント JSON を base64 で配る経路。
+# gog が client_secret を keyring に退避していて、配った GOG_CREDENTIALS_B64 にも
+# 入っていない場合の逃げ道。クラウドの環境変数に入れておけば恒久的に効く。
+if [ -n "${GWS_CLIENT_SECRET_JSON_B64:-}" ] && [ -z "${GWS_CLIENT_SECRET_JSON:-}" ]; then
+  b64_env_to_file GWS_CLIENT_SECRET_JSON_B64 "$WORK_DIR/client_secret.json" || exit 1
+  GWS_CLIENT_SECRET_JSON="$WORK_DIR/client_secret.json"
+  log "client 情報の候補: GWS_CLIENT_SECRET_JSON_B64 を使用"
+fi
 
 if [ -n "${GWS_CREDENTIALS_B64:-}" ]; then
   # (1) gws 独自の認証を配っている場合(通常は使わない)
