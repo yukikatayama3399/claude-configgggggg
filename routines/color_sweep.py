@@ -4,10 +4,18 @@
 判定は決定論。変更するのは colorId だけで、タイトル・時間・出席者・公開範囲・
 availability には一切触れない。--apply を付けない限り読み取りのみ。
 
-既知の制約: gog v0.19.0 も Google Calendar MCP も「色を既定色に戻す」ことができない
+既知の制約1: gog v0.19.0 も Google Calendar MCP も「色を既定色に戻す」ことができない
 （gog は --event-color= を exit 0 のまま黙って無視し、MCP は空 colorId を拒否する）。
 そのため「デフォルト」バケツは *色を付けない* と定義し、既に色が付いている場合は
 触らずに要手動クリアとして報告する。
+
+既知の制約2: 対面かオンラインかを機械的に判別する材料がカレンダーに無い（2026-08-22 実測）。
+  - 会議室を押さえていてもオンライン: [オンライン社外] Regal core は TELECUBE ブース、
+    [オンライン 社外] サイバーバズ加賀美さんは Lumpy Gravy 会議室から接続している
+  - Meet リンクがあっても対面: 【週次】HAWK定例会、来社勉強会（サイバーバズ様）
+つまり location / 会議室リソース / hangoutLink はどれも判定に使えない。
+唯一の確かな手がかりはタイトル先頭の [主タグ] で、これは命名ルーティンが付ける。
+タグが無い予定は「相手がいれば対面」に倒し、推定であることを必ず報告する。
 """
 import argparse, json, re, subprocess, sys
 
@@ -15,7 +23,7 @@ ACC = "yuki.katayama@fout.jp"
 DAYS = 14
 
 # バケツ -> colorId。None = 色を付けない（既定色のまま）
-COLOR = {"作業": "8", "meet": "6", "対面": "11", "デフォルト": None}
+COLOR = {"作業": "8", "meet": "6", "対面": "3", "デフォルト": None}
 
 PRIVATE_RE = re.compile(
     r"私用|病院|通院|歯医者|処方箋|薬局|会食|ランチ|昼食|飲み会|呑み|ジム|キックボクシング|"
@@ -65,18 +73,19 @@ def classify(e):
 
     tag = main_tag(summary)
     humans = [a for a in e.get("attendees", []) if not a.get("resource") and not a.get("self")]
-    has_meet = bool(e.get("hangoutLink") or e.get("conferenceData"))
 
+    # タグがあればそれが唯一の確かな手がかり。必ず優先する。
     if tag:
         b = TAG_BUCKET.get(tag) or TAG_BUCKET.get(tag.lower())
         return (b, f"タグ[{tag}]") if b else (None, f"未知のタグ[{tag}]")
 
     if PRIVATE_RE.search(summary):
         return "デフォルト", "私用キーワード"
-    if has_meet:
-        return "meet", f"推定・Meetあり(他{len(humans)}名)"
+
+    # 対面とオンラインは機械的に区別できない（下の「判定材料が無い」参照）。
+    # 相手がいる予定は対面に倒す。オンラインなら命名ルーティンが [オンライン*] を付ける。
     if humans:
-        return "対面", f"推定・Meetなし(他{len(humans)}名)"
+        return "対面", f"推定・他{len(humans)}名"
     return "作業", "推定・出席者なし"
 
 
