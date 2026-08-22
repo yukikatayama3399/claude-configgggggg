@@ -56,6 +56,31 @@ with os.fdopen(fd, "wb") as f:
 PY
 }
 
+# sync_gog_token.sh が書き出した .env の 1 行(KEY=base64)を decode する。
+# クラウドへ配った値には、gog が keyring に退避する前の client_secret が
+# 残っていることがあるため、Mac 側の候補として使える。
+b64_line_to_file() {  # $1=envファイル $2=変数名 $3=出力先
+  python3 - "$1" "$2" "$3" <<'PYLINE'
+import base64, os, sys
+src, name, out = sys.argv[1], sys.argv[2], sys.argv[3]
+val = None
+with open(src) as f:
+    for line in f:
+        line = line.strip()
+        if line.startswith(name + "="):
+            val = line.split("=", 1)[1].strip().strip('"').strip("'")
+if not val:
+    sys.exit(1)
+try:
+    data = base64.b64decode(val)
+except Exception:
+    sys.exit(1)
+fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "wb") as f:
+    f.write(data)
+PYLINE
+}
+
 # ---- 1. gws のインストール ----
 # npm パッケージは薄いラッパで、postinstall が OS 別のバイナリを取ってくる。
 if command -v gws >/dev/null 2>&1 && [ "$(gws --version 2>/dev/null | head -1)" = "gws $GWS_VERSION" ]; then
@@ -117,19 +142,37 @@ elif command -v gog >/dev/null 2>&1; then
   # 候補集め。set -e 下では `[ test ] && cmd` を文の最後に置くと
   # テストが偽になった時点でスクリプトが落ちるので if で書く。
   CLIENT_SOURCES=()
-  # 明示指定(Cloud Console から落とした元の client_secret JSON など)が最優先
+  add_source() {  # 実在するファイルだけ、重複なしで足す
+    local p="$1" existing
+    [ -f "$p" ] || return 0
+    for existing in ${CLIENT_SOURCES+"${CLIENT_SOURCES[@]}"}; do
+      if [ "$existing" = "$p" ]; then return 0; fi
+    done
+    CLIENT_SOURCES+=("$p")
+  }
+  # 明示指定(Cloud Console から落とした OAuth クライアントの JSON)が最優先。
+  # 存在しないパスを渡されたら黙って無視せずここで止める。
   if [ -n "${GWS_CLIENT_SECRET_JSON:-}" ]; then
-    CLIENT_SOURCES+=("$GWS_CLIENT_SECRET_JSON")
+    if [ -f "$GWS_CLIENT_SECRET_JSON" ]; then
+      add_source "$GWS_CLIENT_SECRET_JSON"
+    else
+      fail "GWS_CLIENT_SECRET_JSON のファイルが無い: $GWS_CLIENT_SECRET_JSON"
+    fi
   fi
-  if [ -n "$CRED_PATH" ] && [ -f "$CRED_PATH" ]; then
-    CLIENT_SOURCES+=("$CRED_PATH")
-  fi
-  for c in "$HOME/.config/gogcli/credentials.json" \
-           "$HOME/Library/Application Support/gogcli/credentials.json"; do
-    if [ -f "$c" ]; then
-      CLIENT_SOURCES+=("$c")
+  # sync_gog_token.sh が過去に書き出した値(新しい順)。gog が keyring へ
+  # 退避する前の client_secret が残っていることがある。
+  i=0
+  for envf in $(ls -t "$HOME"/.gog_sync/gog_env_*.env 2>/dev/null || true); do
+    i=$((i + 1))
+    if b64_line_to_file "$envf" GOG_CREDENTIALS_B64 "$WORK_DIR/sync_${i}.json" 2>/dev/null; then
+      add_source "$WORK_DIR/sync_${i}.json"
     fi
   done
+  if [ -n "$CRED_PATH" ]; then
+    add_source "$CRED_PATH"
+  fi
+  add_source "$HOME/.config/gogcli/credentials.json"
+  add_source "$HOME/Library/Application Support/gogcli/credentials.json"
   python3 "$BUILDER" --account "$ACCOUNT" --token "$WORK_DIR/gog_token.json" \
       --out "$CRED_FILE" --verbose ${CLIENT_SOURCES+"${CLIENT_SOURCES[@]}"} \
     || fail "ローカルの gog から credentials.json を組めなかった"

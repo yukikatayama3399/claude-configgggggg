@@ -113,10 +113,12 @@ def pick_client(sources):
         f"   確認した候補: {checked}\n"
         "   gog が client_secret を keyring に退避していると、管理下の\n"
         "   credentials.json には入っていない(gog auth credentials list の\n"
-        "   SECRET_KEYRING=true がその状態)。その場合は Cloud Console の\n"
-        "   OAuth クライアント(Desktop app)の JSON を落として渡す:\n"
-        "     GWS_CLIENT_SECRET_JSON=~/Downloads/client_secret_....json \\\n"
-        "       bash setup_gws_remote.sh")
+        "   SECRET_KEYRING=true がその状態)。入手先は2つ:\n"
+        "   (a) ~/.gog_sync/gog_env_*.env … sync_gog_token.sh の出力。\n"
+        "       setup_gws_remote.sh が自動で見るので、あれば何もしなくてよい。\n"
+        "   (b) Cloud Console の OAuth クライアント(Desktop app)の JSON を\n"
+        "       ダウンロードして、その実際のパスを渡す:\n"
+        "         GWS_CLIENT_SECRET_JSON=<落としたJSONのパス> bash setup_gws_remote.sh")
 
 
 def pick_refresh_token(tok, account):

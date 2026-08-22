@@ -77,12 +77,26 @@ gog は **client_secret を keyring に退避する**ことがある
 `client_id` と `client_secret` は**同じファイルから対で**取る
 （別プロジェクトの id と secret を混ぜないため）。
 
-どちらにも secret が無いと止まる。その場合は Cloud Console から
-OAuth クライアント（Desktop app）の JSON を落として渡す:
+候補は次の順に見る:
+
+1. `GWS_CLIENT_SECRET_JSON`（明示指定）
+2. `~/.gog_sync/gog_env_*.env` の `GOG_CREDENTIALS_B64`（新しい順）
+   … `sync_gog_token.sh` が過去に書き出した値。gog が keyring へ退避する前の
+   secret が残っていることがあるので、**Mac ではこれが本命**
+3. gog 管理下の `credentials.json`
+4. token export
+
+全部に secret が無いと止まる。その場合は Cloud Console から
+OAuth クライアント（Desktop app）の JSON をダウンロードして、
+**その実際のパス**を渡す:
 
 ```bash
-GWS_CLIENT_SECRET_JSON=~/Downloads/client_secret_xxx.json bash setup_gws_remote.sh
+GWS_CLIENT_SECRET_JSON=<落としたJSONのパス> bash setup_gws_remote.sh
 ```
+
+（macOS の keychain から secret を読む経路は実装していない。
+Claude Code の権限ガードに引っかかるうえ、キーチェーンの許可プロンプトと
+サービス名の当て推量に依存して壊れやすいので採らなかった。）
 
 前提として、以下3つの環境変数がセッションに登録済みであること:
 
