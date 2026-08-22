@@ -38,15 +38,15 @@ bash check_gws_apis.sh   # gws 側
 ## クラウドセッションでの自動セットアップ
 
 `.claude/hooks/session-start.sh`（SessionStart フック）が
-セッション開始時に `setup_gog_remote.sh` を実行するため、**gog は手動実行不要**。
-
-**gws はまだフックに入っていない**ので、使う前に一度だけ叩く:
+セッション開始時に `setup_gog_remote.sh` と `setup_gws_remote.sh` を実行するため、
+**どちらも手動実行は不要**。手動でやるなら:
 
 ```bash
+bash setup_gog_remote.sh
 bash setup_gws_remote.sh
 ```
 
-フックにも入れたい場合は下記「gws をフックに組み込む」を参照。
+セッション開始時のログに `[session-start] gws setup: OK` / `FAILED` が出る。
 
 ### Mac で使う場合
 
@@ -147,11 +147,11 @@ gog とは独立した認証に切り替えられる（通常は不要）。
 `setup_gws_remote.sh` の `GWS_VERSION` で固定している。上げるときはこの1箇所。
 （gog と違い npm 経由で取るので、リポジトリにバイナリは同梱していない）
 
-### gws をフックに組み込む
+### gws をフックに組み込む（適用済み）
 
-毎セッション自動で入れたいなら `.claude/hooks/session-start.sh` の
-「PATH を通す」ブロックの手前に以下を足し、PATH 行を差し替える。
-（`hooks/session-start-gws.patch` に同じ差分を置いてある: `git apply hooks/session-start-gws.patch`）
+**この差分は既に `.claude/hooks/session-start.sh` に入っている**ので、
+通常は何もしなくてよい。フックを作り直したときの参考として残す。
+（同じ差分が `hooks/session-start-gws.patch` にある）
 
 ```bash
 # gws セットアップ(冪等)。gog と同じく失敗してもセッションはブロックしない。

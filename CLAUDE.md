@@ -247,9 +247,9 @@ gws calendar events list --params '{"calendarId":"primary","maxResults":5}'
 - 状態確認: `gws auth status`（`token_valid` / `scopes` / `enabled_apis` が JSON で出る）
 - 疎通確認: `bash check_gws_apis.sh`（読み取り専用）
 
-**gws は SessionStart フックに入っていない**（gog だけが自動セットアップされる）。
-クラウドセッションで gws を使う前に一度 `bash setup_gws_remote.sh` を叩くこと。
-フックに入れる差分は `hooks/session-start-gws.patch` に置いてある。
+**gws も SessionStart フックで自動セットアップされる**（gog と同じ扱い）。
+セッション開始ログの `[session-start] gws setup: OK` / `FAILED` で状態が分かる。
+FAILED なら `bash setup_gws_remote.sh` を手で叩いてエラーを読む。
 
 Mac で使うときは**リポジトリのクローン内で** `bash setup_gws_remote.sh` を叩く。
 環境変数が無い端末では、ローカルの gog から直接トークンをもらう。
