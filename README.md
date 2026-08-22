@@ -174,10 +174,16 @@ gws --help                           # サービス一覧
 会社 Mac で `gws auth export --unmasked` した結果を base64 で配れば、
 gog とは独立した認証に切り替えられる（通常は不要）。
 
-### バージョン
+### バージョン / バイナリ
 
-`setup_gws_remote.sh` の `GWS_VERSION` で固定している。上げるときはこの1箇所。
-（gog と違い npm 経由で取るので、リポジトリにバイナリは同梱していない）
+Linux 用バイナリ `bin/gws_0.22.5_linux_amd64.tar.gz` を同梱しているので、
+クラウドセッションではダウンロード不要（gog と同じ方式）。
+Mac などで同梱が無い場合だけ npm から取る。
+
+バージョンを上げるときは**2箇所を同時に**揃える:
+
+1. `bin/` の tarball
+2. `setup_gws_remote.sh` の `GWS_VERSION`
 
 ### gws をフックに組み込む（適用済み）
 

@@ -301,7 +301,9 @@ gog 管理下の credentials.json → token export の順に見る。
 
 - API の有効/無効は OAuth プロジェクト側の設定なので、**gog と gws で共通**。
   Slides のように無効だと `not enabled` で落ちるのも同じ（有効化手順は上記）。
-- npm 経由で入れているため、リポジトリにバイナリは同梱していない。
-  バージョンは `setup_gws_remote.sh` の `GWS_VERSION` で固定。
+- Linux 用バイナリは `bin/gws_<version>_linux_amd64.tar.gz` として同梱しており、
+  クラウドではダウンロード不要（gog と同じ方式）。Mac では npm から取る。
+  バージョンを上げるときは tarball と `setup_gws_remote.sh` の `GWS_VERSION` の
+  **2箇所を同時に**揃える。
 - gws は 100+ の Agent Skills を配布しているが、このリポジトリには入れていない
   （必要になったら `npx skills add https://github.com/googleworkspace/cli`）。

@@ -91,16 +91,37 @@ PYLINE
 }
 
 # ---- 1. gws のインストール ----
-# npm パッケージは薄いラッパで、postinstall が OS 別のバイナリを取ってくる。
+# Linux 用バイナリは bin/ に同梱しているのでネットワーク不要(gog と同じ方式)。
+# 同梱が無い環境(Mac など)は npm で入れる。npm パッケージは薄いラッパで、
+# postinstall が OS 別のバイナリを取ってくる。
 if command -v gws >/dev/null 2>&1 && [ "$(gws --version 2>/dev/null | head -1)" = "gws $GWS_VERSION" ]; then
   log "gws は既にインストール済み: $(gws --version | head -1)"
 else
-  command -v npm >/dev/null 2>&1 || fail "npm が無い。Node.js を入れるか、別の方法で gws を入れて。"
-  log "gws v${GWS_VERSION} をインストール中 (npm)..."
-  mkdir -p "$NPM_PREFIX"
-  npm install --prefix "$NPM_PREFIX" -g "@googleworkspace/cli@${GWS_VERSION}" >/dev/null \
-    || fail "npm install に失敗。ネットワーク(npm registry)へ到達できるか確認して。"
-  log "インストール完了: $BIN_DIR/gws"
+  case "$(uname -m)" in
+    x86_64)        GOARCH="amd64" ;;
+    aarch64|arm64) GOARCH="arm64" ;;
+    *)             GOARCH="" ;;
+  esac
+  LOCAL_TARBALL=""
+  if [ "$(uname)" = "Linux" ] && [ -n "$GOARCH" ]; then
+    CAND="$SCRIPT_DIR/bin/gws_${GWS_VERSION}_linux_${GOARCH}.tar.gz"
+    if [ -f "$CAND" ]; then LOCAL_TARBALL="$CAND"; fi
+  fi
+
+  mkdir -p "$BIN_DIR"
+  if [ -n "$LOCAL_TARBALL" ]; then
+    log "同梱の gws v${GWS_VERSION} (${GOARCH}) を使用: $LOCAL_TARBALL"
+    tar -xzf "$LOCAL_TARBALL" -C "$WORK_DIR" gws
+    install -m 0755 "$WORK_DIR/gws" "$BIN_DIR/gws"
+    log "インストール完了: $BIN_DIR/gws"
+  else
+    command -v npm >/dev/null 2>&1 || fail "npm が無い。Node.js を入れるか、別の方法で gws を入れて。"
+    log "gws v${GWS_VERSION} をインストール中 (npm)..."
+    mkdir -p "$NPM_PREFIX"
+    npm install --prefix "$NPM_PREFIX" -g "@googleworkspace/cli@${GWS_VERSION}" >/dev/null \
+      || fail "npm install に失敗。ネットワーク(npm registry)へ到達できるか確認して。"
+    log "インストール完了: $BIN_DIR/gws"
+  fi
 fi
 
 # PATH を通す(このシェル + 使っているシェルの rc)
