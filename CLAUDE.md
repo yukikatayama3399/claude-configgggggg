@@ -42,6 +42,17 @@ bash sync_gog_token.sh --reauth   # 認証をやり直してから書き出す
 1. Claude Code on the web の環境変数（クラウドセッション用）
 2. GitHub Secrets（Actions を使う場合。`--gh-secrets` で自動 push 可）
 
+**GitHub Secrets は会社 Mac から配らない方がよい**（2026-08-24 実測）。
+Mac の gog は client_secret を keychain に退避しており、ディスク上の
+`credentials.json` には入っていない。そこから作った `GOG_CREDENTIALS_B64` は
+128 文字（クラウドで動いている値は 412 文字）で、**配った先でリフレッシュが失敗する**。
+`GOG_TOKEN_EXPORT_B64` も 1212 文字 対 4336 文字で中身が違い、スコープが
+細っている可能性がある。
+→ **クラウド(web)のセッション環境変数に入っている実証済みの3値を、
+そのまま GitHub Secrets に貼るのが正解。** Mac も `gh` も経由しない。
+`sync_gog_token.sh` は client_secret が無い credentials を配ろうとすると
+中断する（続行するなら `GOG_SYNC_ALLOW_NO_SECRET=1`）。
+
 バラバラに認証すると壊れる理由:
 - **スコープが縮む**: `gog auth add` の `--services` の既定値は `user` なので、
   指定を忘れると 22 個あるスコープが最小構成に上書きされる。
