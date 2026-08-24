@@ -1,0 +1,69 @@
+﻿元の行番号,会社名,分類,理由,サイトURL,フォームURL
+6,株式会社ecbeing,除外リスト該当(同一法人),完全一致(表記ゆれ含む) / 除外リスト: 株式会社ｅｃｂｅｉｎｇ,https://www.ecbeing.net/,https://www.ecbeing.net/contacts/
+17,トランスコスモス株式会社 CX事業統括 サービス推進本部,除外リスト該当(同一法人),同一法人(拠点・部署付き表記) / 除外リスト: トランスコスモス株式会社,https://www.trans-cosmos.co.jp/,https://www.trans-cosmos.co.jp/contact/
+33,株式会社ウィルオブ・ワーク（ウィルグループ）,除外リスト該当(同一法人),同一法人（社名変更・別表記） / 株式会社ウィルオブ・ワーク（括弧内はグループ名）,https://willof-work.co.jp/,https://willof-work.co.jp/corp/contact/
+92,株式会社Leo Sophia Group,除外リスト該当(同一法人),同一法人（社名変更・別表記） / 株式会社LeoSophia,https://leosophia.co.jp/,https://leosophia.co.jp/contact/
+197,株式会社UP VILLAGE,除外リスト該当(同一法人),完全一致(表記ゆれ含む) / 除外リスト: 株式会社UPVILLAGE,https://www.upvillage.jp/,https://www.upvillage.jp/contact/
+199,"株式会社マイベスト／mybest, Inc.",除外リスト該当(同一法人),同一法人（社名変更・別表記） / 株式会社マイベスト（英語表記併記）,https://us.my-best.com/company,https://business.my-best.com/contact
+231,株式会社電通デジタル 港区,除外リスト該当(同一法人),同一法人(拠点・部署付き表記) / 除外リスト: 株式会社電通デジタル,https://www.dentsudigital.co.jp/,https://www.dentsudigital.co.jp/contact/
+306,トランスコスモス株式会社 渋谷区,除外リスト該当(同一法人),同一法人(拠点・部署付き表記) / 除外リスト: トランスコスモス株式会社,https://www.trans-cosmos.co.jp/,https://www.trans-cosmos.co.jp/contact/
+347,株式会社Offbeat,除外リスト該当(同一法人),完全一致(表記ゆれ含む) / 除外リスト: Off Beat株式会社,https://off-beat.co.jp/,https://off-beat.co.jp/contact.html
+358,クラシル株式会社,除外リスト該当(同一法人),同一法人（社名変更・別表記） / dely株式会社（2025-10-01 に クラシル株式会社 へ社名変更。同一法人）,https://kurashiru.co.jp/,https://kurashiru.co.jp/contact
+366,株式会社D&CMarketing,除外リスト該当(同一法人),完全一致(表記ゆれ含む) / 除外リスト: 株式会社D&C marketing,https://www.dcmarketing.jp/,https://www.dcmarketing.jp/contact/
+376,株式会社DYM 品川区,除外リスト該当(同一法人),同一法人(拠点・部署付き表記) / 除外リスト: 株式会社DYM,https://dym.asia/,https://dym.asia/contact
+382,株式会社PLAN‐Bマーケティングパートナーズ,除外リスト該当(同一法人),完全一致(表記ゆれ含む) / 除外リスト: 株式会社PLAN-Bマーケティングパートナーズ,https://www.pbmp.co.jp/,https://www.pbmp.co.jp/contact/
+578,株式会社W‐ENDLESS,除外リスト該当(同一法人),完全一致(表記ゆれ含む) / 除外リスト: 株式会社W-ENDLESS,https://www.w-endless.co.jp/,https://www.w-endless.co.jp/contact/
+596,売れるネット広告社株式会社,除外リスト該当(同一法人),完全一致(表記ゆれ含む) / 除外リスト: 株式会社売れるネット広告社,https://www.ureru.co.jp/,https://www.ureru.co.jp/contact/
+623,株式会社データX 新宿区,除外リスト該当(同一法人),同一法人(拠点・部署付き表記) / 除外リスト: 株式会社データX,https://data-x.co.jp/,https://data-x.jp/contact/
+706,株式会社電通デジタル 大阪市,除外リスト該当(同一法人),同一法人(拠点・部署付き表記) / 除外リスト: 株式会社電通デジタル,https://www.dentsudigital.co.jp/,https://www.dentsudigital.co.jp/contact/
+798,楽天グループ,除外リスト該当(同一法人),完全一致(表記ゆれ含む) / 除外リスト: 楽天グループ株式会社,https://corp.rakuten.co.jp/,https://www.rakuten.co.jp/sitemap/inquiry.html
+816,パナソニックコネクト株式会社,除外リスト該当(同一法人),完全一致(表記ゆれ含む) / 除外リスト: パナソニック コネクト株式会社,https://connect.panasonic.com/jp-ja,https://connect.panasonic.com/jp-ja/support
+837,株式会社DGコミュニケーションズ ~デジタルガレ...,除外リスト該当(同一法人),同一法人(拠点・部署付き表記) / 除外リスト: 株式会社DGコミュニケーションズ,https://www.dg-c.co.jp/,https://www.dg-c.co.jp/contact/
+897,ADKマーケティング・ソリューションズ,除外リスト該当(同一法人),完全一致(表記ゆれ含む) / 除外リスト: 株式会社ADKマーケティング・ソリューションズ,https://www.adkms.jp/,https://www.adkms.jp/ask/
+70,株式会社CARTA HOLDINGS,除外リスト該当(親子・グループ会社),親子・グループ会社 / 株式会社CARTA ZERO の親会社,https://cartaholdings.co.jp/,https://cartaholdings.co.jp/contact/
+98,ニフティライフスタイル株式会社,除外リスト該当(親子・グループ会社),親子・グループ会社 / ニフティ株式会社 の関連会社,https://niftylifestyle.co.jp/,https://dm.niftylifestyle.co.jp/contact/
+230,株式会社リクルートR&Dスタッフィング,除外リスト該当(親子・グループ会社),親子・グループ会社 / 株式会社リクルート の関連会社,https://www.recruit-rds.co.jp/,https://www.recruit-rds.co.jp/contact/
+232,サイバーエージェントグループ,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: 株式会社サイバーエージェント,https://www.cyberagent.co.jp/,https://www.cyberagent.co.jp/contact/
+233,株式会社CARTAHOLDINGS,除外リスト該当(親子・グループ会社),親子・グループ会社 / 株式会社CARTA ZERO の親会社,https://cartaholdings.co.jp/,https://cartaholdings.co.jp/contact/
+236,デジマールリンクス株式会社,除外リスト該当(親子・グループ会社),親子・グループ会社 / デジマール株式会社 の関連会社,https://digimarl-links.com/,https://digimarl-links.com/contact
+286,株式会社ベクトルグループ,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: 株式会社ベクトル,https://vectorinc.co.jp/,https://vectorinc.co.jp/inquiry
+313,株式会社電通PRコンサルティング,除外リスト該当(親子・グループ会社),親子・グループ会社 / 電通グループ（除外に株式会社電通）,https://www.dentsuprc.co.jp/,https://www.dentsuprc.co.jp/contact/
+372,株式会社ベネッセスタイルケアグループ,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: 株式会社ベネッセスタイルケア,https://benesse-scg.co.jp/,https://benesse-scg.co.jp/faq
+373,エムスリーキャリア株式会社,除外リスト該当(親子・グループ会社),親子・グループ会社 / エムスリー株式会社 の子会社,https://www.m3career.com/,https://www.m3career.com/contact/
+379,株式会社NEW ART HOLDINGS,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: 株式会社NEW ART,https://newart-ir.jp/,https://newart-ir.jp/contact/
+384,インキュデータ株式会社,除外リスト該当(親子・グループ会社),親子・グループ会社 / ソフトバンク×博報堂×トレジャーデータのJV（3社すべて除外リストにあり）,https://www.incudata.co.jp/,https://www.incudata.co.jp/contact/
+479,株式会社フリークアウト・ホールディングス,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: 株式会社フリークアウト,https://www.fout.co.jp/,https://www.fout.co.jp/contact/
+480,株式会社D2C R,除外リスト該当(親子・グループ会社),親子・グループ会社 / 株式会社D2C の子会社,https://www.d2cr.co.jp/,https://www.d2cr.co.jp/contact
+501,ネクステージグループホールディングス株式会社,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: ネクステージ株式会社,https://c-nextage.com/,https://c-nextage.com/contact/
+531,パナソニック エナジー株式会社,除外リスト該当(親子・グループ会社),親子・グループ会社 / パナソニックグループ（除外にパナソニック株式会社・パナソニック コネクト株式会社）,https://www.panasonic.com/jp/energy/,https://energy.panasonic.com/jp/business/inquiry/sales-agency
+600,第一三共ヘルスケアダイレクト株式会社,除外リスト該当(親子・グループ会社),親子・グループ会社 / 第一三共ヘルスケア株式会社 の子会社,https://daiichisankyo-hcdr.co.jp/,https://daiichisankyo-hcdr.co.jp/contact/
+636,GMO TECHホールディングス株式会社,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: GMO TECH株式会社,https://hd.gmotech.jp/,https://hd.gmotech.jp/contact/
+777,楽天カード株式会社,除外リスト該当(親子・グループ会社),親子・グループ会社 / 楽天グループ株式会社 の子会社,https://www.rakuten-card.co.jp/,https://www.rakuten-card.co.jp/support/contact/
+786,リンクタイズホールディングス株式会社,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: リンクタイズ株式会社,https://linkties-holdings.com/,https://linkties-holdings.com/contact/
+817,パナソニックグループ,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: パナソニック株式会社,https://holdings.panasonic/jp/,https://holdings.panasonic/jp/support/inquiry.html
+820,マテリアルグループ株式会社,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: 株式会社マテリアル,https://materialgroup.jp/,https://materialgroup.jp/contact/
+825,パナソニック エナジー,除外リスト該当(親子・グループ会社),親子・グループ会社 / パナソニックグループ（除外にパナソニック株式会社・パナソニック コネクト株式会社）,https://www.panasonic.com/jp/energy/,https://energy.panasonic.com/jp/business/inquiry/
+834,福岡ソフトバンクホークス株式会社,除外リスト該当(親子・グループ会社),親子・グループ会社 / ソフトバンクグループ（除外にソフトバンク株式会社）,https://www.softbankhawks.co.jp/,https://www.softbankhawks.co.jp/company/inquiry.html
+895,株式会社DYM NEXT,除外リスト該当(親子・グループ会社),親子・グループ会社 / 株式会社DYM の子会社,https://dymnext.jp/,https://dymnext.jp/contact/
+898,ラクスルグループ,除外リスト該当(親子・グループ会社),同一グループ(グループ/ホールディングス表記) / 除外リスト: ラクスル株式会社,https://corp.raksul.com/,https://corp.raksul.com/contact/
+31,株式会社Ｈ・Ｏ・Ｃ,重複,重複（会社名一致） / 30行目「株式会社H・O・C」を残した,https://hoc-inc.jp/,https://hoc-inc.jp/info/contact/
+34,株式会社スタッフサービス エンジニアガイド,重複,重複（ドメイン一致） / 32行目「スタッフサービス・エンジニアリング」を残した,https://www.staffservice-engineering.jp/,https://sp.staffservice-engineering.jp/form/inquiry/entry1.php
+94,株式会社Bamos,重複,重複（ドメイン一致） / 78行目「株式会社Bamosグループ」を残した,https://bamos.co.jp/,https://bamos.co.jp/contact/
+144,株式会社Oxxx,重複,重複（会社名一致） / 14行目「株式会社Ｏｘｘｘ」を残した,https://oxxx.co.jp/,https://oxxx.co.jp/ec/contact
+150,株式会社Add Flow,重複,重複（会社名一致） / 23行目「株式会社ＡｄｄＦｌｏｗ」を残した,https://www.add-flow.com/,https://www.add-flow.com/contact/
+182,MOON‐X Japan株式会社,重複,重複（会社名一致） / 487行目「MOON-X Japan株式会社」を残した,https://www.moon-x-japan.co.jp/,https://www.moon-x-japan.co.jp/contact/others
+266,株式会社ラフライフ／キャリアセンター,重複,重複（ドメイン一致） / 258行目「株式会社ラフライフ東京本社」を残した,https://laughlife.jp/,https://laughlife.jp/contact/
+294,XMile株式会社,重複,重複（会社名一致） / 228行目「X Mile株式会社」を残した,https://www.xmile.co.jp/,https://www.xmile.co.jp/inquiry
+343,Side Kicks株式会社,重複,重複（会社名一致） / 340行目「SideKicks株式会社」を残した,https://side-k.co.jp/,https://side-k.co.jp/contact/
+350,株式会社FaberCompany,重複,重複（会社名一致） / 421行目「株式会社Faber Company」を残した,https://www.fabercompany.co.jp/,https://www.fabercompany.co.jp/contact/
+378,株式会社NEXER Group,重複,重複（ドメイン一致） / 349行目「株式会社NEXER」を残した,https://nexer.co.jp/,https://nexer.co.jp/contact
+381,株式会社WaterAir,重複,重複（会社名一致） / 223行目「株式会社Water Air」を残した,https://waterair.jp/,https://waterair.jp/contact
+526,AnyMind Group,重複,重複（ドメイン一致） / 89行目「AnyMind Japan株式会社」を残した,https://anymindgroup.com/,https://anymindgroup.com/ja/contact/
+579,株式会社ギークリー 渋谷区,重複,重複（ドメイン一致） / 97行目「株式会社ギークリー」を残した,https://corp.geekly.co.jp/,https://corp.geekly.co.jp/contact/
+598,株式会社Ultimate Life,重複,重複（会社名一致） / 715行目「株式会社UltimateLife」を残した,https://ultimatelife.co.jp/,https://ultimatelife.co.jp/contact/
+787,X Mile株式会社 新宿区,重複,重複（ドメイン一致） / 228行目「X Mile株式会社」を残した,https://www.xmile.co.jp/,https://www.xmile.co.jp/inquiry
+826,Mouser Electronics,重複,重複（ドメイン一致） / 535行目「Mouser Japan合同会社」を残した,https://www.mouser.jp/,https://www.mouser.jp/help/contact-us/
+861,タイガー魔法瓶,重複,重複（会社名一致） / 594行目「タイガー魔法瓶株式会社」を残した,https://www.tiger-corporation.com/,https://www.tiger-corporation.com/ja/jpn/support/inquiry/
+876,リビンテクノロジーズ株式会社,重複,重複（会社名一致） / 200行目「リビン・テクノロジーズ株式会社」を残した,https://www.lvn.co.jp/,https://www.lvn.co.jp/contact/
+886,エクセレントケアシステム関東支社,重複,重複（ドメイン一致） / 885行目「株式会社エクセレントケアシステム本部」を残した,https://www.excare.co.jp/,https://www.excare.co.jp/inquiry/
+915,株式会社ベクティム,重複,重複（ドメイン一致） / 16行目「株式会社VECTIM」を残した,https://vectim.co.jp/,https://vectim.co.jp/contact/
