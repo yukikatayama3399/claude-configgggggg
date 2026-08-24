@@ -24,7 +24,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from company_match import Exclusion, domain  # noqa: E402
+from company_match import Exclusion, domain, load_extra  # noqa: E402
 from company_match import key as company_key  # noqa: E402
 
 SPREADSHEET_ID = "1gYL-_-rM52JrWEtsL-Cx-Wv4BPjS49qg9g_n2xq8WqQ"
@@ -36,6 +36,9 @@ RAW_SHEET_ID = 1963927632
 # 除外リスト（既存顧客・お断り先）。B列が社名。
 EXCLUDE_SHEET_ID = 785706625
 EXCLUDE_KEY_COL = "B"
+# 除外リストには無いが取込んではいけない社名（社名変更・親子会社など）。
+# 顧客マスタを書き換えたくないのでリポジトリ側で持つ。
+EXTRA_EXCLUDE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exclude_extra.tsv")
 
 # 取込元の列構成。ここが変わったら追記せず中止する。
 EXPECTED_HEADER = [
@@ -196,7 +199,8 @@ def main():
     work_sheet, raw_sheet = titles[WORK_SHEET_ID], titles[RAW_SHEET_ID]
     raw_rows = read_raw(raw_sheet)
     existing, existing_domains, existing_count, last_data_row = read_work(work_sheet)
-    exclusion = Exclusion(read_exclusion(titles[EXCLUDE_SHEET_ID]))
+    extra = load_extra(EXTRA_EXCLUDE_FILE)
+    exclusion = Exclusion(read_exclusion(titles[EXCLUDE_SHEET_ID]), extra)
 
     fresh, seen, seen_domains, blocked = [], set(), set(), []
     for row in raw_rows:
@@ -217,7 +221,8 @@ def main():
         fresh.append(row)
 
     if blocked:
-        print(f"除外リスト該当で取込まなかった: {len(blocked)}件")
+        print(f"除外リスト該当で取込まなかった: {len(blocked)}件"
+              f"（除外リスト {len(exclusion.exact)}社 + 個別指定 {len(extra)}社と照合）")
         for name, (why, src) in blocked:
             print(f"  - {name} … {why} / 除外リスト「{src}」")
 

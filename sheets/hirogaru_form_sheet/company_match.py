@@ -7,14 +7,24 @@
 のような表記は素通りしてしまう。既存顧客に営業メールを送るのが一番まずいので、
 取込の直前にこちらで判定する。
 
-判定は3段階。いずれも「同一法人・同一グループとみなす」＝取込まない。
+**方針は「迷ったら落とす」**。既存顧客に1通送る損害のほうが、見込み客1社を
+落とす損害より大きい、という運用判断（2026-08-24 に確認）。判定は5段階で、
+どれかに当たれば取込まない。
+
   1. 完全一致       … 正規化して一致（全角半角・スペース・ハイフン・法人格の差を吸収）
   2. 拠点・部署付き … 空白の前が一致し、後ろが「港区」「本部」「採用」等
   3. グループ表記   … 末尾の「グループ」「ホールディングス」を落とすと一致
+  4. 法人格違い     … 正規化後は同名だが 株式会社 / 合同会社 が違う（別法人の可能性でも落とす）
+  5. 社名の一部一致 … 空白の前だけが一致（株式会社LiB と 株式会社Lib Work のような形）
 
-似ているだけの別会社（株式会社LiB と 株式会社Lib Work など）は落とさない。
+4と5は「別会社かもしれない」ケースなので、以前は通していた。当たると危ないので
+落とす側に変えた。通したい社名が出てきたら `EXEMPT` に足す。
+
+社名変更・親子会社は文字列では判定できないので `exclude_extra.tsv` に社名と理由を
+書いて足す（除外リスト本体＝顧客マスタは触らない）。
 """
 
+import os
 import re
 import unicodedata
 from urllib.parse import urlparse
@@ -37,6 +47,9 @@ LEGAL_TYPE = [
     ("合同会社", "合同"), ("有限会社", "有限"), ("合資会社", "合資"), ("合名会社", "合名"),
     ("一般社団法人", "社団"), ("一般財団法人", "財団"), ("株式会社", "株"), ("(株)", "株"), ("㈱", "株"),
 ]
+# 判定4・5で落としたくない社名（別会社だと確認できたもの）を key() 済みで置く。
+# 今は空。落としすぎて困る社名が出たらここに足す。
+EXEMPT = set()
 
 
 def nfkc(s):
@@ -97,24 +110,55 @@ def domain(url):
     return host if re.fullmatch(r"[a-z0-9][a-z0-9.\-]*\.[a-z]{2,}", host) else ""
 
 
-class Exclusion:
-    """除外リストの社名を受け取り、照合できるようにする。"""
+def load_extra(path):
+    """exclude_extra.tsv（社名 <TAB> 理由）を読む。無ければ空。"""
+    extra = {}
+    if not os.path.exists(path):
+        return extra
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.rstrip("\n")
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            name, _, reason = line.partition("\t")
+            if name.strip():
+                extra[name.strip()] = reason.strip() or "個別指定"
+    return extra
 
-    def __init__(self, names):
-        self.exact, self.group = {}, {}
+
+class Exclusion:
+    """除外リストの社名を受け取り、照合できるようにする。
+
+    names … 除外リストタブ(B列)の社名。extra … exclude_extra.tsv の {社名: 理由}。
+    """
+
+    def __init__(self, names, extra=None):
+        self.exact, self.group, self.manual = {}, {}, {}
         for n in names:
             n = str(n).strip()
             if n:
                 self.exact.setdefault(key(n), n)
                 self.group.setdefault(key_nogroup(n), n)
+        for n, reason in (extra or {}).items():
+            n = str(n).strip()
+            if n:
+                self.manual.setdefault(key(n), (n, reason))
 
     def hit(self, name):
         """除外すべきなら (理由, 除外リスト上の社名) を返す。該当しなければ None。"""
         k = key(name)
+        # 個別指定は「絶対に当たらない」ためのリストなので、拠点・部署付きの表記も拾う
+        for cand in (k, key(head(name))):
+            if cand in self.manual:
+                src, reason = self.manual[cand]
+                return f"個別指定({reason})", src
         if k in self.exact:
             src = self.exact[k]
             if legal_type(name) and legal_type(src) and legal_type(name) != legal_type(src):
-                return None  # 株式会社 と 合同会社 など。別法人の可能性があるので落とさない
+                if k in EXEMPT:
+                    return None
+                # 株式会社 と 合同会社 など。別法人かもしれないが、当たると危ないので落とす
+                return "法人格違いの完全一致(迷ったら落とす)", src
             return "完全一致(表記ゆれ含む)", src
         h = head(name)
         if h != nfkc(name) and key(h) in self.exact:
@@ -123,7 +167,11 @@ class Exclusion:
                 rest = rest.replace(nfkc(lg), "")
             if rest.strip() == "" or BRANCH_RE.search(rest.strip()):
                 return "同一法人(拠点・部署付き表記)", self.exact[key(h)]
-            return None  # 「Lib Work」「Blue Zone」のように社名の一部が一致するだけ
+            if k in EXEMPT:
+                return None
+            # 「Lib Work」「Blue Zone」のように社名の一部が一致するだけ。
+            # 別会社の可能性が高いが、当たると危ないので落とす
+            return "社名の一部が一致(迷ったら落とす)", self.exact[key(h)]
         g = key_nogroup(name)
         if g != k and g in self.group:
             return "同一グループ(グループ/ホールディングス表記)", self.group[g]

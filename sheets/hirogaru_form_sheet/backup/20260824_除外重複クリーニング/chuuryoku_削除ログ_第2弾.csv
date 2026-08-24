@@ -1,0 +1,10 @@
+﻿元の行番号(第1弾後),会社名,分類,理由,サイトURL,フォームURL
+116,株式会社メディカルハンズ,同一法人・系列（手動判定）,株式会社ハンズ と同一・系列の可能性,https://www.medical-hands.net/,https://www.medical-hands.net/contact/
+216,NTT東日本株式会社,同一法人・系列（手動判定）,NTTグループ（除外に株式会社NTTドコモ）,https://www.ntt-east.co.jp/,https://www.ntt-east.co.jp/contact/
+415,株式会社Lib Work,判断が割れる（社名の一部だけ一致）,除外リスト「株式会社LiB」と先頭が一致（後続: Work）,https://www.libwork.co.jp/,https://www.libwork.co.jp/inquiry/
+495,株式会社富士フイルムヘルスケアラボラトリー,判断が割れる（同一ドメインの別法人）,fujifilm.com / 823行目「富士フイルムビジネスイノベーション株式会社」を残した,https://www.fujifilm.com/ffhc/ja,https://www.fujifilm.com/ffhc/ja/contact
+513,インタラクティブ株式会社,同一法人・系列（手動判定）,jekiインタラクティブ・コミュニケーションズ と同一・系列の可能性,https://www.inta.co.jp/,https://www.inta.co.jp/contact/
+518,GMOコマース株式会社,同一法人・系列（手動判定）,GMOグループ（除外にGMO TECH・GMOメイクショップ）,https://www.gmo-c.jp/,https://www.gmo-c.jp/contact/
+584,ソニー損害保険株式会社,同一法人・系列（手動判定）,ソニーグループ（除外にソニー株式会社）,https://www.sonysonpo.co.jp/,https://www.sonysonpo.co.jp/inq/n0010000.html
+733,株式会社ラクス,同一法人・系列（手動判定）,ラクスル株式会社 と同一・系列の可能性,https://www.rakus.co.jp/,https://www.rakus.co.jp/contact/
+814,株式会社エッセンスクライアント,同一法人・系列（手動判定）,エッセンス株式会社 と同一・系列の可能性,https://essenceclient.co.jp/,https://essenceclient.co.jp/contact1
