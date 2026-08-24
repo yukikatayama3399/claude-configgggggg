@@ -39,12 +39,12 @@ def read(tab: str, a1: str = "A1:AD5000", spreadsheet_id: str = None) -> list:
     return d.get("values", [])
 
 
-def append(tab: str, rows: list) -> int:
+def append(tab: str, rows: list, spreadsheet_id: str = None) -> int:
     """行を追記する。戻り値は追記した行数。"""
     if not rows:
         return 0
     params = {
-        "spreadsheetId": config.SPREADSHEET_ID,
+        "spreadsheetId": spreadsheet_id or config.SPREADSHEET_ID,
         "range": f"{tab}!A1",
         "valueInputOption": "USER_ENTERED",
         "insertDataOption": "INSERT_ROWS",

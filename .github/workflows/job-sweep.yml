@@ -3,7 +3,7 @@ name: job-sweep
 # SNS広告運用求人の常時収集。
 #   :05 毎時 … 24時間以内の新着を全国から拾う
 #   :25 毎時 … 都道府県ローテーション（3県/回。東京・大阪は最後に回る）
-#   :45 3時間ごと … 収集済み行のエンリッチ（ドメイン解決 → フォーム発見）
+#   :45 3時間ごと … 収集済み行のエンリッチ（ドメイン解決 → フォーム発見）→ 作業タブへ投入
 #
 # 認証は gog/gws のトークンを流用する（新規認証はしない）。
 # 必要な Secrets: GOG_CREDENTIALS_B64 / GOG_TOKEN_EXPORT_B64 / GOG_KEYRING_PASSWORD
@@ -20,7 +20,7 @@ on:
         description: 実行する処理
         type: choice
         default: fresh
-        options: [fresh, region, backfill, enrich-domain, enrich-form]
+        options: [fresh, region, backfill, enrich-domain, enrich-form, worklist]
       prefectures:
         description: 'backfill時の都道府県（カンマ区切り）'
         default: ''
@@ -91,9 +91,14 @@ jobs:
             enrich-form)
               python -m jobsweep.enrich_rows --stage form --limit "$LIMIT"
               ;;
+            worklist)
+              python -m jobsweep.worklist
+              ;;
             enrich)
               # 定期実行では両方を少しずつ進める
               python -m jobsweep.enrich_rows --stage domain --limit 150
               python -m jobsweep.enrich_rows --stage form   --limit 250
+              # フォームURLが埋まった行を作業者タブへ流し込む（H列/I列には触れない）
+              python -m jobsweep.worklist
               ;;
           esac
