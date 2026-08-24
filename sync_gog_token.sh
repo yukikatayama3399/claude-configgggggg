@@ -100,8 +100,23 @@ log "credentials.json: $CRED_PATH"
 TOKEN_TMP="$(mktemp)"
 trap 'rm -f "$TOKEN_TMP"' EXIT
 # mktemp が既にファイルを作っているので --overwrite が必須。
-gog auth tokens export --out "$TOKEN_TMP" --overwrite >/dev/null \
+gog auth tokens export "$ACCOUNT" --out "$TOKEN_TMP" --overwrite >/dev/null \
   || fail "gog auth tokens export に失敗"
+
+# client_secret が credentials.json に入っていないと、配った先で
+# トークンのリフレッシュができない。Mac は gog が secret を keychain に
+# 退避することがあり(実際にこの状態)、気付かず配ると配布先が壊れる。
+if ! grep -q '"client_secret"[[:space:]]*:[[:space:]]*"[^"]\+"' "$CRED_PATH"; then
+  echo "!! $CRED_PATH に client_secret が入っていない。" >&2
+  echo "   gog が keyring(Mac は keychain) に退避している状態。" >&2
+  echo "   この値を配ると配布先でリフレッシュに失敗する。" >&2
+  echo "   すでに動いている環境(クラウドのセッション環境変数)の値を" >&2
+  echo "   そのまま配るか、Cloud Console で同じ OAuth クライアントに" >&2
+  echo "   シークレットを追加して渡すこと(古い secret は無効化しない)。" >&2
+  echo "   それでも続けるなら GOG_SYNC_ALLOW_NO_SECRET=1 を付けて再実行。" >&2
+  [ "${GOG_SYNC_ALLOW_NO_SECRET:-}" = "1" ] || exit 1
+  echo "   GOG_SYNC_ALLOW_NO_SECRET=1 が指定されているので続行する。" >&2
+fi
 
 CREDENTIALS_B64="$(openssl base64 -A -in "$CRED_PATH")"
 TOKEN_B64="$(openssl base64 -A -in "$TOKEN_TMP")"
