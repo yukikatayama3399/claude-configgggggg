@@ -1,0 +1,95 @@
+# jobsweep — SNS広告運用求人の常時スイープ
+
+対象シート: `HIROGARU_フォーム送信リスト`
+(`1zOefPeDmOtPLRfNhs-8EZQWzKhYdu0wUxI0nvOMjqc0`)
+
+## 何を守るか
+
+**唯一の品質ゲートは「SNS広告運用の求人が実在するか」**。
+優先度(S/A/B)は判定に使わない — 求人さえ出ていればS級でもB級でもリストに入れる。
+クエリは SNS広告運用 の周辺から広げない（`config.CORE_QUERIES` の12本で固定）。
+
+## なぜ地域スライスなのか
+
+媒体を替えても全国クエリの1ページ目は既存リストと85%重複する
+（実測: スタンバイ全国「SNS広告運用」1p → 13社中 純増2社）。
+一方で都道府県で切ると純増が跳ねる。
+
+| 切り口 | 純増率(実測) |
+|---|---|
+| 全国クエリ 1ページ目 | 15% |
+| 北海道 × SNS広告運用 | 46% |
+| 福岡県 × SNS広告運用 | 53% |
+| 静岡県 × マーケティング | 86% |
+
+原因は関連度ソートのランキングバイアスで、全国クエリでは地方求人が
+構造的に上位へ来ないため。したがって
+**「小さいローカル求人サイトを個別に実装する」のではなく
+「大手アグリゲータを47分割して舐める」** のが正しいレバー。
+
+## 構成
+
+| ファイル | 役割 |
+|---|---|
+| `config.py` | クエリ12本 / 都道府県47（東京・大阪は最後） / 除外シートID |
+| `relevance.py` | **品質ゲート**。SNS語×広告語の近接判定＋タイトル職種NG |
+| `sources.py` | 求人ボックス・スタンバイのカード抽出 |
+| `fetch.py` | レート制限(1.5s)・リトライ付きHTTP |
+| `enrich.py` | 会社名→ドメイン解決 / ドメイン→問い合わせフォーム発見 |
+| `enrich_rows.py` | 既存行の穴埋めバッチ（domain / form の2段階） |
+| `sheets.py` | gws CLI 経由のシート入出力・重複判定 |
+| `sweep.py` | 収集本体（fresh / region / backfill） |
+
+## 実行
+
+```bash
+# 24時間以内の新着を全国から（毎時）
+python -m jobsweep.sweep --mode fresh --no-resolve
+
+# 都道府県ローテーション 3県/回（毎時）
+python -m jobsweep.sweep --mode region --per-run 3 --no-resolve
+
+# 指定県を深掘り
+python -m jobsweep.sweep --mode backfill --prefectures "福岡県,北海道" --max-pages 4
+
+# 手持ちストックの回収
+python -m jobsweep.enrich_rows --stage domain --limit 150   # サイトURLを埋める
+python -m jobsweep.enrich_rows --stage form   --limit 250   # フォームURLを埋める
+```
+
+`--dry-run` で書き込まずに件数だけ確認できる。
+
+## 自動実行
+
+`.github/workflows/job-sweep.yml`
+
+| cron | 処理 |
+|---|---|
+| `5 * * * *` | 新着(24h以内)を全国から収集 |
+| `25 * * * *` | 都道府県ローテーション 3県 |
+| `45 */3 * * *` | エンリッチ（domain 150件 → form 250件） |
+
+3県/時 × 24時間 = 72スロット/日なので、**全国47県を1日以内に一巡**する。
+
+必要な Secrets（会社Macで `bash sync_gog_token.sh --gh-secrets`）:
+`GOG_CREDENTIALS_B64` / `GOG_TOKEN_EXPORT_B64` / `GOG_KEYRING_PASSWORD`
+
+## 重複除去
+
+3段で突合する。
+
+1. `全リスト` の会社名（正規化: 法人格・記号を除去）
+2. `除外リスト`（別シート `HIROGARU_フォーム入力シート_0817`）の企業名 1,808件
+3. `_除外ドメイン`（同上）の既接触ドメイン **12,301件**
+   → ドメイン解決後に一致したら優先度を「除外」にする
+
+2と3を見ないと「純増に見えて実は既接触」が混ざる。
+
+## 既知の制約
+
+- **Claude Code on the web のセッションからは各社サイト・検索エンジンに出られない**
+  （エージェントプロキシが CONNECT を403で拒否）。求人媒体2つは通る。
+  したがって `enrich_rows` と `sweep --resolve` は GitHub Actions か Mac で実行する。
+- 掲載元が転職エージェント（doda/マイナビ/リクルート等）の求人は会社名が
+  「非公開」になることがあり、その行は取り込まない。
+- スタンバイは掲載元を表示しないため `備考` の掲載元は空になる。
