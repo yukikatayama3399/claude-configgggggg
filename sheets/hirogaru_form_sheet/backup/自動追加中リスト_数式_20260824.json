@@ -1,0 +1,9 @@
+{
+  "majorDimension": "ROWS",
+  "range": "'自動追加中リスト_SNS広告求人'!A1:R1000",
+  "values": [
+    [
+      "=IFERROR({IMPORTRANGE(\"1zOefPeDmOtPLRfNhs-8EZQWzKhYdu0wUxI0nvOMjqc0\",\"フォーム送信用!A1:R1\");LET(src,IMPORTRANGE(\"1zOefPeDmOtPLRfNhs-8EZQWzKhYdu0wUxI0nvOMjqc0\",\"フォーム送信用!A2:R3000\"),nm,INDEX(src,,2),FILTER(src,nm<>\"\",COUNTIF('除外リスト'!B:B,nm)=0,COUNTIF('配信結果csv'!A:A,nm)=0,COUNTIF('全リスト'!A:A,nm)=0,COUNTIF('0814_注力_SNS系(624)'!A:A,nm)=0,COUNTIF('0817_注力_WEB広告(1015)'!A:A,nm)=0))},IMPORTRANGE(\"1zOefPeDmOtPLRfNhs-8EZQWzKhYdu0wUxI0nvOMjqc0\",\"フォーム送信用!A1:R1\"))"
+    ]
+  ]
+}
