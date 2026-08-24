@@ -1,0 +1,73 @@
+name: 自動追加中リスト_SNS広告求人 の新着取込
+
+# クロール結果（IMPORTRANGE の取込元）から未取込の行だけを作業シートに追記する。
+# H列(入力状況) / I列(送信日時) は書き込み対象外なので、外部作業者の入力は消えない・ズレない。
+#
+# 必要な Secrets（会社 Mac で `bash sync_gog_token.sh --gh-secrets` を実行すると設定される）:
+#   GOG_CREDENTIALS_B64 / GOG_TOKEN_EXPORT_B64 / GOG_KEYRING_PASSWORD
+
+on:
+  schedule:
+    # 3時間おき（UTC。取込元のクロールは日次なのでこの頻度で十分）
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '追記せず対象件数だけ確認する'
+        type: boolean
+        default: false
+
+concurrency:
+  group: sync-sns-list
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GOG_CREDENTIALS_B64: ${{ secrets.GOG_CREDENTIALS_B64 }}
+      GOG_TOKEN_EXPORT_B64: ${{ secrets.GOG_TOKEN_EXPORT_B64 }}
+      GOG_KEYRING_PASSWORD: ${{ secrets.GOG_KEYRING_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secrets の有無を確認
+        run: |
+          missing=0
+          for v in GOG_CREDENTIALS_B64 GOG_TOKEN_EXPORT_B64 GOG_KEYRING_PASSWORD; do
+            if [ -z "${!v}" ]; then echo "::error::Secret $v が未設定"; missing=1; fi
+          done
+          if [ "$missing" = 1 ]; then
+            echo "会社 Mac で 'bash sync_gog_token.sh --gh-secrets' を実行して配布してください" >&2
+            exit 1
+          fi
+
+      - name: gog セットアップ
+        run: bash setup_gog_remote.sh
+
+      - name: gws セットアップ
+        run: |
+          export PATH="$HOME/bin:$PATH"
+          bash setup_gws_remote.sh
+
+      - name: 新着取込
+        run: |
+          set -o pipefail
+          export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
+          export GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE="$HOME/.config/gws/credentials.json"
+          export GOOGLE_WORKSPACE_CLI_KEYRING_BACKEND=file
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="--dry-run"; fi
+          python3 sheets/hirogaru_form_sheet/sync_new_rows.py $ARGS | tee result.txt
+
+      - name: 実行結果をサマリに出す
+        if: always()
+        run: |
+          echo '### 新着取込の結果' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          { cat result.txt 2>/dev/null || echo '(出力なし。前のステップで失敗しています)'; } >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
