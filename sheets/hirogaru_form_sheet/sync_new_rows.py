@@ -17,15 +17,23 @@ import subprocess
 import sys
 
 SPREADSHEET_ID = "1gYL-_-rM52JrWEtsL-Cx-Wv4BPjS49qg9g_n2xq8WqQ"
-WORK_SHEET = "自動追加中リスト_SNS広告求人"
-RAW_SHEET = "_取込元_SNS広告求人"
+# タブは名前ではなく sheetId で指す。名前は実際に変わった
+# (自動追加中リスト_SNS広告求人 → 注力_最新SNS広告求人(自動追加))ので、
+# 名前で参照すると改名のたびに同期が止まる。
+WORK_SHEET_ID = 892888463
+RAW_SHEET_ID = 1963927632
+
+# 取込元の列構成。ここが変わったら追記せず中止する。
+EXPECTED_HEADER = [
+    "優先度", "会社名", "サイトURL", "フォームURL", "Eメール", "営業お断り", "取得日",
+    "入力状況", "送信日時", "種別", "求人タイトル", "シグナル", "勤務地", "検索クエリ", "備考",
+]
 
 KEY_COL = 2   # B列 = 会社名（重複判定キー）
 LAST_COL = 15  # O列まで
 # 追記する列ブロック [開始列, 終了列]。H(8)・I(9) は意図的に除外している。
 WRITE_BLOCKS = [(1, 7), (10, 15)]
 
-MAX_ROWS = 20000
 CHUNK = 100   # 1回の書込行数（gws の引数長上限を避けるため分割する）
 ERROR_MARKERS = ("#REF!", "#N/A", "#ERROR!", "#VALUE!", "#NAME?", "Loading...")
 
@@ -61,6 +69,19 @@ def col_letter(n):
     return s
 
 
+def sheet_titles():
+    """sheetId -> タイトルの対応を引く。改名に追従するため毎回引き直す。"""
+    got = gws(
+        "sheets", "spreadsheets", "get",
+        params={"spreadsheetId": SPREADSHEET_ID, "fields": "sheets(properties(sheetId,title))"},
+    )
+    by_id = {s["properties"]["sheetId"]: s["properties"]["title"] for s in got.get("sheets", [])}
+    for sid in (WORK_SHEET_ID, RAW_SHEET_ID):
+        if sid not in by_id:
+            raise SyncError(f"sheetId {sid} のタブが見つかりません（削除された可能性）")
+    return by_id
+
+
 def get_values(sheet, a1):
     # UNFORMATTED_VALUE: 日付シリアル等を数値のまま読む。表示文字列で読むと
     # 書き戻したとき数値が文字列に化けて型が混ざる。
@@ -83,44 +104,53 @@ def norm(v):
     return "".join(str("" if v is None else v).split())
 
 
-def read_raw():
+def read_raw(sheet):
     """取込元を読む。壊れた取込（#REF! / 読込中 / 空）なら例外を投げて追記させない。"""
-    rows = [pad(r)[:LAST_COL] for r in get_values(RAW_SHEET, f"A1:{col_letter(LAST_COL)}{MAX_ROWS}")]
-    if len(rows) < 2:
-        raise SyncError(f"{RAW_SHEET} にデータがありません（IMPORTRANGE 失敗の可能性）")
+    rows = [pad(r)[:LAST_COL] for r in get_values(sheet, f"A1:{col_letter(LAST_COL)}")]
+    if not rows:
+        raise SyncError(f"{sheet} が空です（IMPORTRANGE の数式が消えた可能性）")
     for row in rows[:5]:
         for cell in row:
             if str(cell).strip() in ERROR_MARKERS:
-                raise SyncError(f"{RAW_SHEET} が {cell} 状態です。取込を中止しました")
-    data = [r for r in rows[1:] if norm(r[KEY_COL - 1])]
-    if not data:
-        raise SyncError(f"{RAW_SHEET} の有効行が 0 件です。取込を中止しました")
-    return rows[0], data
+                raise SyncError(f"{sheet} が {cell} 状態です。取込を中止しました")
+    assert_header(rows[0], sheet)
+    # 有効行 0 件は異常ではない。取込元は FILTER で既出企業を落とすので、
+    # 全部処理済みならヘッダーだけになる。ここで落とすと定期実行が毎回
+    # 誤警報を出すので、空リストを返して「新着なし」に合流させる。
+    return [r for r in rows[1:] if norm(r[KEY_COL - 1])]
 
 
-def read_work():
-    """作業シートのヘッダーと、キー列から求めた最終データ行・既存キーを返す。"""
-    rows = [pad(r)[:LAST_COL] for r in get_values(WORK_SHEET, f"A1:{col_letter(LAST_COL)}{MAX_ROWS}")]
+def read_work(sheet):
+    """作業シートの既存キーと、キー列から求めた最終データ行を返す。
+
+    作業シートはヘッダー行が消されることがある（実際に消された）ので、
+    1行目がヘッダーかどうかは中身を見て判定し、データなら取りこぼさない。
+    """
+    rows = [pad(r)[:LAST_COL] for r in get_values(sheet, f"A1:{col_letter(LAST_COL)}")]
     if not rows:
-        raise SyncError(f"{WORK_SHEET} が空です")
-    header, body = rows[0], rows[1:]
+        raise SyncError(f"{sheet} が空です")
+    start = 1 if is_header(rows[0]) else 0
     keys = set()
-    last_data_row = 1
-    for i, row in enumerate(body):
+    last_data_row = start
+    for i, row in enumerate(rows[start:], start=start):
         key = norm(row[KEY_COL - 1])
         if key:
             keys.add(key)
-            last_data_row = i + 2  # H:I だけ入力された行を「データあり」と誤認しない
-    return header, keys, last_data_row
+            last_data_row = i + 1  # H:I だけ入力された行を「データあり」と誤認しない
+    return keys, last_data_row
 
 
-def assert_header_matches(raw_header, work_header):
-    """列構成がずれていたら止める（列を足したときの事故防止）。"""
+def is_header(row):
+    return norm(row[KEY_COL - 1]) == norm(EXPECTED_HEADER[KEY_COL - 1])
+
+
+def assert_header(header, sheet):
+    """取込元の列構成がずれていたら止める（列を足したときの事故防止）。"""
     for i in range(LAST_COL):
-        if norm(raw_header[i]) != norm(work_header[i]):
+        if norm(header[i]) != norm(EXPECTED_HEADER[i]):
             raise SyncError(
-                f"列構成が一致しません（{col_letter(i + 1)}列: 取込元「{raw_header[i]}」"
-                f"/ 作業シート「{work_header[i]}」）。取込を中止しました"
+                f"{sheet} の列構成が変わっています（{col_letter(i + 1)}列: "
+                f"「{header[i]}」/ 期待「{EXPECTED_HEADER[i]}」）。取込を中止しました"
             )
 
 
@@ -129,9 +159,10 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="追記せず対象件数だけ表示する")
     args = ap.parse_args()
 
-    raw_header, raw_rows = read_raw()
-    work_header, existing, last_data_row = read_work()
-    assert_header_matches(raw_header, work_header)
+    titles = sheet_titles()
+    work_sheet, raw_sheet = titles[WORK_SHEET_ID], titles[RAW_SHEET_ID]
+    raw_rows = read_raw(raw_sheet)
+    existing, last_data_row = read_work(work_sheet)
 
     fresh, seen = [], set()
     for row in raw_rows:
@@ -159,7 +190,8 @@ def main():
         for off in range(0, len(block), CHUNK):
             part = block[off:off + CHUNK]
             top = start + off
-            rng = f"{WORK_SHEET}!{col_letter(first)}{top}:{col_letter(last)}{top + len(part) - 1}"
+            rng = (f"'{work_sheet}'!{col_letter(first)}{top}"
+                   f":{col_letter(last)}{top + len(part) - 1}")
             gws(
                 "sheets", "spreadsheets", "values", "update",
                 params={"spreadsheetId": SPREADSHEET_ID, "range": rng, "valueInputOption": "RAW"},
