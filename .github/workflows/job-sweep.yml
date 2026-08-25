@@ -1,0 +1,104 @@
+name: job-sweep
+
+# SNS広告運用求人の常時収集。
+#   :05 毎時 … 24時間以内の新着を全国から拾う
+#   :25 毎時 … 都道府県ローテーション（3県/回。東京・大阪は最後に回る）
+#   :45 3時間ごと … 収集済み行のエンリッチ（ドメイン解決 → フォーム発見）→ 作業タブへ投入
+#
+# 認証は gog/gws のトークンを流用する（新規認証はしない）。
+# 必要な Secrets: GOG_CREDENTIALS_B64 / GOG_TOKEN_EXPORT_B64 / GOG_KEYRING_PASSWORD
+#   → 会社Macで `bash sync_gog_token.sh --gh-secrets` を実行して配る。
+
+on:
+  schedule:
+    - cron: '5 * * * *'
+    - cron: '25 * * * *'
+    - cron: '45 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 実行する処理
+        type: choice
+        default: fresh
+        options: [fresh, region, backfill, enrich-domain, enrich-form, worklist]
+      prefectures:
+        description: 'backfill時の都道府県（カンマ区切り）'
+        default: ''
+      limit:
+        description: 'enrich時の処理件数上限（0=全件）'
+        default: '250'
+
+concurrency:
+  group: job-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GOG_CREDENTIALS_B64: ${{ secrets.GOG_CREDENTIALS_B64 }}
+      GOG_TOKEN_EXPORT_B64: ${{ secrets.GOG_TOKEN_EXPORT_B64 }}
+      GOG_KEYRING_PASSWORD: ${{ secrets.GOG_KEYRING_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: gog / gws をセットアップ
+        run: |
+          bash setup_gog_remote.sh
+          bash setup_gws_remote.sh
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: 実行する処理を決める
+        id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "task=${{ inputs.task }}" >> "$GITHUB_OUTPUT"
+          else
+            case "${{ github.event.schedule }}" in
+              "5 * * * *")    echo "task=fresh"         >> "$GITHUB_OUTPUT" ;;
+              "25 * * * *")   echo "task=region"        >> "$GITHUB_OUTPUT" ;;
+              "45 */3 * * *") echo "task=enrich"        >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
+
+      - name: 収集 / エンリッチ
+        env:
+          TASK: ${{ steps.pick.outputs.task }}
+          PREFS: ${{ inputs.prefectures }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          set -euo pipefail
+          LIMIT="${LIMIT:-250}"
+          case "$TASK" in
+            fresh)
+              python -m jobsweep.sweep --mode fresh --no-resolve
+              ;;
+            region)
+              python -m jobsweep.sweep --mode region --per-run 3 --no-resolve
+              ;;
+            backfill)
+              python -m jobsweep.sweep --mode backfill --prefectures "$PREFS" --no-resolve
+              ;;
+            enrich-domain)
+              python -m jobsweep.enrich_rows --stage domain --limit "$LIMIT"
+              ;;
+            enrich-form)
+              python -m jobsweep.enrich_rows --stage form --limit "$LIMIT"
+              ;;
+            worklist)
+              python -m jobsweep.worklist
+              ;;
+            enrich)
+              # 定期実行では両方を少しずつ進める
+              python -m jobsweep.enrich_rows --stage domain --limit 150
+              python -m jobsweep.enrich_rows --stage form   --limit 250
+              # フォームURLが埋まった行を作業者タブへ流し込む（H列/I列には触れない）
+              python -m jobsweep.worklist
+              ;;
+          esac
