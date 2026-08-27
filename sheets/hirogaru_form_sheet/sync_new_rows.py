@@ -5,6 +5,12 @@ _取込元_SNS広告求人（IMPORTRANGE+FILTER の生データ）と作業シ�
 未取込の行だけを追記する。追記するのは A:G と J:O だけで、
 H列(入力状況) / I列(送信日時) には一切書かないので、外部作業者の入力が消えたりズレたりしない。
 
+追記の前に必ず除外リスト（既存顧客・お断り先）と照合する。取込元の FILTER も
+除外リストを見ているが COUNTIF の完全一致なので、「株式会社電通デジタル 港区」
+「パナソニックコネクト株式会社」のような表記ゆれが素通りする。既存顧客に営業を
+かけるのが一番まずいので、company_match.py の正規化照合でもう一段落とす。
+重複判定も社名の正規化キーとドメインの両方で見る。
+
 依存: gws (Google Workspace CLI) が PATH にあり認証済みであること。
 使い方:
     python3 sync_new_rows.py            # 実行
@@ -13,8 +19,13 @@ H列(入力状況) / I列(送信日時) には一切書かないので、外部�
 
 import argparse
 import json
+import os
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from company_match import Exclusion, domain, load_extra  # noqa: E402
+from company_match import key as company_key  # noqa: E402
 
 SPREADSHEET_ID = "1gYL-_-rM52JrWEtsL-Cx-Wv4BPjS49qg9g_n2xq8WqQ"
 # タブは名前ではなく sheetId で指す。名前は実際に変わった
@@ -22,6 +33,12 @@ SPREADSHEET_ID = "1gYL-_-rM52JrWEtsL-Cx-Wv4BPjS49qg9g_n2xq8WqQ"
 # 名前で参照すると改名のたびに同期が止まる。
 WORK_SHEET_ID = 892888463
 RAW_SHEET_ID = 1963927632
+# 除外リスト（既存顧客・お断り先）。B列が社名。
+EXCLUDE_SHEET_ID = 785706625
+EXCLUDE_KEY_COL = "B"
+# 除外リストには無いが取込んではいけない社名（社名変更・親子会社など）。
+# 顧客マスタを書き換えたくないのでリポジトリ側で持つ。
+EXTRA_EXCLUDE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exclude_extra.tsv")
 
 # 取込元の列構成。ここが変わったら追記せず中止する。
 EXPECTED_HEADER = [
@@ -30,6 +47,7 @@ EXPECTED_HEADER = [
 ]
 
 KEY_COL = 2   # B列 = 会社名（重複判定キー）
+URL_COL = 3   # C列 = サイトURL（ドメインでの重複判定に使う）
 LAST_COL = 15  # O列まで
 # 追記する列ブロック [開始列, 終了列]。H(8)・I(9) は意図的に除外している。
 WRITE_BLOCKS = [(1, 7), (10, 15)]
@@ -76,7 +94,7 @@ def sheet_titles():
         params={"spreadsheetId": SPREADSHEET_ID, "fields": "sheets(properties(sheetId,title))"},
     )
     by_id = {s["properties"]["sheetId"]: s["properties"]["title"] for s in got.get("sheets", [])}
-    for sid in (WORK_SHEET_ID, RAW_SHEET_ID):
+    for sid in (WORK_SHEET_ID, RAW_SHEET_ID, EXCLUDE_SHEET_ID):
         if sid not in by_id:
             raise SyncError(f"sheetId {sid} のタブが見つかりません（削除された可能性）")
     return by_id
@@ -120,8 +138,21 @@ def read_raw(sheet):
     return [r for r in rows[1:] if norm(r[KEY_COL - 1])]
 
 
+def read_exclusion(sheet):
+    """除外リストの社名を読む。空なら異常なので止める（全通しになるのを防ぐ）。"""
+    rows = get_values(sheet, f"{EXCLUDE_KEY_COL}1:{EXCLUDE_KEY_COL}")
+    names = [str(r[0]).strip() for r in rows if r and str(r[0]).strip()]
+    names = [n for n in names if n not in ("企業名", "会社名")]
+    if len(names) < 100:
+        raise SyncError(
+            f"{sheet} から読めた社名が {len(names)}件しかありません。"
+            "除外リストが壊れている可能性があるので取込を中止しました"
+        )
+    return names
+
+
 def read_work(sheet):
-    """作業シートの既存キーと、キー列から求めた最終データ行を返す。
+    """作業シートの既存キー・既存ドメイン・社数・最終データ行を返す。
 
     作業シートはヘッダー行が消されることがある（実際に消された）ので、
     1行目がヘッダーかどうかは中身を見て判定し、データなら取りこぼさない。
@@ -130,14 +161,19 @@ def read_work(sheet):
     if not rows:
         raise SyncError(f"{sheet} が空です")
     start = 1 if is_header(rows[0]) else 0
-    keys = set()
+    keys, domains, companies = set(), set(), 0
     last_data_row = start
     for i, row in enumerate(rows[start:], start=start):
-        key = norm(row[KEY_COL - 1])
-        if key:
-            keys.add(key)
+        name = row[KEY_COL - 1]
+        if norm(name):
+            keys.add(norm(name))
+            keys.add(company_key(name))
+            dom = domain(row[URL_COL - 1])
+            if dom:
+                domains.add(dom)
+            companies += 1
             last_data_row = i + 1  # H:I だけ入力された行を「データあり」と誤認しない
-    return keys, last_data_row
+    return keys, domains, companies, last_data_row
 
 
 def is_header(row):
@@ -162,17 +198,35 @@ def main():
     titles = sheet_titles()
     work_sheet, raw_sheet = titles[WORK_SHEET_ID], titles[RAW_SHEET_ID]
     raw_rows = read_raw(raw_sheet)
-    existing, last_data_row = read_work(work_sheet)
+    existing, existing_domains, existing_count, last_data_row = read_work(work_sheet)
+    extra = load_extra(EXTRA_EXCLUDE_FILE)
+    exclusion = Exclusion(read_exclusion(titles[EXCLUDE_SHEET_ID]), extra)
 
-    fresh, seen = [], set()
+    fresh, seen, seen_domains, blocked = [], set(), set(), []
     for row in raw_rows:
-        key = norm(row[KEY_COL - 1])
-        if key in existing or key in seen:
+        name = row[KEY_COL - 1]
+        keys = {norm(name), company_key(name)}
+        if keys & existing or keys & seen:
             continue
-        seen.add(key)
+        dom = domain(row[URL_COL - 1])
+        if dom and (dom in existing_domains or dom in seen_domains):
+            continue
+        hit = exclusion.hit(name)
+        if hit:
+            blocked.append((name, hit))
+            continue
+        seen |= keys
+        if dom:
+            seen_domains.add(dom)
         fresh.append(row)
 
-    print(f"取込元 {len(raw_rows)}件 / 作業シート {len(existing)}件 / 新着 {len(fresh)}件")
+    if blocked:
+        print(f"除外リスト該当で取込まなかった: {len(blocked)}件"
+              f"（除外リスト {len(exclusion.exact)}社 + 個別指定 {len(extra)}社と照合）")
+        for name, (why, src) in blocked:
+            print(f"  - {name} … {why} / 除外リスト「{src}」")
+
+    print(f"取込元 {len(raw_rows)}件 / 作業シート {existing_count}社 / 新着 {len(fresh)}件")
     if not fresh:
         print("新着なし。何もしません。")
         return 0

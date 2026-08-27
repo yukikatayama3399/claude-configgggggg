@@ -1,0 +1,23 @@
+﻿元の行番号(第1弾後),会社名,分類,理由,サイトURL,フォームURL
+156,株式会社メディカルハンズ,同一法人・系列（手動判定）,株式会社ハンズ と同一・系列の可能性,https://www.medical-hands.net/,https://www.medical-hands.net/contact/
+167,株式会社エムジー熊本,判断が割れる（同一ドメインの別法人）,m-group.co.jp / 492行目「株式会社エムジー広島」を残した,https://m-group.co.jp/,不明
+385,NTT東日本株式会社,同一法人・系列（手動判定）,NTTグループ（除外に株式会社NTTドコモ）,https://www.ntt-east.co.jp/,https://www.ntt-east.co.jp/contact/
+404,株式会社サムライ・アドウェイズ,同一法人・系列（手動判定）,株式会社アドウェイズ の子会社,https://samurai-adways.net/,不明
+500,株式会社集英社アーツ&デジタル,同一法人・系列（手動判定）,株式会社集英社 の子会社,不明,不明
+712,LINEヤフー株式会社,同一法人・系列（手動判定）,同一法人（除外のヤフー株式会社が2023年にLINEヤフーへ統合）,https://www.lycorp.co.jp/ja/,https://www.lycorp.co.jp/ja/contact/
+808,株式会社博報堂マーケティングシステムズ,同一法人・系列（手動判定）,博報堂グループ（除外に株式会社博報堂）,不明,不明
+844,株式会社Lib Work,判断が割れる（社名の一部だけ一致）,除外リスト「株式会社LiB」と先頭が一致（後続: Work）,https://www.libwork.co.jp/,https://www.libwork.co.jp/inquiry/
+1024,トランス・コスモス株式会社～プライム市場上場企業～,同一法人・系列（手動判定）,同一法人（トランスコスモス株式会社。中黒と装飾付き表記）,https://www.trans-cosmos.co.jp/,不明
+1027,Blue Zone株式会社,判断が割れる（社名の一部だけ一致）,除外リスト「Blue株式会社」と先頭が一致（後続: Zone）,要確認,要確認
+1038,株式会社富士フイルムヘルスケアラボラトリー,判断が割れる（同一ドメインの別法人）,fujifilm.com / 1746行目「富士フイルムビジネスイノベーション株式会社」を残した,https://www.fujifilm.com/ffhc/ja,https://www.fujifilm.com/ffhc/ja/contact
+1104,インタラクティブ株式会社,同一法人・系列（手動判定）,jekiインタラクティブ・コミュニケーションズ と同一・系列の可能性,https://www.inta.co.jp/,https://www.inta.co.jp/contact/
+1117,GMOコマース株式会社,同一法人・系列（手動判定）,GMOグループ（除外にGMO TECH・GMOメイクショップ）,https://www.gmo-c.jp/,https://www.gmo-c.jp/contact/
+1248,ソニー損害保険株式会社,同一法人・系列（手動判定）,ソニーグループ（除外にソニー株式会社）,https://www.sonysonpo.co.jp/,https://www.sonysonpo.co.jp/inq/n0010000.html
+1422,山田養蜂場&ソフィアシステムズ株式会社,同一法人・系列（手動判定）,株式会社山田養蜂場 の関連（社名に併記）,https://ybs-systems.com/,不明
+1550,アノマリーマーケティング株式会社,同一法人・系列（手動判定）,株式会社アノマリー の関連会社,https://anomaly-marketing.co.jp/,不明
+1554,株式会社ラクス,同一法人・系列（手動判定）,ラクスル株式会社 と同一・系列の可能性,https://www.rakus.co.jp/,https://www.rakus.co.jp/contact/
+1587,グリーグループ メタバース事業,同一法人・系列（手動判定）,グリー株式会社 のグループ,https://hd.gree.net/,不明
+1711,有限責任監査法人トーマツ,判断が割れる（同一ドメインの別法人）,deloitte.com / 1317行目「合同会社デロイトトーマツ」を残した,https://www.deloitte.com/jp/ja/about/group/deloitte-touche-tohmatsu.html,不明
+1725,株式会社エッセンスクライアント,同一法人・系列（手動判定）,エッセンス株式会社 と同一・系列の可能性,https://essenceclient.co.jp/,https://essenceclient.co.jp/contact1
+1727,合同会社ライト,判断が割れる（法人格違いの完全一致）,除外リスト「株式会社ライト」と正規化後は同名,要確認,要確認
+1882,株式会社フロンティアダイレクト デジタルソリューション部,同一法人・系列（手動判定）,株式会社フロンティア と同一・系列の可能性,https://www.frontier-di.co.jp/,https://www.frontier-di.co.jp/contact/

@@ -1,0 +1,3 @@
+# Python のビルド生成物。sheets/ 配下のスクリプトを実行すると作られる
+__pycache__/
+*.pyc
