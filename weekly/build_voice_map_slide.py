@@ -2,15 +2,21 @@
 """HAWK顧客の声マップ（業態×規模）スライドを企業マスタから再生成する。
 
 データ源: スプレッドシート「HAWK企業マスタ（業態×規模・顧客の声）」の 企業マスタ タブ
-出力先:   プレゼンテーション「HAWK顧客の声マップ（業態×規模）」を毎回1枚に作り直す
+出力先:   プレゼンテーション「HAWK顧客の声マップ（業態×規模）」を毎回2枚に作り直す
+          1枚目=業態×規模マトリクス＋理由×規模バー／2枚目=失注・解約の理由別ピックアップリスト
 
 使い方:
     python3 weekly/build_voice_map_slide.py            # 再生成
     python3 weekly/build_voice_map_slide.py --dry-run  # リクエスト内容だけ表示
 
 前提: gws がセットアップ済み（クラウドは SessionStart フックで自動）。
-仕組み: 新しいスライドを作ってから旧スライドを全部消すので、常に1枚。
+仕組み: 新しいスライドを作ってから旧スライドを全部消すので、常に2枚。
 毎回全消し→再生成なので、マスタ側の行の増減・分類変更がそのまま反映される。
+
+レイアウトは 2026-09-03 に片山が確定した正式フォーマット:
+タイトル直下にマトリクス表（発見サマリー無し）、右に理由×規模バー、
+セル内は「N社（導x・商x・失x）／主因／全社名（記号なし）」、
+フッター2行（1行目にマスタへのリンク）。変更する場合は片山の指示を得ること。
 """
 import json
 import subprocess
@@ -137,13 +143,16 @@ def main():
     old_slides = [s["objectId"] for s in pres.get("slides", [])]
 
     SLIDE = "voiceMapSlide"
-    if SLIDE in old_slides:
+    SLIDE2 = "voiceListSlide"
+    dels = [{"deleteObject": {"objectId": sid}} for sid in (SLIDE, SLIDE2) if sid in old_slides]
+    if dels:
         gws("slides", "presentations", "batchUpdate", "--params",
-            json.dumps({"presentationId": PRESENTATION_ID}),
-            json_body={"requests": [{"deleteObject": {"objectId": SLIDE}}]})
-        old_slides.remove(SLIDE)
+            json.dumps({"presentationId": PRESENTATION_ID}), json_body={"requests": dels})
+        old_slides = [sid for sid in old_slides if sid not in (SLIDE, SLIDE2)]
 
     reqs = [{"createSlide": {"objectId": SLIDE, "insertionIndex": 0,
+                             "slideLayoutReference": {"predefinedLayout": "BLANK"}}},
+            {"createSlide": {"objectId": SLIDE2, "insertionIndex": 1,
                              "slideLayoutReference": {"predefinedLayout": "BLANK"}}}]
 
     # タイトル
@@ -151,38 +160,16 @@ def main():
     t = f"顧客の声マップ 業態 × 規模（{today}時点・{len(companies)}社）"
     reqs += [text("vmTitle", t), style("vmTitle", 0, len(t), size=17, bold=True, color=INK)]
 
-    # 発見サマリー（3行）
-    small_lost = row_totals.get("小", 0)
-    small_budget = lost_matrix["小"][REASONS[0]]
-    big_lost = row_totals.get("大", 0)
-    big_org = lost_matrix["大"][REASONS[2]]
-    reason_totals = {r: sum(lost_matrix[s2][r] for s2 in SIZES) for r in REASONS}
-    func_by_size = "・".join(f"{s2}{lost_matrix[s2][REASONS[1]]}" for s2 in SIZES if lost_matrix[s2][REASONS[1]])
-    lines = [
-        f"小規模の失注は予算に集中: {small_budget}/{small_lost}件。製品評価は高いまま価格で落ちる → 少額・従量メニューが解",
-        f"大規模の壁は機能より体制・分掌: {big_org}/{big_lost}件が「運用は別部門・別会社の管掌」→ 横展開・OEMが解",
-        f"機能・媒体ミスマッチは{reason_totals[REASONS[1]]}件（{func_by_size}）: リソクリ解約・ながのアド等 → 媒体拡張とレポート改善が継続のレバー",
-    ]
-    body = "\n".join("・" + l for l in lines)
-    reqs.append(box("vmFind", SLIDE, 24, 44, 672, 52))
-    reqs += [text("vmFind", body), style("vmFind", 0, len(body), size=9.5, color=INK)]
-    pos = 0
-    for l in lines:
-        head_len = l.index(":") + 1 if ":" in l else 0
-        if head_len:
-            reqs.append(style("vmFind", pos + 1, pos + 1 + head_len, size=9.5, bold=True, color=INK))
-        pos += len("・" + l) + 1
-
-    # マトリクス表（左）
+    # マトリクス表（左・タイトル直下）
     n_rows = 1 + len(GYOTAI)
     reqs.append({"createTable": {"objectId": "vmTable", "elementProperties": {
-        "pageObjectId": SLIDE, "size": {"width": pt(456), "height": pt(230)},
-        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 24, "translateY": 98, "unit": "PT"}},
+        "pageObjectId": SLIDE, "size": {"width": pt(468), "height": pt(120)},
+        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 24, "translateY": 70, "unit": "PT"}},
         "rows": n_rows, "columns": 4}})
-    for ci, cw in [(0, 48), (1, 136), (2, 136), (3, 136)]:
+    for ci, cw in [(0, 48), (1, 140), (2, 140), (3, 140)]:
         reqs.append({"updateTableColumnProperties": {"objectId": "vmTable", "columnIndices": [ci],
                      "tableColumnProperties": {"columnWidth": pt(cw)}, "fields": "columnWidth"}})
-    heads = ["", "小規模（運用1〜2人）", "中規模（Silver級）", "大規模（電通D級）"]
+    heads = ["", "小規模（運用1〜2人）", "中規模（Silver級）", "大規模"]
     for j, h in enumerate(heads):
         loc = {"objectId": "vmTable", "cellLocation": {"rowIndex": 0, "columnIndex": j}}
         if h:
@@ -216,15 +203,14 @@ def main():
                     cnt[c["reason"]] = cnt.get(c["reason"], 0) + 1
             dom = max(cnt, key=cnt.get) if cnt else None
             order = {"導入済": 0, "商談中": 1}
-            mark = {"導入済": "●", "商談中": "◎"}
-            names = [mark.get(c["status"], "") + NAME_ABBREV.get(c["name"], c["name"])
+            names = [NAME_ABBREV.get(c["name"], c["name"])
                      for c in sorted(items, key=lambda c: order.get(c["status"], 2))]
             shown = "、".join(names)  # 全社を載せる（省略しない）
             line1 = f"{len(items)}社（導{n_in}・商{n_talk}・失{n_lost}）"
             line2 = f"主因: {REASON_SHORT[dom]}" if dom and cnt[dom] >= 2 else ""
             txt = line1 + ("\n" + line2 if line2 else "") + "\n" + shown
             reqs.append({"insertText": {**loc, "text": txt}})
-            reqs.append({"updateTextStyle": {**loc, "style": {"fontSize": pt(7), "fontFamily": "Noto Sans JP", "foregroundColor": {"opaqueColor": {"rgbColor": INK}}},
+            reqs.append({"updateTextStyle": {**loc, "style": {"fontSize": pt(7.5), "fontFamily": "Noto Sans JP", "foregroundColor": {"opaqueColor": {"rgbColor": INK}}},
                                              "fields": "fontSize,fontFamily,foregroundColor", "textRange": {"type": "ALL"}}})
             reqs.append({"updateTextStyle": {**loc, "style": {"bold": True},
                                              "fields": "bold", "textRange": {"type": "FIXED_RANGE", "startIndex": 0, "endIndex": len(line1)}}})
@@ -234,11 +220,11 @@ def main():
                                                  "fields": "bold,foregroundColor", "textRange": {"type": "FIXED_RANGE", "startIndex": s2, "endIndex": e2}}})
 
     # 失注バー（右）
-    bx, bw_max = 486, 200
-    reqs.append(box("vmBarT", SLIDE, bx, 104, 210, 16))
+    bx, bw_max = 504, 190
+    reqs.append(box("vmBarT", SLIDE, bx, 72, 200, 16))
     bt = f"失注・解約{len(lost)}件 — 理由 × 規模"
     reqs += [text("vmBarT", bt), style("vmBarT", 0, len(bt), size=10, bold=True, color=INK)]
-    y = 126
+    y = 96
     for s in SIZES:
         total = row_totals[s]
         lbl = f"{s}規模  {total}件"
@@ -268,10 +254,60 @@ def main():
         lt = f"{r}（{sum(lost_matrix[s][r] for s in SIZES)}件）"
         reqs += [text(f"vmLgT{i}", lt), style(f"vmLgT{i}", 0, len(lt), size=8, color=INK2)]
 
-    # フッター
-    reqs.append(box("vmFoot", SLIDE, 24, 382, 672, 16))
-    ft = f"●=導入済 ◎=商談中 無印=失注・解約｜{MASTER_DOC_NOTE}｜規模: 小=運用1〜2人／中=営業数十名・Silver級／大=電通デジタル級｜週次自動更新（水曜）"
+    # フッター（2行: 1行目=出典＋マスタへのリンク、2行目=補足）
+    master_url = f"https://docs.google.com/spreadsheets/d/{MASTER_SHEET_ID}/edit"
+    reqs.append(box("vmFoot", SLIDE, 24, 372, 672, 28))
+    l1 = f"出典: HAWK企業マスタ（業態×規模） {master_url}"
+    l2 = "顧客からの要望まとめDoc／提案ステータス｜規模: 小=運用1〜2人／中=営業数十名・Silver級／大=電通デジタル級｜週次自動更新（水曜）"
+    ft = l1 + "\n" + l2
     reqs += [text("vmFoot", ft), style("vmFoot", 0, len(ft), size=7, color=INK2)]
+    url_start = l1.index("https://")
+    reqs.append({"updateTextStyle": {"objectId": "vmFoot",
+                 "style": {"link": {"url": master_url}},
+                 "fields": "link",
+                 "textRange": {"type": "FIXED_RANGE", "startIndex": url_start, "endIndex": len(l1)}}})
+
+    # ---- 2ページ目: 失注・解約の理由別ピックアップリスト（全社） ----
+    reqs.append(box("vlTitle", SLIDE2, 24, 14, 672, 26))
+    t2 = f"失注・解約 理由別リスト（{today}時点・全{len(lost)}社）"
+    reqs += [text("vlTitle", t2), style("vlTitle", 0, len(t2), size=17, bold=True, color=INK)]
+
+    size_order = {"小": 0, "中": 1, "大": 2}
+
+    def entry(c):
+        note = "・解約" if c["status"] == "解約" else ""
+        return f"・{NAME_ABBREV.get(c['name'], c['name'])}（{c['gyotai']}・{c['size']}規模{note}）"
+
+    def block(bid, x, y, w, reason, subtitle):
+        items = sorted((c for c in lost if c["reason"] == reason),
+                       key=lambda c: (size_order.get(c["size"], 9), c["gyotai"]))
+        # 見出しバー
+        reqs.extend(rect(f"{bid}H", SLIDE2, x, y, w, 18, REASON_COLOR[reason]))
+        ht = f"{reason} — {len(items)}社"
+        reqs.extend([text(f"{bid}H", ht),
+                 {"updateTextStyle": {"objectId": f"{bid}H", "style": {"fontSize": pt(9.5), "bold": True, "fontFamily": "Noto Sans JP",
+                  "foregroundColor": {"opaqueColor": {"rgbColor": {"red": 1, "green": 1, "blue": 1}}}},
+                  "fields": "fontSize,bold,fontFamily,foregroundColor", "textRange": {"type": "ALL"}}}])
+        # サブタイトル＋リスト
+        lines = ([subtitle] if subtitle else []) + [entry(c) for c in items]
+        body_h = 12.5 * len(lines) + 6
+        reqs.append(box(f"{bid}B", SLIDE2, x, y + 20, w, body_h))
+        bodytxt = "\n".join(lines)
+        reqs.extend([text(f"{bid}B", bodytxt), style(f"{bid}B", 0, len(bodytxt), size=8.5, color=INK)])
+        if subtitle:
+            reqs.append(style(f"{bid}B", 0, len(subtitle), size=8, color=INK2))
+        return y + 20 + body_h + 10
+
+    # 左列: ①予算・案件なし（小規模で予算が足りない会社を含む）
+    block("vlBlkA", 24, 50, 330, REASONS[0], "※規模が小さく予算・案件が足りない会社を含む。製品評価は高い先が多く再攻略対象")
+    # 右列: ②機能・媒体 → ③体制・分掌（所属部署） → ④停滞
+    ry = block("vlBlkB", 376, 50, 320, REASONS[1], "※機能・対応媒体のミスマッチ（解約含む）")
+    ry = block("vlBlkC", 376, ry, 320, REASONS[2], "※所属部署・分掌の問題で運用に届かず上がってこなかった会社")
+    block("vlBlkD", 376, ry, 320, REASONS[3], "※理由未確定。まず失注理由の特定から")
+
+    reqs.append(box("vlFoot", SLIDE2, 24, 382, 672, 16))
+    fl = "出典・規模の定義は1ページ目参照。分類は企業マスタ「失注理由カテゴリ」列に準拠（マスタ更新で自動反映）"
+    reqs += [text("vlFoot", fl), style("vlFoot", 0, len(fl), size=7, color=INK2)]
 
     # 旧スライドの削除（新スライド作成後）
     for oid in old_slides:
