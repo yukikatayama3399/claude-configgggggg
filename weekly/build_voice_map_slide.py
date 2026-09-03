@@ -33,6 +33,14 @@ HEAD_BG = {"red": 0.93, "green": 0.93, "blue": 0.90}
 REASONS = ["①予算・案件なし", "②機能・媒体", "③体制・分掌", "④停滞・未確定"]
 REASON_COLOR = dict(zip(REASONS, [BUDGET, FUNC, ORG, STALL]))
 REASON_SHORT = dict(zip(REASONS, ["予算・案件", "機能・媒体", "体制・分掌", "停滞"]))
+# スライド上の表示だけ短くする略称（マスタは正式名のまま）
+NAME_ABBREV = {
+    "スターミュージック・エンタテインメント": "スターミュージック",
+    "メンバーズフォーアドカンパニー": "メンバーズフォーアド",
+    "トータルヘルスコンサルティング": "トータルヘルスC",
+    "リンクシェア・ジャパン": "リンクシェア",
+    "for you（ContentAge）": "for you(ContentAge)",
+}
 SIZES = ["小", "中", "大"]
 GYOTAI = ["代理店", "媒体社", "広告主", "その他"]
 
@@ -166,9 +174,12 @@ def main():
     # マトリクス表（左）
     n_rows = 1 + len(GYOTAI)
     reqs.append({"createTable": {"objectId": "vmTable", "elementProperties": {
-        "pageObjectId": SLIDE, "size": {"width": pt(440), "height": pt(230)},
-        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 24, "translateY": 104, "unit": "PT"}},
+        "pageObjectId": SLIDE, "size": {"width": pt(456), "height": pt(230)},
+        "transform": {"scaleX": 1, "scaleY": 1, "translateX": 24, "translateY": 98, "unit": "PT"}},
         "rows": n_rows, "columns": 4}})
+    for ci, cw in [(0, 48), (1, 136), (2, 136), (3, 136)]:
+        reqs.append({"updateTableColumnProperties": {"objectId": "vmTable", "columnIndices": [ci],
+                     "tableColumnProperties": {"columnWidth": pt(cw)}, "fields": "columnWidth"}})
     heads = ["", "小規模（運用1〜2人）", "中規模（Silver級）", "大規模（電通D級）"]
     for j, h in enumerate(heads):
         loc = {"objectId": "vmTable", "cellLocation": {"rowIndex": 0, "columnIndex": j}}
@@ -203,13 +214,15 @@ def main():
                     cnt[c["reason"]] = cnt.get(c["reason"], 0) + 1
             dom = max(cnt, key=cnt.get) if cnt else None
             order = {"導入済": 0, "商談中": 1}
-            names = [c["name"] for c in sorted(items, key=lambda c: order.get(c["status"], 2))]
-            shown = "、".join(names[:3]) + (f" ほか{len(names)-3}社" if len(names) > 3 else "")
+            mark = {"導入済": "●", "商談中": "◎"}
+            names = [mark.get(c["status"], "") + NAME_ABBREV.get(c["name"], c["name"])
+                     for c in sorted(items, key=lambda c: order.get(c["status"], 2))]
+            shown = "、".join(names)  # 全社を載せる（省略しない）
             line1 = f"{len(items)}社（導{n_in}・商{n_talk}・失{n_lost}）"
             line2 = f"主因: {REASON_SHORT[dom]}" if dom and cnt[dom] >= 2 else ""
             txt = line1 + ("\n" + line2 if line2 else "") + "\n" + shown
             reqs.append({"insertText": {**loc, "text": txt}})
-            reqs.append({"updateTextStyle": {**loc, "style": {"fontSize": pt(7.5), "fontFamily": "Noto Sans JP", "foregroundColor": {"opaqueColor": {"rgbColor": INK}}},
+            reqs.append({"updateTextStyle": {**loc, "style": {"fontSize": pt(7), "fontFamily": "Noto Sans JP", "foregroundColor": {"opaqueColor": {"rgbColor": INK}}},
                                              "fields": "fontSize,fontFamily,foregroundColor", "textRange": {"type": "ALL"}}})
             reqs.append({"updateTextStyle": {**loc, "style": {"bold": True},
                                              "fields": "bold", "textRange": {"type": "FIXED_RANGE", "startIndex": 0, "endIndex": len(line1)}}})
@@ -255,7 +268,7 @@ def main():
 
     # フッター
     reqs.append(box("vmFoot", SLIDE, 24, 382, 672, 16))
-    ft = f"{MASTER_DOC_NOTE}｜規模: 小=運用1〜2人／中=営業数十名・Silver級／大=電通デジタル級｜週次自動更新（水曜）"
+    ft = f"●=導入済 ◎=商談中 無印=失注・解約｜{MASTER_DOC_NOTE}｜規模: 小=運用1〜2人／中=営業数十名・Silver級／大=電通デジタル級｜週次自動更新（水曜）"
     reqs += [text("vmFoot", ft), style("vmFoot", 0, len(ft), size=7, color=INK2)]
 
     # 旧スライドの削除（新スライド作成後）
