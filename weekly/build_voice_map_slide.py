@@ -289,7 +289,7 @@ def main():
                   "foregroundColor": {"opaqueColor": {"rgbColor": {"red": 1, "green": 1, "blue": 1}}}},
                   "fields": "fontSize,bold,fontFamily,foregroundColor", "textRange": {"type": "ALL"}}}])
         # サブタイトル＋リスト
-        lines = ([subtitle] if subtitle else []) + [entry(c) for c in items]
+        lines = ([subtitle] if subtitle else []) + ([entry(c) for c in items] or ["・該当なし"])
         body_h = 12.5 * len(lines) + 6
         reqs.append(box(f"{bid}B", SLIDE2, x, y + 20, w, body_h))
         bodytxt = "\n".join(lines)
