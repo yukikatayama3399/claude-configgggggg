@@ -156,10 +156,12 @@ def main():
     small_budget = lost_matrix["小"][REASONS[0]]
     big_lost = row_totals.get("大", 0)
     big_org = lost_matrix["大"][REASONS[2]]
+    reason_totals = {r: sum(lost_matrix[s2][r] for s2 in SIZES) for r in REASONS}
+    func_by_size = "・".join(f"{s2}{lost_matrix[s2][REASONS[1]]}" for s2 in SIZES if lost_matrix[s2][REASONS[1]])
     lines = [
-        f"小規模の失注は予算に一極集中: {small_budget}/{small_lost}件。製品評価は高いまま価格で落ちる → 少額・従量メニューが解",
+        f"小規模の失注は予算に集中: {small_budget}/{small_lost}件。製品評価は高いまま価格で落ちる → 少額・従量メニューが解",
         f"大規模の壁は機能より体制・分掌: {big_org}/{big_lost}件が「運用は別部門・別会社の管掌」→ 横展開・OEMが解",
-        "機能・チャネル要望の発生源は中規模（媒体拡張・レポート・クリ運用）→ 開発ロードマップの主要顧客像",
+        f"機能・媒体ミスマッチは{reason_totals[REASONS[1]]}件（{func_by_size}）: リソクリ解約・ながのアド等 → 媒体拡張とレポート改善が継続のレバー",
     ]
     body = "\n".join("・" + l for l in lines)
     reqs.append(box("vmFind", SLIDE, 24, 44, 672, 52))
