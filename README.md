@@ -24,6 +24,36 @@ gws のために新しく OAuth 認証を取る必要はない（詳細は下記
 | `check_gws_apis.sh` | どこでも | gws で 6 API の疎通を一括確認（**読み取り専用・いつでも安全**） |
 | `sync_gog_token.sh` | **会社 Mac のみ** | 認証をやり直し、全環境へ配る値を書き出す |
 | `weekly/collect_shared_notes.sh` | どこでも | 議事録に追記された `【共有】` マーカー行を横断収集（**読み取り専用**）。使い方は `.claude/skills/weekly-shared-notes/SKILL.md` |
+| `mac/diagnose_mac.sh` | **Mac のみ** | 「Mac が遅い」の原因を洗い出す（**読み取り専用・いつでも安全**） |
+| `mac/cleanup_mac.sh` | **Mac のみ** | 消してよいキャッシュを削除してディスクを空ける（**既定はドライラン**、`--apply` で実行） |
+| `mac/_targets.sh` | — | 上記2つが共有する「消す候補」の定義。候補を足すならここ |
+
+### Mac が遅いとき
+
+Claude のクラウドセッションからは Mac 本体のディスクやプロセスは見えないので、
+**Mac のターミナルでリポジトリのクローン内から**実行する。
+
+```bash
+bash mac/diagnose_mac.sh                       # 1) 原因を診断（何も消さない）
+bash mac/cleanup_mac.sh                        # 2) 消える量を確認（ドライラン）
+bash mac/cleanup_mac.sh --apply                # 3) safe 分類だけ削除
+bash mac/cleanup_mac.sh --apply --include-careful   # 4) 足りなければ careful も
+```
+
+候補は3分類。`cleanup_mac.sh` が既定で消すのは `safe` だけ。
+
+| 分類 | 中身 | 削除 |
+|---|---|---|
+| `safe` | 使えば再生成されるキャッシュ（Xcode DerivedData、ブラウザ・Slack・VS Code のキャッシュ、npm/pip/Go キャッシュ等） | `--apply` で消す |
+| `careful` | 消しても壊れないが再ダウンロード・再ビルドの時間を払う（Homebrew キャッシュ、Gradle/Maven、Playwright、ゴミ箱等） | `--include-careful` を付けた時だけ |
+| `report` | 中身を人が見て決めるもの（Downloads、iPhone バックアップ、Docker イメージ、Xcode Archives 等） | **スクリプトは消さない** |
+
+安全弁として `$HOME` 配下でないパスは削除しない。Homebrew と Docker は `rm` ではなく
+公式のクリーンアップコマンドを案内するだけで、スクリプトからは実行しない。
+
+遅さの原因はディスクだけではないので、`diagnose_mac.sh` の出力は上から順に見る
+（空き容量 → スワップ → 重いプロセス → ログイン項目 → Spotlight → 消す候補）。
+`kernel_task` が CPU 上位に来ている場合は熱による制御なので、掃除しても直らない。
 
 ### 調子が悪いときの一次切り分け
 
