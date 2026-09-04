@@ -33,12 +33,52 @@ gws のために新しく OAuth 認証を取る必要はない（詳細は下記
 Claude のクラウドセッションからは Mac 本体のディスクやプロセスは見えないので、
 **Mac のターミナルでリポジトリのクローン内から**実行する。
 
+まずクローンの場所へ移動する。無ければクローンする。
+
 ```bash
-bash mac/diagnose_mac.sh                       # 1) 原因を診断（何も消さない）
-bash mac/cleanup_mac.sh                        # 2) 消える量を確認（ドライラン）
-bash mac/cleanup_mac.sh --apply                # 3) safe 分類だけ削除
-bash mac/cleanup_mac.sh --apply --include-careful   # 4) 足りなければ careful も
+cd ~/claude-configgggggg
 ```
+
+```bash
+git clone https://github.com/yukikatayama3399/claude-configgggggg.git ~/claude-configgggggg
+cd ~/claude-configgggggg
+```
+
+クローンがどこにあるか分からなくなったら探す。
+
+```bash
+find ~ -maxdepth 4 -type d -name claude-configgggggg 2>/dev/null
+```
+
+スクリプトは自分の位置からライブラリを読むので、**絶対パスで叩けばどこからでも動く**
+（`bash ~/claude-configgggggg/mac/diagnose_mac.sh`）。以下は `cd` 済みの前提で書く。
+
+クローン内に入ったら、次を上から順に実行する。
+
+```bash
+bash mac/diagnose_mac.sh
+```
+原因を診断する。何も消さないのでいつでも安全。
+
+```bash
+bash mac/cleanup_mac.sh
+```
+何がどれだけ消えるかを表示する（ドライラン。まだ消さない）。
+
+```bash
+bash mac/cleanup_mac.sh --apply
+```
+`safe` 分類だけを削除する。
+
+```bash
+bash mac/cleanup_mac.sh --apply --include-careful
+```
+それでも足りないとき、`careful` 分類も削除する。
+
+> **貼り付けの注意**: macOS の既定シェル zsh は、対話入力の `#` をコメントとして
+> 扱わない（`INTERACTIVE_COMMENTS` が既定で無効）。`bash mac/... # 説明` のように
+> 末尾へ説明を付けた行をそのまま貼ると `command not found: #` や
+> `parse error near ')'` になる。**コマンド部分だけを貼ること。**
 
 候補は3分類。`cleanup_mac.sh` が既定で消すのは `safe` だけ。
 
