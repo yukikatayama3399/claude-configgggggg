@@ -318,3 +318,14 @@ gog 管理下の credentials.json → token export の順に見る。
   **2箇所を同時に**揃える。
 - gws は 100+ の Agent Skills を配布しているが、このリポジトリには入れていない
   （必要になったら `npx skills add https://github.com/googleworkspace/cli`）。
+
+## 定期通知は Slack DM に統一（メール禁止・2026-09-04 ユーザー指示）
+
+**自分宛の定期レポート・自動通知をメールで送らない**（`gog gmail send` での自分宛レポート送信は全面禁止）。
+通知はすべて Slack の自分宛 DM（ユーザーID `U0B7FMCR8JU`）へ送る。
+
+- HAWK提案ステータス／カレンダー色分けの各 Routine は Slack DM 版に差し替え済み。
+  旧メール版 Routine は無効化してある（再有効化しない）。
+- Routine は「📮 Slack DM通知ハブ」セッションに bind して Slack ツールを確保する方式。
+  **ハブセッションをアーカイブすると通知が止まる。**
+- 詳細・trigger_id 一覧・復旧手順: `routines/slack-dm-notifications.md`
