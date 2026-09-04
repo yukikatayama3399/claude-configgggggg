@@ -26,7 +26,8 @@ gws のために新しく OAuth 認証を取る必要はない（詳細は下記
 | `weekly/collect_shared_notes.sh` | どこでも | 議事録に追記された `【共有】` マーカー行を横断収集（**読み取り専用**）。使い方は `.claude/skills/weekly-shared-notes/SKILL.md` |
 | `mac/diagnose_mac.sh` | **Mac のみ** | 「Mac が遅い」の原因を洗い出す（**読み取り専用・いつでも安全**） |
 | `mac/cleanup_mac.sh` | **Mac のみ** | 消してよいキャッシュを削除してディスクを空ける（**既定はドライラン**、`--apply` で実行） |
-| `mac/_targets.sh` | — | 上記2つが共有する「消す候補」の定義。候補を足すならここ |
+| `mac/remove_startup_items.sh` | **Mac のみ** | 不要な常駐（LaunchAgents / LaunchDaemons）を外す（**既定はドライラン**、`--apply` で実行）。削除ではなく退避し `restore.sh` で全部戻せる |
+| `mac/_targets.sh` | — | `diagnose_mac.sh` と `cleanup_mac.sh` が共有する「消す候補」の定義。候補を足すならここ |
 
 ### Mac が遅いとき
 
@@ -90,6 +91,33 @@ bash mac/cleanup_mac.sh --apply --include-careful
 
 安全弁として `$HOME` 配下でないパスは削除しない。Homebrew と Docker は `rm` ではなく
 公式のクリーンアップコマンドを案内するだけで、スクリプトからは実行しない。
+
+#### 常駐を外す（容量ではなく常時の CPU を減らす）
+
+空き容量が足りているのに遅い場合、効くのはディスク掃除ではなく常駐の削減。
+
+```bash
+bash mac/remove_startup_items.sh
+```
+何を外すか表示する（ドライラン。まだ変更しない）。`--list-untouched` を付けると
+「判断が要るので触らないもの」とその理由も出る。
+
+```bash
+bash mac/remove_startup_items.sh --apply
+```
+実行する。`/Library` 配下が対象に含まれるときだけ sudo を聞く。
+
+plist は**削除ではなく** `~/mac-startup-backup/<日時>/` へ退避し、同じ場所に
+`restore.sh` を書き出す。後悔したら `bash ~/mac-startup-backup/<日時>/restore.sh`
+で全件元に戻る（往復は検証済み）。
+
+2点だけ挙動を知っておく必要がある。
+
+- **Avast は既定で対象外。** カーネル拡張とネットワークフィルタを入れるため、
+  plist だけ外すと中途半端に残る。Avast 自身のアンインストーラを使う。
+  それでも plist を外すなら `--include-avast`。
+- **アプリ本体は消さない。** よって Adobe CC / G HUB / Zoom は次にアプリを
+  起動すると自分の常駐を再登録する。恒久的に止めるならアプリ自体を削除する。
 
 遅さの原因はディスクだけではないので、`diagnose_mac.sh` の出力は上から順に見る
 （空き容量 → スワップ → 重いプロセス → ログイン項目 → Spotlight → 消す候補）。
