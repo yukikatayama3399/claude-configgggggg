@@ -150,15 +150,94 @@ else
   echo "  mdutil が無い"
 fi
 
+# mdutil は「有効/無効」しか言わないので、進行中かは mds の CPU で判断する。
+# 索引作成中は数十分〜数時間ずっと重く、待つ以外にできることが無い。
+mds_cpu="$(ps -Ao pcpu,comm 2>/dev/null | awk '/Metadata\.framework/ {s+=$1} END{printf "%.0f", s+0}')"
+if [ "${mds_cpu:-0}" -ge 20 ]; then
+  echo "  ⚠️  索引作成が進行中（Spotlight 関連の合計 ${mds_cpu}% CPU）。"
+  echo "     終わるまでは何をしても重い。電源を繋いで放置すれば収まる。"
+  echo "     同期フォルダを「システム設定 > Spotlight > 検索プライバシー」で"
+  echo "     除外すると、同期と索引が互いを呼び合う悪循環を切れる。"
+else
+  echo "  ✅ 索引作成は進行中ではない"
+fi
+
+# ------------------------------------------------------------
+section "7. クラウド同期と常駐デーモンの負荷"
+# ------------------------------------------------------------
+# 容量もメモリも白なのに遅い場合、ここが本命になりやすい。
+# 同期クライアントは全ファイルを常時監視するので、2つ同時に動かすと
+# CPU とディスクを取り合って、無操作でも延々と回り続ける。
+
+# 実行パスにキーワードを含むプロセスの %CPU 合計とプロセス数を返す
+cpu_sum_of() {
+  ps -Ao pcpu,comm 2>/dev/null | awk -v key="$1" '
+    index($0, key) > 0 { sum += $1; n++ }
+    END { printf "%.1f %d", sum+0, n+0 }'
+}
+
+sync_active=0
+sync_names=""
+printf '  %-32s %7s %6s\n' "同期クライアント" "%CPU" "プロセス数"
+while IFS='|' read -r label key; do
+  set -- $(cpu_sum_of "$key")
+  cpu="${1:-0}"; n="${2:-0}"
+  [ "$n" -eq 0 ] && continue
+  sync_active=$(( sync_active + 1 ))
+  sync_names="${sync_names}${label} "
+  printf '  %-32s %7s %6s\n' "$label" "$cpu" "$n"
+done <<'EOF'
+OneDrive|OneDrive
+Google Drive|Google Drive
+Dropbox|Dropbox
+Box|Box.app
+iCloud Drive (bird)|/bird
+EOF
+[ "$sync_active" -eq 0 ] && echo "  （動いていない）"
+
+if [ "$sync_active" -ge 2 ]; then
+  echo
+  echo "  ⚠️  同期クライアントが ${sync_active} 種類同時に動いている: ${sync_names}"
+  echo "     常駐が2つ以上あると互いにディスクを取り合う。使う方に寄せると効く。"
+fi
+
+printf '\n  %-32s %7s %6s\n' "常駐デーモン" "%CPU" "プロセス数"
+while IFS='|' read -r label key; do
+  set -- $(cpu_sum_of "$key")
+  cpu="${1:-0}"; n="${2:-0}"
+  [ "$n" -eq 0 ] && continue
+  printf '  %-32s %7s %6s\n' "$label" "$cpu" "$n"
+done <<'EOF'
+fileproviderd (同期の仲介役)|fileproviderd
+Spotlight の索引作成 (mds 系)|Metadata.framework
+WindowServer (画面描画)|WindowServer
+mediaanalysisd (写真の解析)|mediaanalysisd
+photoanalysisd (写真の解析)|photoanalysisd
+iconservicesagent (アイコン生成)|iconservicesagent
+EOF
+
+# 1コアを食い切っているプロセスは、それ単体で体感を落とす
+hogs="$(ps -Ao pcpu,comm -r 2>/dev/null | awk '
+  NR>1 { c=$1+0; sub(/^[ \t]*[0-9.]+[ \t]+/, ""); if (c>=50) printf "    %6.1f%%  %s\n", c, $0 }' | head -10)"
+echo
+if [ -n "$hogs" ]; then
+  echo "  ⚠️  CPU を 50% 以上使っているプロセス（1コア級の負荷）:"
+  printf '%s\n' "$hogs"
+  echo "     MacBook Air はファンが無いので、この負荷が続くと熱で CPU が絞られ、"
+  echo "     結果として「全体が遅い」状態になる。まずこれを止めるのが最短。"
+else
+  echo "  ✅ CPU を 50% 以上使い続けているプロセスは無し"
+fi
+
 if [ "$QUICK" -eq 1 ]; then
   echo
-  echo "== 7. 消す候補（--quick なので集計を省略）"
+  echo "== 8. 消す候補（--quick なので集計を省略）"
   echo "  サイズを見るには --quick を外して実行する。"
   exit 0
 fi
 
 # ------------------------------------------------------------
-section "7. 消す候補とサイズ（測るだけ。ここでは何も消さない）"
+section "8. 消す候補とサイズ（測るだけ。ここでは何も消さない）"
 # ------------------------------------------------------------
 echo "  du で1つずつ測るので少し待つ..."
 
@@ -224,13 +303,31 @@ fi
 # ------------------------------------------------------------
 section "次にやること"
 # ------------------------------------------------------------
-cat <<'EOF'
+# 容量に余裕がある Mac で掃除を勧めるのは筋違いなので、状況で出し分ける。
+if [ "$free_pct" -ge 25 ]; then
+  cat <<'EOF'
+  ディスクは余っているので、掃除しても速度は変わらない。
+  見るべきは上の「3. 重いプロセス」と「7. クラウド同期と常駐デーモン」。
+
+  1. 1コア級の負荷が出ていたアプリを一旦終了して、体感が戻るか確かめる。
+     戻ればそれが原因。戻らなければ次を疑う。
+  2. 索引作成や初回同期が進行中なら、終わるまで待つのが正解。
+     電源を繋いで放置する。止めても次回また同じ処理が走る。
+  3. 「5. ログイン時に自動起動するもの」に使っていないアプリの常駐があれば外す。
+     これは容量ではなく常時の CPU を減らす作業で、体感に効く。
+
+  容量目的で掃除したいときだけ:
+       bash mac/cleanup_mac.sh
+EOF
+else
+  cat <<'EOF'
   1. まずドライランで消える量を確認:
        bash mac/cleanup_mac.sh
   2. safe だけ実際に消す:
        bash mac/cleanup_mac.sh --apply
   3. それでも足りなければ careful も含める:
        bash mac/cleanup_mac.sh --apply --include-careful
-  4. ディスク以外の遅さは上の 2〜5 が原因。スワップが多いなら常駐アプリを、
+  4. ディスク以外の遅さは上の 2〜7 が原因。スワップが多いなら常駐アプリを、
      ログイン項目に見覚えのないものがあればそれを外す。
 EOF
+fi
