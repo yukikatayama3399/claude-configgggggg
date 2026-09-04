@@ -142,7 +142,9 @@ while IFS='|' read -r scope group file desc; do
   d="$(dir_for_scope "$scope")"
   [ -n "$d" ] || continue
   path="$d/$file"
-  if [ ! -e "$path" ]; then
+  # -e はリンク先を追うので、壊れたシンボリックリンクだと偽になる。
+  # ディレクトリには残っているので -L も見る（launchd は読めないが掃除の対象）。
+  if [ ! -e "$path" ] && [ ! -L "$path" ]; then
     missing=$(( missing + 1 ))
     continue
   fi
@@ -242,7 +244,7 @@ fail_n=0
 
 while IFS='|' read -r scope path desc; do
   [ -n "${path:-}" ] || continue
-  [ -e "$path" ] || continue
+  { [ -e "$path" ] || [ -L "$path" ]; } || continue
 
   label="$(label_of "$path")"
   base="$(basename "$path")"
