@@ -76,7 +76,23 @@ python3 $S/dump_slides_text.py "<Slides URL or ID>" ...      # 参考スライ�
 ## Step 4: 出力先
 
 既定は **Slack の DM 下書き**（`mcp__Slack__slack_send_message_draft`、`channel_id` に相手の
-user ID）。**送信はしない**。Drive / Docs には残さない（明示依頼があれば gog docs で作る）。
+user ID）。**送信はしない**。Drive / Docs には残さない（明示依頼があれば下記の Doc 版を作る）。
+
+原稿は必ず Markdown ファイル（`<scratchpad>/minutes.md`）に一度書き、Slack にも Doc にも
+**同じ原稿から**出す（二重メンテしない）。
+
+### Doc 版（「docs にもして」「文字詰めて」と言われたら）
+
+```bash
+gog --account yuki.katayama@fout.jp docs create "議事録_MMDD_<テーマ>（<参加者>）"   # → id
+python3 .claude/skills/hawk-gijiroku/scripts/minutes_to_gdoc.py <scratchpad>/minutes.md <docId>
+```
+
+- 「文字詰め」体裁: 本文 9pt・段落間隔 0・行間 100%・余白 36/40pt、■ 見出しだけ 10.5pt＋上余白 7pt、
+  空行と `---` は捨てる、Next Action の表は番号リストに変換。
+- URL は gdocs-hyperlink スキルの流儀で本物のリンクにする（UTF-16 単位で範囲計算。スクリプトが担当）。
+- Doc は My Drive 直下に作られる。顧客フォルダ等へ入れる指示があれば `gog drive move` で移す。
+- 作成後は `gog docs cat` で読み返し、`gws docs documents get` で link 付き textRun が期待数あるか確認する。
 
 - 中西（Hideyuki Nakanishi, hide@fout.jp）: `U1FCLBC31`
   ※ Slack の表示名は `hide`。`中西` で検索しても出ないので `hideyuki` / `nakanishi` で探す
@@ -94,7 +110,7 @@ user ID）。**送信はしない**。Drive / Docs には残さない（明示�
 
 ## 関連
 
-- スクリプト: `scripts/dump_gdoc_tabs.py`（Doc 全タブ→txt）、`scripts/dump_slides_text.py`（Slides 全文字）
+- スクリプト: `scripts/dump_gdoc_tabs.py`（Doc 全タブ→txt）、`scripts/dump_slides_text.py`（Slides 全文字）、`scripts/minutes_to_gdoc.py`（Markdown 原稿→文字詰め Doc）
 - 週報への【共有】拾い上げ: `weekly-shared-notes`
 - 商談前ブリーフ: `hawk-shodan-prep`（synced skills）
 - 初回適用: 2026-09-08 Lite プラン／ツナグ・アクセスプログレス打合せ（中西×片山）

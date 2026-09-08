@@ -24,7 +24,7 @@ gws のために新しく OAuth 認証を取る必要はない（詳細は下記
 | `check_gws_apis.sh` | どこでも | gws で 6 API の疎通を一括確認（**読み取り専用・いつでも安全**） |
 | `sync_gog_token.sh` | **会社 Mac のみ** | 認証をやり直し、全環境へ配る値を書き出す |
 | `weekly/collect_shared_notes.sh` | どこでも | 議事録に追記された `【共有】` マーカー行を横断収集（**読み取り専用**）。使い方は `.claude/skills/weekly-shared-notes/SKILL.md` |
-| `.claude/skills/hawk-gijiroku/scripts/dump_gdoc_tabs.py` / `dump_slides_text.py` | どこでも | Gemini 自動メモ Doc の全タブ／参考 Slides の全文字を txt 化（**読み取り専用**）。厚め議事録を作る `hawk-gijiroku` スキルが使う |
+| `.claude/skills/hawk-gijiroku/scripts/` | どこでも | `dump_gdoc_tabs.py` / `dump_slides_text.py`（Gemini メモ Doc 全タブ・参考 Slides の txt 化、読み取り専用）、`minutes_to_gdoc.py`（Markdown 原稿→文字詰め体裁の Doc に書き込み）。`hawk-gijiroku` スキルが使う |
 
 ### 調子が悪いときの一次切り分け
 
