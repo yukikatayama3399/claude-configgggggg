@@ -24,6 +24,7 @@ gws のために新しく OAuth 認証を取る必要はない（詳細は下記
 | `check_gws_apis.sh` | どこでも | gws で 6 API の疎通を一括確認（**読み取り専用・いつでも安全**） |
 | `sync_gog_token.sh` | **会社 Mac のみ** | 認証をやり直し、全環境へ配る値を書き出す |
 | `weekly/collect_shared_notes.sh` | どこでも | 議事録に追記された `【共有】` マーカー行を横断収集（**読み取り専用**）。使い方は `.claude/skills/weekly-shared-notes/SKILL.md` |
+| `.claude/skills/customer-requests-daily/SKILL.md` | クラウド（毎日21:00 JST Routine） | 議事録・Meet文字起こし・顧客メールから要望を拾い、正本Doc「顧客からの要望まとめ（HAWK・毎日更新）」へ反映する手順（スクリプトではなくスキル） |
 
 ### 調子が悪いときの一次切り分け
 

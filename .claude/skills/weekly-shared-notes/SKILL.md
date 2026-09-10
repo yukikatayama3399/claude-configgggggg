@@ -62,9 +62,13 @@ gws docs documents batchUpdate \
 - **追記前に必ず既存内容を読む**。同一項目が既に載っていれば重複追記しない
   （既出の場合は社名の並記など既存項目側の更新に留める）。
 - 0件の週は Doc に何も書かない（収集結果の「なし」を週報下書きにだけ書く）。
-- 純粋な「機能要望」は月曜の Routine（機能要望ストック タブ `t.1tg9z5jlttjh`）が
-  担当。この Skill が扱うのは **全体共有事項としての拾い上げ**（要望を含むがそれに限らない）。
+- 純粋な「機能要望」は毎日21:00 JST の Routine（`customer-requests-daily` スキル →
+  正本Doc「顧客からの要望まとめ（HAWK・毎日更新）」
+  `12h8p2HA3Zpgp-G7j0filhmVfy9XTxBvX9jMdn0sTJeM`）が担当。旧「機能要望ストック」タブは廃止済み。
+  この Skill が扱うのは **全体共有事項としての拾い上げ**（要望を含むがそれに限らない）。
   同じ内容が両方に載るのは許容（用途が違う）。
+- 週報下書きの「■ 参照URL」一覧には **「顧客からの要望まとめ（HAWK・毎日更新）」のリンクを必ず載せる**
+  （毎日更新されるので、週報からは常に最新版を参照する）。
 - 週報下書き（水曜の HAWK週報 Routine）には、拾い上げた項目をそのまま
   「今週の共有事項」として含める。
 
@@ -72,4 +76,4 @@ gws docs documents batchUpdate \
 
 - 収集スクリプト: `weekly/collect_shared_notes.sh`（読み取り専用）
 - 水曜 10:00 JST「HAWK週報」Routine（trig_01H9pNo2RxrpTioqPK3QV9yT）に手順 4b として組み込み済み
-- 月曜 9:00 JST「週報メモ『機能要望ストック』週次更新」Routine（trig_015FwE4GCRbtYhjUTgDk7Lax）
+- 毎日 21:00 JST「「顧客からの要望まとめ」日次更新」Routine（trig_015FwE4GCRbtYhjUTgDk7Lax）→ `.claude/skills/customer-requests-daily/SKILL.md`
