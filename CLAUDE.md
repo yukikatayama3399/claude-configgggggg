@@ -318,3 +318,41 @@ gog 管理下の credentials.json → token export の順に見る。
   **2箇所を同時に**揃える。
 - gws は 100+ の Agent Skills を配布しているが、このリポジトリには入れていない
   （必要になったら `npx skills add https://github.com/googleworkspace/cli`）。
+
+## 許可ポリシー（都度クリックを求めない方針）
+
+2026-09-16 決定。**作業は原則クリック許可なしで進める。**
+`.claude/settings.json` の `permissions.defaultMode` を `dontAsk` にしてある。
+
+例外は2つだけ。ここだけは必ず人の確認を挟む:
+
+1. **メールを送る**（Gmail send / reply / forward）
+2. **Slack に投稿する**（メッセージ送信・予約投稿・Canvas 作成/更新）
+
+下書き作成（`create_draft` / `update_draft`）と読み取りは例外ではない。自由にやる。
+
+### 二重で止めている理由
+
+`permissions.ask` は MCP ツール名にしか効かない。
+CLAUDE.md の方針上 Google Workspace 操作の主経路は gog なので、
+**実際にメールが飛ぶのは Bash 経由**（`gog ... gmail send`）であり、
+permissions だけでは素通りしてしまう。
+そこで PreToolUse フック `.claude/hooks/guard-send.sh` で Bash コマンドを見て、
+送信系にマッチしたら `permissionDecision: "ask"` を返している。
+
+拾っているパターン: `gmail ... send` / `gmail +send` / `gmail drafts send` /
+`chat.postMessage` / `chat.scheduleMessage` / `hooks.slack.com`。
+
+gog / gws に新しい送信サブコマンドが増えたら、このフックの正規表現も足すこと。
+動作確認は以下で（何も出力されなければ「素通り＝許可」の意味）:
+
+```bash
+echo '{"tool_name":"Bash","tool_input":{"command":"gog -a x gmail send --to a@b.com"}}' \
+  | bash .claude/hooks/guard-send.sh
+```
+
+### 注意: 止めていないもの
+
+`mcp__Google_Drive__share_file`（Drive ファイルの共有）は許可側に入れてある。
+外部にアクセス権が渡るという意味ではメール送信に近いので、
+止めたくなったら `permissions.ask` に足す。
