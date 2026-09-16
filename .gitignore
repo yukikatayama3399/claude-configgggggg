@@ -1,3 +1,6 @@
 # Python のビルド生成物。sheets/ 配下のスクリプトを実行すると作られる
 __pycache__/
 *.pyc
+
+# gog/gws をリポジトリ直下で実行したときに出る 0 バイトの副産物
+download.html
