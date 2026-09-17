@@ -464,3 +464,24 @@ def build_steps(page, slide):
         y+=h+6
     reqs+=set_notes(slide,'デモで実物を見せるので、ここは概観に留める。順番はデモ（A 入稿編：与件→見積→配信設計→入稿）に合わせ、02 見積 → 03 配信設計 に入れ替え（2026-09-17）。実測した4タスクがこの5ステップに対応する。')
     return reqs
+
+def build_rows_big(page, slide, label, title, subtitle, items, note, footer=None, h=96):
+    """本日の結論の型: items=(左見出し, [(text, highlight?)])。左22pt、右18pt＋強調24pt緑。"""
+    reqs=header(page,slide,label,title,subtitle)
+    y=146 if subtitle else 118
+    for left,runs in items:
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,h,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',85,y,230,h,runs=left,size=22,color=TXT,bold=True); reqs+=r
+        rr=[(t,{'size':24,'bold':True,'color':DG} if b else {'size':18,'color':GRAY,'bold':False}) for t,b in runs]
+        _,r=shape(page,'TEXT_BOX',320,y,560,h,runs=rr,size=18,color=GRAY); reqs+=r
+        y+=h+8
+    if footer:
+        _,r=shape(page,'TEXT_BOX',61,y+2,829,20,runs=footer,size=11,color=DG,bold=True); reqs+=r
+    return reqs+set_notes(slide,note)
+
+VALUES=[('時間',[('運用4タスクを ',0),('87%削減',1),('。1案件あたり 月28.6時間・年343時間が戻る',0)]),
+        ('安全',[('予算超過・誤配信を ',0),('構造的に防ぐ',1),('。媒体の自動最適化に頼らない、人が確認できる設計',0)]),
+        ('蓄積',[('辞めない。',0),('ノウハウが残る',1),('。与件・実績・ルール・ロジックをHAWKに集約し、属人化を解消',0)])]
+NEXTSTEPS=[('個別デモ',[('貴社の案件条件に合わせて、',0),('実際の画面',1),('をご覧いただきながらご説明します',0)]),
+           ('投資対効果の試算',[('貴社の人員数・作業時間・運用タスクの具体値から、',0),('削減効果と担当可能案件数',1),('を試算します',0)]),
+           ('紹介型パートナー制度',[('自社で運用されない場合の取り組み方。',0),('制度の詳細と条件',1),('を個別にご案内します',0)])]
