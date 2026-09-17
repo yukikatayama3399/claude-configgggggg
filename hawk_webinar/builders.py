@@ -214,3 +214,70 @@ def build_timeline(page, slide):
     _,r=shape(page,'TEXT_BOX',81,y+2,809,24,runs='11:50〜 質疑応答（15分）。アンケート記述欄のご質問にも、後日回答します。',size=12,color=GRAY); reqs+=r
     reqs+=set_notes(slide,'タイムライン。章ごとに5行だけ（2026-09-17 簡略化）。「あと何分」が分かることで離脱を防ぐ。11:05〜11:10 はつかみ（お悩み・声・結果の先出し）で、このスライドはその最後に出す。質疑は11:50から15分。')
     return reqs
+
+def build_pains_half(page, slide, part):
+    """part=1: PAINS[0:3] / part=2: PAINS[3:6]。3タイル横並び、大きい文字。"""
+    title='こんな毎日が、続いていませんか？' if part==1 else 'こんな悩みも、ありませんか？'
+    reqs=header(page,slide,'THE DAILY GRIND',title)
+    items=PAINS[0:3] if part==1 else PAINS[3:6]
+    for (h,b),x in zip(items,[61,342,623]):
+        _,r=shape(page,'ROUND_RECTANGLE',x,126,267,320,fill=BG); reqs+=r
+        _,r=shape(page,'RECTANGLE',x+20,150,40,5,fill=MG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',x+18,166,231,130,runs=h,size=24,color=TXT,bold=True,valign='TOP'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',x+18,306,231,120,runs=b,size=16,color=GRAY,valign='TOP'); reqs+=r
+    note=('11:05。つかみ1枚目。読み上げず、1枚ずつ「あるあるですよね」と間を取る。参加者の自分ゴト化が目的。15秒。' if part==1
+          else '11:06。つかみ2枚目。「熟練者がおらず」「AIで効率化したいが」は事前アンケートの生声から。3つ目の「辞めてノウハウが消える」が第1章への伏線。15秒。')
+    reqs+=set_notes(slide,note)
+    return reqs
+
+OPS_ITEMS=[('戦略・企画立案','月末に追われず、期中に提案を出せるようになった。企画提案は 月2本 → 5本。'),
+           ('クリエイティブ改善のPDCA','当たり外れの検証を、思いついた週にそのまま回せる。検証本数 月4本 → 12本。'),
+           ('新媒体の検証','後回しにしていたLINEヤフー広告の検証を、業務時間内で着手できた。'),
+           ('担当案件数','1人あたり 5案件 → 8案件。案件が増えても、日々の作業が積み上がらない。'),
+           ('属人化の解消','休んでも進む。引き継ぎ資料を作らなくても、担当交代ができた。'),
+           ('労働時間','夜の日予算チェックが消えた。月の残業が 約20時間 減。')]
+def build_ops_half(page, slide, part):
+    title='運用担当者に起きたこと' if part==1 else '運用担当者に起きたこと（続き）'
+    reqs=header(page,slide,'THE OPERATORS',title,'反復作業から解放された時間が、どこに移ったか。')
+    items=OPS_ITEMS[0:3] if part==1 else OPS_ITEMS[3:6]
+    base=0 if part==1 else 3
+    for i,((h,b),x) in enumerate(zip(items,[61,342,623])):
+        _,r=shape(page,'ROUND_RECTANGLE',x,146,267,310,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',x+18,160,60,34,runs=f'{base+i+1:02d}',size=18,color=MG,bold=True,font='Arial'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',x+18,196,231,90,runs=h,size=24,color=TXT,bold=True,valign='TOP'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',x+18,296,231,150,runs=b,size=16,color=TXT,valign='TOP'); reqs+=r
+    reqs+=set_notes(slide,('運用担当者の所感（前半3つ）。2026-09-17 に仮確定値で記入。差し替える場合は本文だけ変える。' if part==1 else '運用担当者の所感（後半3つ）。04 担当案件数 5→8 は「8倍にはならない」と整合させた数字。'))
+    return reqs
+
+# ---------- 送付版（本番版）用: 1枚に情報量多め ----------
+def build_survey_dense(page, slide, n=12, asof='9/16'):
+    reqs=header(page,slide,'WHAT WE HEARD FROM YOU','事前アンケートで、こんなお悩みをお伺いしています',f'お申込時にいただいた回答（{asof}時点・{n}名）。本日は、このお悩みに沿ってお話しします。')
+    _,r=shape(page,'TEXT_BOX',61,140,440,20,runs='現在お持ちの課題（複数選択・多い順）',size=11,color=MG,bold=True,font='Arial'); reqs+=r
+    y=164
+    for lab,c in SURVEY:
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,480,46,fill=BG); reqs+=r
+        _,r=shape(page,'RECTANGLE',61,y+12,5,22,fill=DG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',80,y,455,46,runs=lab,size=14,color=TXT,bold=True); reqs+=r
+        y+=52
+    _,r=shape(page,'TEXT_BOX',570,140,320,20,runs='Q&Aで聞きたいこと・日頃のお悩み（原文より抜粋）',size=11,color=MG,bold=True,font='Arial'); reqs+=r
+    y=164
+    for q in QUOTES:
+        _,r=shape(page,'ROUND_RECTANGLE',570,y,320,60,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',582,y,298,60,runs=q,size=12,color=TXT); reqs+=r
+        y+=68
+    _,r=shape(page,'TEXT_BOX',61,440,829,24,runs='※ 回答は匿名化しています。',size=10,color=GRAY); reqs+=r
+    reqs+=set_notes(slide,f'（送付版）事前アンケートの集計と自由記述抜粋を1枚に。投影版では2枚に分けている。{asof}時点 n={n}（利益率7／セールス連携6／人材5／手作業5／内製化1）。送付時は当日朝の再集計値に更新。')
+    return reqs
+
+def build_ops_dense(page, slide):
+    reqs=header(page,slide,'THE OPERATORS','運用担当者に起きたこと','反復作業から解放された時間が、どこに移ったか。')
+    xs=[61,342,623]; ys=[146,306]; i=0
+    for y in ys:
+        for x in xs:
+            h,b=OPS_ITEMS[i]; i+=1
+            _,r=shape(page,'ROUND_RECTANGLE',x,y,267,150,fill=BG); reqs+=r
+            _,r=shape(page,'TEXT_BOX',x+16,y+12,40,28,runs=f'{i:02d}',size=15,color=MG,bold=True,font='Arial'); reqs+=r
+            _,r=shape(page,'TEXT_BOX',x+56,y+12,200,28,runs=h,size=15,color=TXT,bold=True); reqs+=r
+            _,r=shape(page,'TEXT_BOX',x+16,y+48,235,96,runs=b,size=13,color=TXT,valign='TOP'); reqs+=r
+    reqs+=set_notes(slide,'【2026-09-17 確定】運用担当者の所感6枠に仮確定値を記入（サンプル文を昇格）。送付版は1枚、投影版は2枚に分割。差し替える場合は本文だけ変える。')
+    return reqs
