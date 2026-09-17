@@ -364,3 +364,16 @@ def build_flow_vertical(page, slide):
     _,r=shape(page,'TEXT_BOX',61,y+2,829,30,runs=[('反復作業の連続が疲弊と離職を招き、離職はそのまま',{'size':15,'color':TXT,'bold':True}),('ノウハウの喪失',{'size':15,'color':DG,'bold':True}),('につながります。',{'size':15,'color':TXT,'bold':True})],size=15,color=TXT,bold=True,align='CENTER'); reqs+=r
     reqs+=set_notes(slide,'この流れは別々の問題ではない、という次のスライドへの伏線。上から下へ指でなぞるように話す。2026-09-17 に横→縦の流れに変更。')
     return reqs
+
+def build_boundary_rows(page, slide):
+    reqs=header(page,slide,'AUTOMATION HAS A BOUNDARY',[('自動化されたのは、キャンペーン',{}),('「内部」',{'color':DG}),('だけ',{})],'Advantage+ / Smart+ が自動化するのは配信の最適化レイヤー。その前後の業務は、いまも手元に残っています。')
+    bands=[(126,DG,WHITE,LG,'配信最適化レイヤー','媒体の自動化が担う',['オーディエンス（ターゲティング）の最適化','予算配分・入札の最適化','プレースメント（配信面）の最適化','クリエイティブの最適化']),
+           (290,BG,TXT,GRAY,'ワークフローレイヤー','いまも代理店の手元に残る',['与件の整理と見積もりの作成','キャンペーン設計・KPI設計','媒体横断での予算配分と全体最適','レポート作成・次アクションの提案'])]
+    for y,fill,tc,sc,name,who,items in bands:
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,150,fill=fill); reqs+=r
+        _,r=shape(page,'TEXT_BOX',85,y+18,300,40,runs=name,size=20,color=tc,bold=True,valign='TOP'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',85,y+60,300,30,runs=who,size=13,color=sc,bold=True,valign='TOP'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',400,y+12,470,130,runs='\n'.join('・'+t for t in items),size=15,color=tc,line_spacing=125); reqs+=r
+    _,r=shape(page,'TEXT_BOX',61,448,829,26,runs=[('つまり、媒体の自動化とHAWKは',{'size':15,'color':TXT,'bold':True}),('「別のレイヤー」',{'size':15,'color':DG,'bold':True}),('の話です。',{'size':15,'color':TXT,'bold':True})],size=15,color=TXT,bold=True); reqs+=r
+    reqs+=set_notes(slide,'第5章「HAWKは媒体の自動化と競合しない」への伏線。上下対比は1枚のまま（2026-09-17 左右→上下に変更）。上の段が媒体、下の段が手元に残る仕事。')
+    return reqs
