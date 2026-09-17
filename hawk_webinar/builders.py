@@ -329,3 +329,38 @@ def build_changed_half(page, slide, part):
     note=('11:06。前の2枚のお悩みに1対1で答える（前半3つ）。数字は第2章で回収するので、ここでは「変わった」ことだけ言う。読み上げは右列の太字だけ。30秒。' if part==1
           else '11:07。後半2つ。「AI導入による効果がイメージできない」は第2章の全開示と、次のアクション（個別試算）で回収する。20秒。')
     return reqs+set_notes(slide,note)
+
+CHANGES2=[('手作業が多く、ミスが増える','運用4タスクの工数と、事故の両方が減った。','33.0h → 4.4h／月（−87%）　入稿1件 30分 → 4分　事故 発生ゼロ'),
+          ('熟練者がいない・属人化している','メモを貼るだけで、設定項目80超を自動生成。','新人の立ち上げ 約3ヶ月 → 約1ヶ月'),
+          ('セールスと運用の連携が大変','与件メモを貼るだけで、見積が出る。','見積 2分　提案リードタイム 3営業日 → 当日'),
+          ('運用業務の利益率を高めたい','費用は月額固定。人件費を増やさず、取扱高を拡大。','1人あたり担当案件 5件 → 8件'),
+          ('AI導入による効果がイメージできない','第2章で、測定条件と内訳をすべて開示。','貴社の人員・時間で、投資対効果を個別に試算')]
+def build_changed_half(page, slide, part):
+    title='そのお悩みは、こう変わりました' if part==1 else 'そのお悩みは、こう変わりました（続き）'
+    reqs=header(page,slide,'WHAT CHANGED',title,'私たち自身の運用チーム（運用者5名）で実測した結果です。測り方は、第2章ですべて開示します。')
+    items=CHANGES2[0:3] if part==1 else CHANGES2[3:5]
+    h=96 if part==1 else 120; y=146
+    for pain,lead,num in items:
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,h,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',81,y,300,h,runs=pain,size=20,color=TXT,bold=True); reqs+=r
+        _,r=shape(page,'TEXT_BOX',385,y,26,h,runs='▶',size=14,color=MG,font='Arial',align='CENTER'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',416,y,465,h,runs=[(lead+'\n',{'size':15,'color':GRAY,'bold':False}),(num,{'size':20,'color':DG,'bold':True})],size=15,color=GRAY); reqs+=r
+        y+=h+10
+    note=('11:06。前の2枚のお悩みに1対1で答える（前半3つ）。数字は第2章で回収するので、ここでは「変わった」ことだけ言う。読み上げは右列の緑の数字だけ。30秒。' if part==1
+          else '11:07。後半2つ。「AI導入による効果がイメージできない」は第2章の全開示と、次のアクション（個別試算）で回収する。20秒。')
+    return reqs+set_notes(slide,note)
+
+FLOW=['煩雑な反復作業の連続','専門性の習得に時間がかかる','キャリアパスが不明確','離職','ノウハウの喪失']
+def build_flow_vertical(page, slide):
+    reqs=header(page,slide,'EXPERTISE LOCKED IN PEOPLE','人材が定着しない。ノウハウも残らない。')
+    y=112
+    for i,t in enumerate(FLOW):
+        last=(i==len(FLOW)-1)
+        _,r=shape(page,'ROUND_RECTANGLE',230,y,500,48,fill=DG if last else BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',230,y,500,48,runs=t,size=20,color=WHITE if last else TXT,bold=True,align='CENTER'); reqs+=r
+        if not last:
+            _,r=shape(page,'DOWN_ARROW',468,y+51,24,14,fill=MG); reqs+=r
+        y+=66
+    _,r=shape(page,'TEXT_BOX',61,y+2,829,30,runs=[('反復作業の連続が疲弊と離職を招き、離職はそのまま',{'size':15,'color':TXT,'bold':True}),('ノウハウの喪失',{'size':15,'color':DG,'bold':True}),('につながります。',{'size':15,'color':TXT,'bold':True})],size=15,color=TXT,bold=True,align='CENTER'); reqs+=r
+    reqs+=set_notes(slide,'この流れは別々の問題ではない、という次のスライドへの伏線。上から下へ指でなぞるように話す。2026-09-17 に横→縦の流れに変更。')
+    return reqs
