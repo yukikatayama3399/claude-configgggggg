@@ -447,3 +447,20 @@ def build_disclosure(page, slide):
     _,r=shape(page,'TEXT_BOX',85,y+4,795,36,runs=[('測定範囲外　',{'size':14,'color':YEL,'bold':True}),('提案 ／ クリエイティブ制作 ／ 顧客折衝 ／ 請求業務　',{'size':14,'color':WHITE,'bold':True}),('── ここは含んでいません',{'size':12.5,'color':LG,'bold':False})],size=14,color=WHITE,bold=True); reqs+=r
     reqs+=set_notes(slide,'必ずこのスライドを通してから数字を出す。特に「範囲外」の明言が信頼担保になる（最下段の濃緑の帯を指して言う）。案件条件・測定方法は 2026-09-17 に確定値を記入（運用者5名・12案件、2026年4〜6月、作業記録からの再構成）。数値の軸は「1案件あたり」で統一。')
     return reqs
+
+STEPS=[('メモから与件を作成','顧客からのメモやメール本文をそのまま貼る。AIが案件情報を理解し、設定項目を抽出'),
+       ('見積りを作成','過去実績からリーチ・クリック・視聴数を予測した見積りを自動作成。手動調整も可能'),
+       ('配信設計を作成・入稿','与件をもとにキャンペーン・広告セット・広告の構成を、媒体に合わせて自動作成'),
+       ('日予算を自動調整','残予算と残日数から適切な日予算を毎日自動計算し、アクティブな広告セットへ均等配分'),
+       ('インサイトレポートを出力','実績とクリエイティブの分析結果を、そのまま報告に使えるPowerPoint形式で出力')]
+def build_steps(page, slide):
+    reqs=header(page,slide,'FIVE STEPS',[('HAWKは、',{}),('メモをコピペするだけ',{'color':DG})])
+    y=110; h=64
+    for i,(hd,body) in enumerate(STEPS):
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,h,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',81,y,50,h,runs=f'{i+1:02d}',size=18,color=MG,bold=True,font='Arial'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',130,y,300,h,runs=hd,size=21,color=TXT,bold=True); reqs+=r
+        _,r=shape(page,'TEXT_BOX',440,y,440,h,runs=body,size=14.5,color=GRAY); reqs+=r
+        y+=h+6
+    reqs+=set_notes(slide,'デモで実物を見せるので、ここは概観に留める。順番はデモ（A 入稿編：与件→見積→配信設計→入稿）に合わせ、02 見積 → 03 配信設計 に入れ替え（2026-09-17）。実測した4タスクがこの5ステップに対応する。')
+    return reqs
