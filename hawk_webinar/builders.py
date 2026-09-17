@@ -281,3 +281,35 @@ def build_ops_dense(page, slide):
             _,r=shape(page,'TEXT_BOX',x+16,y+48,235,96,runs=b,size=13,color=TXT,valign='TOP'); reqs+=r
     reqs+=set_notes(slide,'【2026-09-17 確定】運用担当者の所感6枠に仮確定値を記入（サンプル文を昇格）。送付版は1枚、投影版は2枚に分割。差し替える場合は本文だけ変える。')
     return reqs
+
+def _rows3(page, items, y0=126, numbered_from=None):
+    """3段の横割り。左に見出し(24pt)、右に本文(16pt)。"""
+    reqs=[]; y=y0
+    for i,(h,b) in enumerate(items):
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,100,fill=BG); reqs+=r
+        if numbered_from is not None:
+            _,r=shape(page,'TEXT_BOX',81,y,50,100,runs=f'{numbered_from+i:02d}',size=18,color=MG,bold=True,font='Arial'); reqs+=r
+            hx=130
+        else:
+            _,r=shape(page,'RECTANGLE',81,y+47,6,6,fill=MG); reqs+=r
+            hx=100
+        _,r=shape(page,'TEXT_BOX',hx,y,400-(hx-81),100,runs=h,size=24,color=TXT,bold=True); reqs+=r
+        _,r=shape(page,'TEXT_BOX',500,y,375,100,runs=b,size=16,color=GRAY); reqs+=r
+        y+=110
+    return reqs
+
+def build_pains_half(page, slide, part):
+    title='こんな毎日が、続いていませんか？' if part==1 else 'こんな悩みも、ありませんか？'
+    reqs=header(page,slide,'THE DAILY GRIND',title)
+    reqs+=_rows3(page, PAINS[0:3] if part==1 else PAINS[3:6])
+    note=('11:05。つかみ1枚目。読み上げず、1行ずつ「あるあるですよね」と間を取る。参加者の自分ゴト化が目的。15秒。' if part==1
+          else '11:06。つかみ2枚目。「熟練者がおらず」「AIで効率化したいが」は事前アンケートの生声から。3つ目の「辞めてノウハウが消える」が第1章への伏線。15秒。')
+    return reqs+set_notes(slide,note)
+
+def build_ops_half(page, slide, part):
+    title='運用担当者に起きたこと' if part==1 else '運用担当者に起きたこと（続き）'
+    reqs=header(page,slide,'THE OPERATORS',title,'反復作業から解放された時間が、どこに移ったか。')
+    reqs+=_rows3(page, OPS_ITEMS[0:3] if part==1 else OPS_ITEMS[3:6], y0=146, numbered_from=1 if part==1 else 4)
+    note=('運用担当者の所感（前半3つ）。2026-09-17 に仮確定値で記入。差し替える場合は本文だけ変える。' if part==1
+          else '運用担当者の所感（後半3つ）。04 担当案件数 5→8 は「8倍にはならない」と整合させた数字。')
+    return reqs+set_notes(slide,note)
