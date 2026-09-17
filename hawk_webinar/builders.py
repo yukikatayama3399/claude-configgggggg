@@ -48,12 +48,12 @@ def build_survey(page, slide, n=12, asof='9/16'):
     return reqs
 
 # ---------- こんな毎日 ----------
-PAINS=[('朝いちで管理画面を開く','クライアントごとに、日予算を手で直す。毎日。'),
-       ('設定項目は80超','1つ間違えれば、誤配信か予算超過。'),
-       ('週末はレポート作成','「次の提案」を考える時間が、残らない。'),
-       ('熟練者がいない','見よう見まねで、疑問をその都度調べながら運用している。'),
-       ('AIで効率化したいが','どの業務が、どれだけ変わるのか。計算のしかたがイメージできない。'),
-       ('運用が分かる人が辞める','ノウハウも、一緒に消える。')]
+PAINS=[('毎朝、日予算を手で直している','クライアントごとに管理画面を開いて、毎日。'),
+       ('80を超える設定項目の選定が大変','1つ間違えれば、誤配信か予算超過。'),
+       ('レポート作成に追われる','週末に作る。「次の提案」を考える時間が、残らない。'),
+       ('熟練者がおらず、見よう見まねで運用している','疑問は、その都度調べながら。'),
+       ('AIで効率化したいが、効果がイメージできない','どの業務が、どれだけ変わるのか。計算のしかたが分からない。'),
+       ('運用が分かる人が辞めて、ノウハウが消える','引き継ぎ資料も、残らない。')]
 def build_pains(page, slide):
     reqs=header(page,slide,'THE DAILY GRIND','こんな毎日が、続いていませんか？')
     xs=[61,342,623]; ys=[118,296]
@@ -62,9 +62,9 @@ def build_pains(page, slide):
         for x in xs:
             h,b=PAINS[i]; i+=1
             _,r=shape(page,'ROUND_RECTANGLE',x,y,267,160,fill=BG); reqs+=r
-            _,r=shape(page,'TEXT_BOX',x+16,y+14,235,44,runs=h,size=17,color=TXT,bold=True); reqs+=r
-            _,r=shape(page,'TEXT_BOX',x+16,y+64,235,84,runs=b,size=13,color=GRAY,valign='TOP'); reqs+=r
-    reqs+=set_notes(slide,'11:05。つかみ。読み上げず、1行ずつ「あるあるですよね」と間を取る。参加者の自分ゴト化が目的。左下2枚（熟練者がいない／AIで効率化したいが）は 2026-09-17 に事前アンケートの生声から追加。ここは30秒。')
+            _,r=shape(page,'TEXT_BOX',x+16,y+12,235,60,runs=h,size=17,color=TXT,bold=True,valign='TOP'); reqs+=r
+            _,r=shape(page,'TEXT_BOX',x+16,y+80,235,70,runs=b,size=13,color=GRAY,valign='TOP'); reqs+=r
+    reqs+=set_notes(slide,'11:05。つかみ。読み上げず、1行ずつ「あるあるですよね」と間を取る。参加者の自分ゴト化が目的。見出しは課題ベースの言い回しに統一（2026-09-17）。「熟練者がおらず」「AIで効率化したいが」は事前アンケートの生声から追加。ここは30秒。')
     return reqs
 
 # ---------- こう変わる ----------
@@ -162,3 +162,42 @@ DEMO_RUNS=[('A　入稿編\n',{'size':17,'bold':True,'color':WHITE}),('　与件
            ('C　レポート編\n',{'size':17,'bold':True,'color':WHITE}),('　インサイトレポートを PowerPoint で出力\n\n',{'size':13.5,'color':WHITE,'bold':False}),
            ('この3部を、録画（約5分）でご覧いただきます。',{'size':14,'color':LG,'bold':True})]
 DEMO_NOTE='11:40頃。デモは録画を正とする（2026-09-17 決定。ライブはしない）。尺4〜5分、A→B→Cの3部構成。A 入稿編：与件メモ貼付→見積→配信設計→Metaへ入稿（広告マネージャで反映を確認）。B 運用編：キャンペーン／広告セット／広告の構造、広告セット単位の日予算自動調整ボタン、キャンペーン単位の予算設定、広告セット単位の入札設定、クリエイティブのON/OFF。過去の参照キャンペーンで CPC・CPE・CTR・25%視聴率・完全視聴率・完全視聴単価を確認（スコアは今後のキャンペーン対象なので飛ばす）。C レポート編：レポートのフォーマット紹介→PowerPoint出力（競合との最大差、省かない）。運用：ローカルに置いた動画を再生アプリで一時停止待機→動画ウィンドウを直接共有（ビデオクリップ最適化・音声共有ON）。1本版と3分割版（A/B/C）を持ち、質疑の「もう一度」は分割版で応える。話者は動画に合わせて口頭で説明（ナレーションは録画に入れない）。出ない場合は末尾の予備スライド（静止画）へ。'
+
+# ---------- お悩み集計（2枚分割版） ----------
+def build_survey_issues(page, slide, n=12, asof='9/16'):
+    reqs=header(page,slide,'WHAT WE HEARD FROM YOU','事前アンケートで、こんなお悩みをお伺いしています',f'お申込時にいただいた「現在お持ちの課題」（複数選択・{asof}時点・{n}名）。本日は、このお悩みに沿ってお話しします。')
+    y=146; mx=max(c for _,c in SURVEY)
+    for lab,c in SURVEY:
+        top=(c==mx)
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,54,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',81,y,500,54,runs=lab,size=17,color=TXT,bold=True); reqs+=r
+        bw=max(8,220*c/mx)
+        _,r=shape(page,'RECTANGLE',590,y+15,bw,24,fill=DG if top else MG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',590+bw+6,y+6,80,42,runs=[(f'{c}',{'size':22,'bold':True,'color':DG if top else TXT}),('名',{'size':12,'color':GRAY})],size=22,color=DG,bold=True,font='Arial'); reqs+=r
+        y+=60
+    _,r=shape(page,'TEXT_BOX',61,448,829,22,runs='※ 回答は匿名化して集計しています。数字は当日朝の申込状況で更新します。',size=10,color=GRAY); reqs+=r
+    reqs+=set_notes(slide,f'11:05。事前アンケートの集計（集客シート「集客状況」タブ、{asof}時点 n={n}）。数字は当日朝に再集計して更新する。読み上げず「利益率と、セールス連携が最多でした」とだけ言う。20秒。')
+    return reqs
+
+def build_survey_quotes(page, slide):
+    reqs=header(page,slide,'WHAT WE HEARD FROM YOU','Q&Aで聞きたいこと・日頃のお悩みも、お伺いしています','お申込フォームの自由記述より抜粋（原文・匿名）。本日の質疑でも、ここからお答えします。')
+    pos=[(61,146),(480,146),(61,300),(480,300)]
+    for q,(x,y) in zip(QUOTES,pos):
+        _,r=shape(page,'ROUND_RECTANGLE',x,y,410,140,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',x+14,y+4,40,50,runs='“',size=40,color=LG,bold=True,font='Arial'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',x+24,y+22,370,110,runs=q.strip('「」'),size=16,color=TXT,bold=True); reqs+=r
+    reqs+=set_notes(slide,'11:05。前のスライドの続き。4つのうち1つだけ読む（おすすめは「その都度調べながら、なんとか運用している」）。「これ、全部このあとの章で答えます」と言って次へ。「AIで効率化したいがイメージできない」は第2章、「セキュリティ・注意点」は第5章ガードレール＋質疑で回収。20秒。')
+    return reqs
+
+def build_survey_issues_plain(page, slide, n=12, asof='9/16'):
+    """グラフ・人数なし。お悩み文言だけを大きく。"""
+    reqs=header(page,slide,'WHAT WE HEARD FROM YOU','事前アンケートで、こんなお悩みをお伺いしています',f'お申込時にいただいた「現在お持ちの課題」（{asof}時点・{n}名、多い順）。本日は、このお悩みに沿ってお話しします。')
+    y=146
+    for lab,c in SURVEY:
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,54,fill=BG); reqs+=r
+        _,r=shape(page,'RECTANGLE',61,y+15,6,24,fill=DG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',85,y,790,54,runs=lab,size=22,color=TXT,bold=True); reqs+=r
+        y+=60
+    _,r=shape(page,'TEXT_BOX',61,448,829,22,runs='※ 回答は匿名化しています。',size=10,color=GRAY); reqs+=r
+    reqs+=set_notes(slide,f'11:05。事前アンケートの「現在お持ちの課題」を多い順に並べたもの（集客シート「集客状況」タブ、{asof}時点 n={n}：利益率7／セールス連携6／人材5／手作業5／内製化1）。人数は出さず口頭で「利益率とセールス連携が最多でした」とだけ言う。当日朝に再集計して並び順を確認。20秒。')
+    return reqs
