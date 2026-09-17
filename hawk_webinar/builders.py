@@ -201,3 +201,16 @@ def build_survey_issues_plain(page, slide, n=12, asof='9/16'):
     _,r=shape(page,'TEXT_BOX',61,448,829,22,runs='※ 回答は匿名化しています。',size=10,color=GRAY); reqs+=r
     reqs+=set_notes(slide,f'11:05。事前アンケートの「現在お持ちの課題」を多い順に並べたもの（集客シート「集客状況」タブ、{asof}時点 n={n}：利益率7／セールス連携6／人材5／手作業5／内製化1）。人数は出さず口頭で「利益率とセールス連携が最多でした」とだけ言う。当日朝に再集計して並び順を確認。20秒。')
     return reqs
+
+TIMELINE=[('11:10','なぜ、運用工数は減らないのか'),('11:17','自社案件の運用工数を、実測しました'),('11:25','工数が減っただけでは、何も変わりません'),('11:33','伴走型AIエージェント「HAWK」のご案内'),('11:40','デモ画面のご案内')]
+def build_timeline(page, slide):
+    reqs=header(page,slide,'TIMELINE','本日のタイムライン')
+    y=126
+    for t,title in TIMELINE:
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,58,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',81,y,110,58,runs=t,size=20,color=MG,bold=True,font='Arial'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',196,y,680,58,runs=title,size=26,color=TXT,bold=True); reqs+=r
+        y+=64
+    _,r=shape(page,'TEXT_BOX',81,y+2,809,24,runs='11:50〜 質疑応答（15分）。アンケート記述欄のご質問にも、後日回答します。',size=12,color=GRAY); reqs+=r
+    reqs+=set_notes(slide,'タイムライン。章ごとに5行だけ（2026-09-17 簡略化）。「あと何分」が分かることで離脱を防ぐ。11:05〜11:10 はつかみ（お悩み・声・結果の先出し）で、このスライドはその最後に出す。質疑は11:50から15分。')
+    return reqs
