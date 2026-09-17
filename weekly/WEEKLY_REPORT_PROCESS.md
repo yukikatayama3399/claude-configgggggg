@@ -42,6 +42,23 @@
 - 強調は `updateTextStyle`（`bold` + `backgroundColor`）。
 - 作業用ヘルパー: `weekly/docs_helpers/`（`doclib.py` / `tablelib.py`）。
 
+### 箇条書き階層の付け方（2026-09-17 に実測）
+
+- `createParagraphBullets` の階層は「先頭タブ数」だけでなく、**直前の段落が箇条書きならその階層に加算**される
+  （L1 の詳細行の直後に挿入したブロックは、タブ0でも L1 になる）。
+- 既に箇条書きになっている段落に対しては、先頭タブがあっても階層は変わらない（タブが残る）。
+- 確実に L0/L1 で作る手順:
+  1. `deleteParagraphBullets` → `updateParagraphStyle` で `indentStart`/`indentFirstLine` を 0 に戻す
+  2. 詳細行の先頭に `\t` を挿入
+  3. ブロック先頭に **一時的な空段落**（`\n`）を入れて「直前が箇条書きでない」状態を作る
+  4. 空段落を除いた範囲に `createParagraphBullets`（`BULLET_DISC_CIRCLE_SQUARE` = ●○■、既存と同じ見た目）
+  5. 一時段落を `deleteContentRange` で消す
+- 挿入テキストは挿入位置の段落の文字スタイル（太字・取り消し線）を継承するので、
+  直後に `updateTextStyle` で `bold:false, strikethrough:false` を明示する。
+- 個別商談の既存フォーマット: 見出し（【確度高】等）= 太字・非箇条書き／社名 = L0 細字／詳細 = L1 細字。
+  段落内の改行は `\u000b`（ソフト改行）で入れられる（ウェビナー節の「参加アンケート／本番資料」行）。
+- リンクは `updateTextStyle` の `link.url`（範囲は段落 startIndex + 文字列オフセット、UTF-16 単位）。
+
 ## 3. 是正点（2026-09-17 時点）
 
 1. **前週コピーの残骸**が毎週残る（ステータス表の週列、5. の「8/31予定」、OEM リストの日付）。
