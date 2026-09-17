@@ -377,3 +377,55 @@ def build_boundary_rows(page, slide):
     _,r=shape(page,'TEXT_BOX',61,448,829,26,runs=[('つまり、媒体の自動化とHAWKは',{'size':15,'color':TXT,'bold':True}),('「別のレイヤー」',{'size':15,'color':DG,'bold':True}),('の話です。',{'size':15,'color':TXT,'bold':True})],size=15,color=TXT,bold=True); reqs+=r
     reqs+=set_notes(slide,'第5章「HAWKは媒体の自動化と競合しない」への伏線。上下対比は1枚のまま（2026-09-17 左右→上下に変更）。上の段が媒体、下の段が手元に残る仕事。')
     return reqs
+
+def build_rows_generic(page, slide, label, title, subtitle, items, note):
+    """items: (見出し, 本文, 強調行 or None)。横3段。"""
+    reqs=header(page,slide,label,title,subtitle)
+    y=146 if subtitle else 126; h=100
+    for i,(hd,body,hl) in enumerate(items):
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,h,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',81,y,50,h,runs=f'{i+1:02d}',size=18,color=MG,bold=True,font='Arial'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',130,y,300,h,runs=hd,size=22,color=TXT,bold=True); reqs+=r
+        runs=[(body,{'size':14.5,'color':GRAY})] if not hl else [(body+'\n',{'size':14,'color':GRAY,'bold':False}),(hl,{'size':19,'color':DG,'bold':True})]
+        _,r=shape(page,'TEXT_BOX',440,y,440,h,runs=runs,size=14.5,color=GRAY); reqs+=r
+        y+=h+10
+    return reqs+set_notes(slide,note)
+
+INCIDENTS=[('予算超過','残予算と残日数から日予算を毎日自動計算し、配信中の広告セットへ均等配分。再計算漏れが構造的に起きない。','導入後：発生ゼロを維持'),
+           ('誤配信・設定ミス','80超の設定項目を与件から自動生成。各ステップに確認ポイントを設け、AIの判断を人がチェック。','導入後：発生ゼロを維持'),
+           ('報告漏れ・遅延','配信終了後のレポートを自動出力。作成待ちによる報告遅延が発生しない。','導入後：報告遅延ゼロ')]
+PITFALLS=[('仕様変更への追随コスト','Meta / TikTok など各媒体の頻繁な仕様変更・API更新に、開発リソースを常に張り続ける必要がある。',None),
+          ('ガードレール構築の難しさ','シンプルなAPI連携では「誤配信・予算超過」を防げない。安全に止める仕組みの設計が、実装の本体。',None),
+          ('膨らみ続ける保守コスト','初期開発費だけでは終わらない。維持・運用・改修のコストが継続的に発生し続ける。',None)]
+
+def build_two_bands(page, slide, label, title, subtitle, bands, footer=None, note=''):
+    """bands: (fill, 見出し, サブ, items[])。上下2段、左に見出し、右に箇条書き。"""
+    reqs=header(page,slide,label,title,subtitle)
+    y=146 if subtitle else 126; h=150
+    for fill,name,who,items in bands:
+        dark=(fill==DG); tc=WHITE if dark else TXT; sc=LG if dark else GRAY
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,h,fill=fill); reqs+=r
+        _,r=shape(page,'TEXT_BOX',85,y+18,300,60,runs=name,size=20,color=tc,bold=True,valign='TOP'); reqs+=r
+        if who:
+            _,r=shape(page,'TEXT_BOX',85,y+82,300,50,runs=who,size=13,color=sc,bold=True,valign='TOP'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',400,y+12,470,h-24,runs='\n'.join('・'+t for t in items),size=15,color=tc,line_spacing=125); reqs+=r
+        y+=h+14
+    if footer:
+        _,r=shape(page,'TEXT_BOX',61,y+2,829,26,runs=footer,size=15,color=TXT,bold=True); reqs+=r
+    return reqs+set_notes(slide,note)
+
+def build_rows_tagged(page, slide, label, title, subtitle, items, note):
+    """items: (見出し, タグ, 本文)。横3段。左＝見出し＋タグ、右＝本文。"""
+    reqs=header(page,slide,label,title,subtitle)
+    y=146 if subtitle else 126; h=96
+    for hd,tag,body in items:
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,h,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',85,y+12,330,44,runs=hd,size=22,color=TXT,bold=True,valign='TOP'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',85,y+58,330,30,runs='▶ '+tag,size=12.5,color=DG,bold=True,valign='TOP'); reqs+=r
+        _,r=shape(page,'TEXT_BOX',430,y,450,h,runs=body,size=14.5,color=GRAY); reqs+=r
+        y+=h+10
+    return reqs+set_notes(slide,note)
+
+GUARD=[('ガードレール機能','注意点02 への回答','各ステップに確認ポイントを設置。AIの判断を人間がチェックする設計。単なるAPI連携では防げない誤配信・予算超過を、構造的に抑止。'),
+       ('仕様変更の吸収','注意点01・03 への回答','各媒体の仕様変更・API更新への追随はプラットフォーム側で対応。お客様側で開発リソースを張り続ける必要なし。'),
+       ('API / MCP 提供','段階的な内製化をご希望の場合','代理店・広告主ご自身のAIエージェントからHAWKを呼び出し、自律運用させることも可能。')]
