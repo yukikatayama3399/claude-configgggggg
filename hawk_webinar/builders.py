@@ -429,3 +429,21 @@ def build_rows_tagged(page, slide, label, title, subtitle, items, note):
 GUARD=[('ガードレール機能','注意点02 への回答','各ステップに確認ポイントを設置。AIの判断を人間がチェックする設計。単なるAPI連携では防げない誤配信・予算超過を、構造的に抑止。'),
        ('仕様変更の吸収','注意点01・03 への回答','各媒体の仕様変更・API更新への追随はプラットフォーム側で対応。お客様側で開発リソースを張り続ける必要なし。'),
        ('API / MCP 提供','段階的な内製化をご希望の場合','代理店・広告主ご自身のAIエージェントからHAWKを呼び出し、自律運用させることも可能。')]
+
+DISCLOSURE=[('測定対象タスク','①見積もり作成　②キャンペーン設計・設定\n③モニタリング・日予算調整　④レポート／次アクション作成'),
+            ('案件条件','媒体: Meta ＋ TikTok\n運用額: 100〜300万円 × 月4キャンペーン'),
+            ('測定方法・期間','作業記録からの再構成（実測ベース）\n2026年4月〜6月／運用者5名・12案件'),
+            ('測定者','弊社SNS運用チーム（＝当事者による測定）')]
+def build_disclosure(page, slide):
+    reqs=header(page,slide,'FULL DISCLOSURE','まず、測定条件をすべて公開します')
+    y=112; h=72
+    for lab,val in DISCLOSURE:
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,h,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',85,y,260,h,runs=lab,size=20,color=TXT,bold=True); reqs+=r
+        _,r=shape(page,'TEXT_BOX',350,y,530,h,runs=val,size=17,color=TXT,bold=True,line_spacing=115); reqs+=r
+        y+=h+8
+    # 測定範囲外は最下段に別表記（濃緑の帯）
+    _,r=shape(page,'ROUND_RECTANGLE',61,y+4,829,36,fill=DG); reqs+=r
+    _,r=shape(page,'TEXT_BOX',85,y+4,795,36,runs=[('測定範囲外　',{'size':14,'color':YEL,'bold':True}),('提案 ／ クリエイティブ制作 ／ 顧客折衝 ／ 請求業務　',{'size':14,'color':WHITE,'bold':True}),('── ここは含んでいません',{'size':12.5,'color':LG,'bold':False})],size=14,color=WHITE,bold=True); reqs+=r
+    reqs+=set_notes(slide,'必ずこのスライドを通してから数字を出す。特に「範囲外」の明言が信頼担保になる（最下段の濃緑の帯を指して言う）。案件条件・測定方法は 2026-09-17 に確定値を記入（運用者5名・12案件、2026年4〜6月、作業記録からの再構成）。数値の軸は「1案件あたり」で統一。')
+    return reqs
