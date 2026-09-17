@@ -378,10 +378,10 @@ def build_boundary_rows(page, slide):
     reqs+=set_notes(slide,'第5章「HAWKは媒体の自動化と競合しない」への伏線。上下対比は1枚のまま（2026-09-17 左右→上下に変更）。上の段が媒体、下の段が手元に残る仕事。')
     return reqs
 
-def build_rows_generic(page, slide, label, title, subtitle, items, note):
+def build_rows_generic(page, slide, label, title, subtitle, items, note, h=100):
     """items: (見出し, 本文, 強調行 or None)。横3段。"""
     reqs=header(page,slide,label,title,subtitle)
-    y=146 if subtitle else 126; h=100
+    y=146 if subtitle else 126
     for i,(hd,body,hl) in enumerate(items):
         _,r=shape(page,'ROUND_RECTANGLE',61,y,829,h,fill=BG); reqs+=r
         _,r=shape(page,'TEXT_BOX',81,y,50,h,runs=f'{i+1:02d}',size=18,color=MG,bold=True,font='Arial'); reqs+=r
