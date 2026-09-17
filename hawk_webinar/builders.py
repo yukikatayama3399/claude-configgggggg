@@ -70,9 +70,9 @@ def build_pains(page, slide):
 # ---------- こう変わる ----------
 CHANGES=[('手作業が多く、ミスが増える',[('運用4タスク 33.0h → 4.4h／月（−87%）。',1),('入稿1件 ',0),('30分 → 4分。',1),('予算超過・誤配信は ',0),('発生ゼロを維持',1)]),
          ('熟練者がいない・属人化している',[('メモを貼るだけで設定項目80超を自動生成。新人の立ち上げ ',0),('約3ヶ月 → 約1ヶ月',1)]),
-         ('セールスと運用の連携',[('与件メモから見積が ',0),('2分',1),('。提案リードタイム ',0),('3営業日 → 当日',1)]),
+         ('セールスと運用の連携が大変',[('与件メモから見積が ',0),('2分',1),('。提案リードタイム ',0),('3営業日 → 当日',1)]),
          ('運用業務の利益率を高めたい',[('費用は月額固定。1人あたり担当案件 ',0),('5件 → 8件',1),('。人件費を増やさず取扱高を拡大',0)]),
-         ('AI導入の効果がイメージできない',[('第2章で測定条件と内訳を全開示。貴社の人員・時間で',0),('投資対効果を個別に試算',1)])]
+         ('AI導入による効果がイメージできない',[('第2章で測定条件と内訳を全開示。貴社の人員・時間で',0),('投資対効果を個別に試算',1)])]
 def build_changed(page, slide):
     reqs=header(page,slide,'WHAT CHANGED','そのお悩みは、こう変わりました','私たち自身の運用チーム（運用者5名）で実測した結果です。測り方は、第2章ですべて開示します。')
     y=146
@@ -312,4 +312,20 @@ def build_ops_half(page, slide, part):
     reqs+=_rows3(page, OPS_ITEMS[0:3] if part==1 else OPS_ITEMS[3:6], y0=146, numbered_from=1 if part==1 else 4)
     note=('運用担当者の所感（前半3つ）。2026-09-17 に仮確定値で記入。差し替える場合は本文だけ変える。' if part==1
           else '運用担当者の所感（後半3つ）。04 担当案件数 5→8 は「8倍にはならない」と整合させた数字。')
+    return reqs+set_notes(slide,note)
+
+def build_changed_half(page, slide, part):
+    title='そのお悩みは、こう変わりました' if part==1 else 'そのお悩みは、こう変わりました（続き）'
+    reqs=header(page,slide,'WHAT CHANGED',title,'私たち自身の運用チーム（運用者5名）で実測した結果です。測り方は、第2章ですべて開示します。')
+    items=CHANGES[0:3] if part==1 else CHANGES[3:5]
+    y=146
+    for pain,runs in items:
+        _,r=shape(page,'ROUND_RECTANGLE',61,y,829,96,fill=BG); reqs+=r
+        _,r=shape(page,'TEXT_BOX',81,y,300,96,runs=pain,size=20,color=TXT,bold=True); reqs+=r
+        _,r=shape(page,'TEXT_BOX',385,y,26,96,runs='▶',size=14,color=MG,font='Arial',align='CENTER'); reqs+=r
+        rr=[(t,{'size':19.5,'bold':True,'color':DG} if b else {'size':16,'color':TXT}) for t,b in runs]  # 数値は本文16ptの約1.2倍
+        _,r=shape(page,'TEXT_BOX',416,y,465,96,runs=rr,size=16,color=TXT); reqs+=r
+        y+=106
+    note=('11:06。前の2枚のお悩みに1対1で答える（前半3つ）。数字は第2章で回収するので、ここでは「変わった」ことだけ言う。読み上げは右列の太字だけ。30秒。' if part==1
+          else '11:07。後半2つ。「AI導入による効果がイメージできない」は第2章の全開示と、次のアクション（個別試算）で回収する。20秒。')
     return reqs+set_notes(slide,note)
