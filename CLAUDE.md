@@ -233,6 +233,33 @@ Cloud Console の「対象」画面にある2つのボタンは**どちらも押
 fout.jp 側でサードパーティアプリのアクセスが制限されると一斉に止まる。
 恒久運用するなら会社側プロジェクトへの移設を検討する余地がある。
 
+## カレンダーの「仮」予定は、消すときに通知を出さない（2026-09-18 決定）
+
+オンボーディングや Meet の日程調整では、候補枠を**複数まとめて仮押さえ**してから
+1 枠に確定し、残りを削除する運用をとる。仮枠が大量にできる前提なので、
+
+> **仮の候補枠（タイトルに「仮」を含む予定）を削除・変更するときは、
+> 参加者への通知を必ず OFF にする。** 取消メールが参加者（杉浦さんなど社内・先方）に
+> 何十通も飛ぶのを防ぐため。カレンダーからは通知なしでも消える。
+
+ツール別の指定方法（**既定は通知 ON なので、毎回明示する**）:
+
+| ツール | 削除 | 作成・更新 |
+|---|---|---|
+| gog | `gog calendar delete primary <eventId> --send-updates none -y --no-input` | `gog calendar create/update ... --send-updates none` |
+| gws | `gws calendar events delete --params '{"calendarId":"primary","eventId":"<id>","sendUpdates":"none"}'` | `--params` に `"sendUpdates":"none"` |
+| MCP Google Calendar | `delete_event` に `notificationLevel: "NONE"` | `create_event` / `update_event` に `notificationLevel: "NONE"` |
+
+適用範囲:
+- **仮枠の削除は常に通知 OFF**（手動でも Routine でも）。
+  `calendar/delete_tentative_onboarding.sh` の既定も `--send-updates none`。
+- 仮枠の**作成**時も、候補を大量に作る場合は通知 OFF にして招待メールの連発を避ける
+  （確定した 1 枠だけタイトルから「仮」を外し、そのときに `--send-updates all` で正式招待を送る）。
+- 確定済みの予定（「仮」が無いもの）の変更・取消は従来どおり通知 ON。相手に伝わらないと困る。
+
+タイトルの「仮」マーカーは、前日 18:00 の自動削除（`tentative-onboarding-cleanup` スキル）の
+判定にも使っている。確定したら必ず外すこと。
+
 ## gws (Google 公式 Google Workspace CLI)
 
 2026-08-22 導入・**疎通確認済み**（クラウドセッションで `drive.files.list` が通った）。

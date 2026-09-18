@@ -39,6 +39,9 @@ bash calendar/delete_tentative_onboarding.sh --send-updates all # 参加者に�
 ```
 
 - 既定は `--send-updates none`（杉浦さんに取消メールを飛ばさない。カレンダーからは消える）。
+  **仮枠の削除は手動・Routine を問わず必ず通知 OFF**（2026-09-18 決定。仮枠は大量に作る前提なので、
+  取消メールの連発を避ける）。gws なら `"sendUpdates":"none"`、MCP なら `notificationLevel: "NONE"`。
+  詳細は CLAUDE.md「カレンダーの『仮』予定は、消すときに通知を出さない」。
 - 出力は 1 行 1 件 `DELETE|DRY-RUN <開始> <タイトル> (<eventId>)` と末尾サマリ。
 - 終了コード: 0 = 正常（0 件含む）/ 1 = 削除失敗あり / 2 = 前提エラー（この時は何も消していない）。
 - ページングは自前で回している（gog の `--all-pages` は JSON 出力だと初回ページしか返さないことがあった）。
