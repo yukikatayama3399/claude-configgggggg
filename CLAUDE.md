@@ -318,3 +318,31 @@ gog 管理下の credentials.json → token export の順に見る。
   **2箇所を同時に**揃える。
 - gws は 100+ の Agent Skills を配布しているが、このリポジトリには入れていない
   （必要になったら `npx skills add https://github.com/googleworkspace/cli`）。
+
+## カレンダーのゲスト権限「予定を変更する」を既定で入れる
+
+Google Calendar の「ゲストの権限 → 予定を変更する」(API の `guestsCanModify`) は
+**予定ごとの属性で、既定値を変える設定が Google 側に存在しない**。
+Calendar の設定画面（予定の設定）にも Workspace 管理コンソールにも項目が無く、
+API の既定も `false` 固定。`guestsCanInviteOthers` と `guestsCanSeeOtherGuests` は
+逆に既定 `true` なので、これらと混同しないこと。
+
+そこで**後追いで潰す**方針を取っている。`calendar_guests_can_modify.py` が
+自分主催かつ人間のゲストが1人以上いる予定を探して `guestsCanModify=true` を patch する。
+
+```bash
+python3 calendar_guests_can_modify.py            # ドライラン（既定）
+python3 calendar_guests_can_modify.py --apply    # 実際に書き込む
+python3 calendar_guests_can_modify.py --apply --days 180 --calendar primary
+```
+
+- **1時間ごとの Routine で自動実行**している（2026-09-24 設定）。付け忘れは最大1時間で解消される。
+- gog に calendar の event patch が無いので **gws を使っている**数少ない常用スクリプト。
+- 繰り返し予定は `singleEvents=false` で「親」を patch する。展開すると1回ぶんの
+  例外インスタンスばかり直すことになり本体の既定が変わらない。
+- `sendUpdates=none` なので、権限を付け替えてもゲストに通知は飛ばない。
+- 冪等。既に `true` の予定と、他人主催の予定と、ゲストのいない予定は触らない。
+  会議室などのリソースだけの参加者はゲストとして数えない。
+
+注意: `guestsCanModify=true` は**概要欄だけでなくタイトル・日時・ゲストリスト・添付まで
+ゲストが変更できる**ようになる。「概要欄だけ編集可」という粒度は Google に無い。
