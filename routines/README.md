@@ -6,7 +6,7 @@ Routine が多数見つかった。原因はほぼ次の3つに集約される�
 | 原因 | 症状 |
 |---|---|
 | **Routine のセッションにはリポジトリがクローンされない** | SessionStart フックが走らず gog/gws が入っていない。「リポジトリの〇〇.py を実行」「スキルを読む」が全部空振り |
-| **Routine にコネクタ（Slack / Gmail 等）が付いていない** | 「Slack DM で通知」「#ai-news に投稿」ができない。`update_trigger` ではコネクタを足せないので、作り直すしかない |
+| **エージェントが作った Routine にはコネクタ（Slack / Gmail 等）が付かない** | 「Slack DM で通知」「#ai-news に投稿」ができない。エージェントからは付けられない（この org では `create_trigger` の `connectors` が使えず、`update_trigger` にも無い）ので、UI で作り直す |
 | **使うスクリプトが未マージのブランチにしか無い** | clone してもファイルが無い |
 
 Routine の run 状態が SUCCEEDED なのは「セッションが起動した」という意味でしかない。
@@ -41,9 +41,12 @@ bash routines/bootstrap.sh
 
 ## コネクタ
 
-Slack / Gmail / Calendar / Drive のコネクタは Routine 作成時（`create_trigger` の `connectors`）にしか付けられない。
-コネクタ無しで作った Routine に後から Slack 投稿を足したくなったら、作り直す
-（旧 Routine は削除せず無効化しておけば戻せる）。
+Slack / Gmail / Calendar / Drive のコネクタは **claude.ai の UI で作った Routine にしか付けられない**（2026-09-25 実測。
+エージェントが作った Routine は `mcp_connections: []` になり、起動したセッションに mcp__Slack__* 等が無い）。
+Slack に投稿する Routine は UI で作る。Google 系は gog/gws（冒頭ブロック）で代替できるのでコネクタ不要。
+
+もう1つの制約: **UI で作った Routine のプロンプトはエージェントから編集できない**（`created_via: http_api`）。
+UI 側で直す必要があるものは `routines/ui/` に貼り付け用のプロンプトを置いてある。
 
 ## 通知ハブ（永続セッションに束ねる方式）はやめる
 
