@@ -318,3 +318,11 @@ gog 管理下の credentials.json → token export の順に見る。
   **2箇所を同時に**揃える。
 - gws は 100+ の Agent Skills を配布しているが、このリポジトリには入れていない
   （必要になったら `npx skills add https://github.com/googleworkspace/cli`）。
+
+## Routine（定期実行）を作る・直すとき
+
+**必ず `routines/README.md` を読む。** Routine のセッションにはリポジトリが clone されず
+SessionStart フックも走らないので、gog/gws やリポジトリのスクリプトを使う Routine は
+プロンプト冒頭で `routines/bootstrap.sh` を叩く（冒頭ブロックは README にある）。
+Slack / Gmail 等のコネクタは作成時にしか付けられない。
+run の SUCCEEDED は「起動した」だけで、中身の成否は書き込み先を見ないと分からない。

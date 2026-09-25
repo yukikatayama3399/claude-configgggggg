@@ -35,26 +35,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Secrets 未登録の間は「失敗」ではなく「スキップ」にする。
+      # 本番の取込は Claude の Routine が担っているので、ここが止まっていても実害は無い。
+      # 未登録のまま cron が失敗し続けると 3時間ごとに失敗通知が飛ぶだけになる（2026-09 実測: 153連続失敗）。
       - name: Secrets の有無を確認
+        id: secrets
         run: |
           missing=0
           for v in GOG_CREDENTIALS_B64 GOG_TOKEN_EXPORT_B64 GOG_KEYRING_PASSWORD; do
-            if [ -z "${!v}" ]; then echo "::error::Secret $v が未設定"; missing=1; fi
+            if [ -z "${!v}" ]; then echo "::warning::Secret $v が未設定のため取込をスキップ"; missing=1; fi
           done
           if [ "$missing" = 1 ]; then
-            echo "会社 Mac で 'bash sync_gog_token.sh --gh-secrets' を実行して配布してください" >&2
-            exit 1
+            echo "クラウド(web)のセッション環境変数に入っている3値を GitHub Secrets に貼れば動く（CLAUDE.md 参照）" >&2
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: gog セットアップ
+        if: steps.secrets.outputs.ready == 'true'
         run: bash setup_gog_remote.sh
 
       - name: gws セットアップ
+        if: steps.secrets.outputs.ready == 'true'
         run: |
           export PATH="$HOME/bin:$PATH"
           bash setup_gws_remote.sh
 
       - name: 新着取込
+        if: steps.secrets.outputs.ready == 'true'
         run: |
           set -o pipefail
           export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
@@ -65,7 +74,7 @@ jobs:
           python3 sheets/hirogaru_form_sheet/sync_new_rows.py $ARGS | tee result.txt
 
       - name: 実行結果をサマリに出す
-        if: always()
+        if: always() && steps.secrets.outputs.ready == 'true'
         run: |
           echo '### 新着取込の結果' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
