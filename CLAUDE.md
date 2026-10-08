@@ -105,6 +105,36 @@ gog --account yuki.katayama@fout.jp docs cat <docId>
 gog --account yuki.katayama@fout.jp docs write <docId> --text "本文"
 ```
 
+### カレンダー予定には本人を必ず参加者に入れる（絶対ルール）
+
+**予定を作るときは、必ず `yuki.katayama@fout.jp` を参加者 (attendees) に含める。**
+API で予定を作ると、主催者であっても attendees に書かない限り参加者リストに入らない。
+実際に gog で作った商談予定（2026-10-08 gaaboo オンボーディング）で、
+主催者の本人が参加者に入っていなかった。
+
+- `gog calendar create` … `--attendees` に本人を必ず入れる
+  （相手がいない仮押さえ・個人予定でも入れる）
+- `gog calendar update --attendees` … 参加者を**置き換える**ので本人を必ず含める。
+  人を足すだけなら `--add-attendee` を使う
+- `gws calendar +insert` … `--attendee yuki.katayama@fout.jp` を必ず付ける
+- `gws calendar events insert` … `--json` の `attendees` に本人を入れる
+- MCP の Google Calendar `create_event` … `attendees` に本人を入れる
+- **作成後は必ず読み返して確認する**:
+  `gog --account yuki.katayama@fout.jp -j calendar event <calendarId> <eventId>` の
+  `attendees` に本人がいることを見てから完了報告する
+
+```bash
+gog --account yuki.katayama@fout.jp calendar create yuki.katayama@fout.jp \
+  --summary "..." --from ... --to ... \
+  --attendees "相手@example.com,yuki.katayama@fout.jp"
+```
+
+PreToolUse フック (`.claude/hooks/require-self-attendee.py`) が、上記のコマンド・MCP ツールで
+本人が attendees に入っていない呼び出しを**実行前にブロック**する。
+ブロックされたら本人を足してやり直す（フックを外して回避しない）。
+フックはコマンド文字列しか見ないので、スクリプトファイル経由で予定を作る場合は
+スクリプト側で本人を入れること。
+
 ### 使える API / 使えない API（2026-07-29 実測）
 
 | API | 状態 |
