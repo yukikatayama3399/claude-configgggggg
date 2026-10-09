@@ -92,7 +92,7 @@ def resolve_drive_images(cfg: dict, refs: dict[str, str]) -> dict[str, str]:
 
 
 # 取り込み時の加工の版。加工方法を変えたら上げると、全スクショが取り込み直される
-IMPORT_TAG = "#trim1"
+IMPORT_TAG = "#trim2"
 
 
 def _trim(png: pathlib.Path):

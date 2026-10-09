@@ -199,6 +199,15 @@ def trim_dark(im: Image.Image, margin: int = 10) -> Image.Image:
     g = im.convert("L")
     w, h = g.size
     px = g.load()
+    rgb = im.convert("RGB").load()
+
+    def neutral_dark_row(y):  # 黒〜灰色の帯だけを削る（緑のヘッダー等の色帯は残す）
+        xs = range(0, w, max(w // 300, 1))
+        return all(max(rgb[x, y]) - min(rgb[x, y]) < 30 for x in xs[::4]) and row_mean(y) < 70
+
+    def neutral_dark_col(x, y0, y1):
+        ys = range(y0, y1, max((y1 - y0) // 300, 1))
+        return all(max(rgb[x, y]) - min(rgb[x, y]) < 30 for y in ys[::4]) and col_mean(x, y0, y1) < 70
 
     def row_mean(y, x0=0, x1=None):
         xs = range(x0, x1 or w, max((x1 or w) // 300, 1))
@@ -209,13 +218,13 @@ def trim_dark(im: Image.Image, margin: int = 10) -> Image.Image:
         return sum(px[x, y] for y in ys) / len(ys)
 
     t, b, l, r = 0, h, 0, w
-    while t < h * 0.15 and row_mean(t) < 70:
+    while t < h * 0.15 and neutral_dark_row(t):
         t += 1
-    while b > h * 0.85 and row_mean(b - 1) < 70:
+    while b > h * 0.85 and neutral_dark_row(b - 1):
         b -= 1
-    while l < w * 0.15 and col_mean(l, t, b) < 70:
+    while l < w * 0.15 and neutral_dark_col(l, t, b):
         l += 1
-    while r > w * 0.85 and col_mean(r - 1, t, b) < 70:
+    while r > w * 0.85 and neutral_dark_col(r - 1, t, b):
         r -= 1
     # 動画キャプチャの左右・上下の白い帯（ピラーボックス）も削る
     while l < w * 0.2 and col_mean(l, t, b) >= 253:
@@ -254,9 +263,14 @@ def trim_dark(im: Image.Image, margin: int = 10) -> Image.Image:
                    min(cols[-1] * step + step + margin, w), min(rows[-1] * step + step + margin, h))
             area = (box[2] - box[0]) * (box[3] - box[1]) / (w * h)
             # 外側が暗く沈んでいる（= モーダルの背景）ときだけ切る
-            outside = [px[x, y] for y in range(0, h, 6) for x in range(0, w, 6)
-                       if not (box[0] <= x < box[2] and box[1] <= y < box[3])]
-            if 0.08 < area < 0.95 and outside and sum(outside) / len(outside) < 205:
+            pts = [(x, y) for y in range(0, h, 6) for x in range(0, w, 6)
+                   if not (box[0] <= x < box[2] and box[1] <= y < box[3])]
+            rgb2 = im.load()
+            outside = [px[x, y] for x, y in pts]
+            chroma = [max(rgb2[x, y]) - min(rgb2[x, y]) for x, y in pts]
+            # 外側が「灰色に」暗く沈んでいるときだけ切る（緑の背景やヘッダー帯は対象外）
+            if (0.08 < area < 0.95 and outside and sum(outside) / len(outside) < 205
+                    and sum(chroma) / len(chroma) < 25):
                 im = im.crop(box)
     return im
 
