@@ -19,10 +19,11 @@ import re
 import subprocess
 
 import assets
+import readme
 from gws import call, read_tab
 from layout import (BODY_BOTTOM, BODY_TOP, GREEN, GREEN_DARK, GREEN_LIGHT, GREEN_PALE, MUTED, MX, RED, SUB,
                     TEXT, WHITE, W, H, Deck, est_lines, paginate)
-from schema import APPROVED, CATEGORIES, CATEGORY_ORDER, RELEASED, REJECTED, SUPERSEDED
+from schema import APPROVED, CATEGORIES, CATEGORY_ORDER, RELEASED
 
 HERE = pathlib.Path(__file__).parent
 CONFIG = HERE / "config.json"
@@ -34,7 +35,16 @@ TITLES = {
     "prod_lite": "HAWK 機能取扱説明書（簡易版）",
 }
 # 初期設定・連携はオンボーディングで済むので運用の流れには入れない（章としては残す）
-RECENT_SINCE = "2026-07-31"  # 「最近の更新」に載せる最古の日付
+# 章の中の画面の並び（片山が v4 で並べ替えた順。2026-10-09 確定）。ここに無い画面は機能一覧の順で後ろに続く
+SCREEN_ORDER = ["S-31", "S-34", "S-27", "S-35", "S-30", "S-28",  # DealDesk: 壁打ちを先頭に
+                "S-01", "S-25", "S-26", "S-02",                  # ワークスペース・権限: ログインを先頭に
+                "S-24", "S-16", "S-23", "S-33", "S-19"]          # 初期設定・連携: 紐付けを連携履歴の前に
+# 画面を別の章に載せる（片山 v4: ログインは初期設定ではなくワークスペース・権限の頭に置く）
+SCREEN_CHAPTER = {"S-01": "ワークスペース・権限"}
+RECENT_SINCE = "2026-07-31"
+# レポートの画面にお客様向けサンプルレポート（config.json の sample_report_url）へのリンクを置く
+SAMPLE_REPORT_SCREENS = {"S-17", "S-20"}
+SAMPLE_REPORT_URL = ""  # main() で config から入れる  # 「最近の更新」に載せる最古の日付
 STEPS = [("BRF", "与件"), ("EST", "設計・見積り"),
          ("DLV", "配信設計"), ("OPS", "運用"), ("RPT", "レポート")]
 MENUS = ["DealDesk", "与件", "キャンペーン", "オブジェクト", "ワークスペース"]
@@ -43,11 +53,9 @@ MENUS = ["DealDesk", "与件", "キャンペーン", "オブジェクト", "ワ�
 # ---- データ読み込み --------------------------------------------------------------
 def load_rows(sid: str, mode: str, lite: bool) -> dict[str, list[dict]]:
     def ok(r: dict, need_release: bool) -> bool:
-        if mode == "draft":
-            return r.get("承認") not in (REJECTED, SUPERSEDED)
-        if r.get("承認") != APPROVED:
+        if r.get("承認") != APPROVED:  # 下書き版も承認済だけ（候補は片山の DM 承認を経てから載せる）
             return False
-        if need_release and r.get("提供状態", RELEASED) not in (RELEASED, ""):
+        if mode == "prod" and need_release and r.get("提供状態", RELEASED) not in (RELEASED, ""):
             return False
         return not lite or r.get("簡易版", "").upper() == "TRUE"
 
@@ -60,20 +68,18 @@ def load_rows(sid: str, mode: str, lite: bool) -> dict[str, list[dict]]:
 
     out = {
         "機能一覧": latest_per_id([r for r in read_tab(sid, "機能一覧") if ok(r, True)], "機能ID"),
-        "サイトマップ": latest_per_id([r for r in read_tab(sid, "サイトマップ")
-                                  if mode == "draft" and r.get("承認") not in (REJECTED, SUPERSEDED)
-                                  or r.get("承認") == APPROVED], "画面ID"),
+        "サイトマップ": latest_per_id([r for r in read_tab(sid, "サイトマップ") if r.get("承認") == APPROVED], "画面ID"),
         "逆引き": latest_per_id([r for r in read_tab(sid, "逆引き") if ok(r, False)], "UCID"),
         "FAQ": latest_per_id([r for r in read_tab(sid, "FAQ") if ok(r, False)], "FAQID"),
-        "更新履歴": [r for r in read_tab(sid, "更新履歴") if mode == "draft" or r.get("反映状況") == APPROVED],
+        "更新履歴": [r for r in read_tab(sid, "更新履歴") if r.get("反映状況") == APPROVED],
     }
-    # 本番に出ない機能を参照している逆引きは、参照を落とす（空になれば逆引きごと落とす）
+    # スライドに出ない機能を参照している逆引きは、参照を落とす（空になれば逆引きごと落とす）。下書き版も同じ
     live = {r["機能ID"] for r in out["機能一覧"]}
     ucs = []
     for r in out["逆引き"]:
         ids = [i for i in split_ids(r.get("使う機能ID", "")) if i in live]
-        if ids or mode == "draft":
-            ucs.append({**r, "使う機能ID": "、".join(ids) if mode != "draft" else r.get("使う機能ID", "")})
+        if ids:
+            ucs.append({**r, "使う機能ID": "、".join(ids)})
     out["逆引き"] = ucs
     return out
 
@@ -92,7 +98,7 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
            screen_pages: dict[str, int] | None, version: str = "") -> tuple[Deck, dict, dict]:
     kind = "prod_lite" if lite else mode
     footer = (f"{TITLES[kind]}｜{today} 版｜このスライドは随時更新されます（リンク先は常に最新版）"
-              if mode != "draft" else f"【下書き{version}・社外秘】{today} 生成｜赤字の機能名は未承認（全件未承認のときは色分けなし）")
+              if mode != "draft" else f"【下書き{version}・社内管理用】{today} 生成｜お客様には本番版（固定URL）を共有してください")
     urls, sizes = art["urls"], art["sizes"]
     d = Deck(f"b{dt.datetime.now(JST).strftime('%H%M%S')}", urls, footer)
     feats, screens, ucs, faqs, changes = (data[k] for k in ("機能一覧", "サイトマップ", "逆引き", "FAQ", "更新履歴"))
@@ -225,8 +231,12 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
         d.table(MX, BODY_TOP + 2, widths, ["日付", "区分", "内容", "関連する機能"], chunk, size=7)
 
     # 機能（カテゴリ → 画面ごと）
+    def chapter_of(r: dict) -> str:
+        return SCREEN_CHAPTER.get(r.get("画面ID", ""), cat_of(r["機能ID"]))
+
+    rank = {sid: i for i, sid in enumerate(SCREEN_ORDER)}
     for cat in CATEGORY_ORDER:
-        cfeats = [r for r in feats if cat_of(r["機能ID"]) == cat]
+        cfeats = [r for r in feats if chapter_of(r) == cat]
         if not cfeats:
             continue
         found_toc[cat] = d.page_no + 1
@@ -241,6 +251,8 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
             if len(small) > 1:
                 merged = [r for k in small for r in groups.pop(k)]
                 groups["__misc"] = merged
+            order = list(groups)
+            groups = {k: groups[k] for k in sorted(order, key=lambda k: (k == "__misc", rank.get(k, len(rank)), order.index(k)))}
         for sid_, rows_ in groups.items():
             screen = by_screen.get(sid_, {})
             if sid_ and sid_ != "__misc":
@@ -349,6 +361,11 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
             d.text(MX, y, lw, ih_, info, size=7.5, color=TEXT, fill="#f6f8f2",
                    runs=[(0, len("画面の場所：") if path else 0, {"bold": True, "color": GREEN_DARK})])
             y += ih_ + 6
+            if k == 0 and SAMPLE_REPORT_URL and sid_ in SAMPLE_REPORT_SCREENS:
+                label = "▶ サンプルレポートはこちら"
+                d.text(MX, y, lw, 16, label + "（別のスライドが開きます）", size=8, color=GREEN_DARK, bold=True,
+                       runs=[(2, len(label), {"bold": True, "color": GREEN_DARK, "link": SAMPLE_REPORT_URL})])
+                y += 20
             # 余白にはこの画面を使う逆引き（やりたいこと）を入れる
             ids = {r["機能ID"] for r in rows}
             related = [u for u in ucs if ids & set(split_ids(u.get("使う機能ID", "")))]
@@ -471,6 +488,8 @@ def main():
                     help="下書き: 版番号を上げず、最新の下書き版を作り直す（同じ修正回の中での再生成用）")
     a = ap.parse_args()
     cfg = json.loads(CONFIG.read_text())
+    global SAMPLE_REPORT_URL
+    SAMPLE_REPORT_URL = cfg.get("sample_report_url", "")
     kind = "prod_lite" if a.lite else a.mode
     picked = assets.pick_up_screenshot_folder(cfg)
     if picked:
@@ -498,6 +517,7 @@ def main():
         pid = ensure_presentation(cfg, f"{kind}_presentation_id", TITLES[kind])
         replace_all(pid, deck)
     print(f"{kind}{(' ' + version) if version else ''}: {deck.page_no} pages, {len(data['機能一覧'])} features")
+    readme.write(cfg)  # README タブ先頭の「いま使う URL」を最新にする
     print(f"https://docs.google.com/presentation/d/{pid}/edit")
     if a.archive and a.mode == "prod":
         digest = data_hash(data)

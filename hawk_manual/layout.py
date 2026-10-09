@@ -112,6 +112,11 @@ class Deck:
                                                       "fields": "alignment,lineSpacing,spaceAbove,spaceBelow"}})
             for s, e, st in runs or []:
                 self._style(oid, None, st.get("size", size), st.get("color", color), st.get("bold", bold), s, e)
+                if st.get("link"):  # クリックで開くリンク
+                    self.req.append({"updateTextStyle": {"objectId": oid,
+                                                         "textRange": {"type": "FIXED_RANGE", "startIndex": s, "endIndex": e},
+                                                         "style": {"link": {"url": st["link"]}, "underline": True},
+                                                         "fields": "link,underline"}})
         return oid
 
     def _style(self, oid, cell, size, color, bold, start=None, end=None):

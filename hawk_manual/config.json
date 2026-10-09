@@ -1,8 +1,8 @@
 {
   "account": "yuki.katayama@fout.jp",
   "master_sheet_id": "1S47bjrubJTz7pkcdNxIRiGT77gAjnM4Z753wv1ACydw",
-  "draft_presentation_id": "1FjI6lbObA9gX85RyCe19YsHTzTS1ucF9S2BagASrp7A",
-  "prod_presentation_id": "",
+  "draft_presentation_id": "1B7i7wGJ_QBQr9igdy3rDKxcme6vsbMi1H0Z-3aqdWq4",
+  "prod_presentation_id": "1qvg3kR1HtS-hbxJW7tTT3-bykIJPP0gOPu5NvxFzrM0",
   "prod_lite_presentation_id": "",
   "archive_folder_id": "1e-bWETERkSf9-ovotVIW1cylSJYGuDel",
   "watch_channels": {
@@ -12,5 +12,7 @@
   "folder_id": "1RJvs2aZP1WF9Mb0QV3XDF4mWizT92779",
   "screenshot_folder_id": "1WebsR017sHUN1Q21YfaAuoHvj-xHfGSh",
   "assets_presentation_id": "1LbvrKaCut6GXe0Yv_NAoVsvwQJ1QLU_JXxfMV9D7ucE",
-  "processed_folder_id": "1MS9TFKGHjUUnwrFPnc3eaT_H4o1fj8gA"
+  "processed_folder_id": "1MS9TFKGHjUUnwrFPnc3eaT_H4o1fj8gA",
+  "sample_report_url": "https://docs.google.com/presentation/d/1xCyncu-ubzTYqseNrM2WDDlB7CI-2aR78uzs3Z_XDNM/view",
+  "routine_id": "trig_011k4XwDZbr9rx9R1gYJHKCn"
 }
