@@ -24,7 +24,7 @@ def main() -> None:
     meta = call("sheets.spreadsheets.get", {"spreadsheetId": SID, "fields": "sheets.properties"})
     gids = {s["properties"]["title"]: s["properties"]["sheetId"] for s in meta["sheets"]}
     updates, rules, log = [], [], []
-    for tab, id_col in (("機能一覧", "機能ID"), ("サイトマップ", "画面ID"), ("逆引き", "UCID")):
+    for tab, id_col in (("機能一覧", "機能ID"), ("サイトマップ", "画面ID"), ("逆引き", "UCID"), ("FAQ", "FAQID")):
         cols = TABS[tab]
         rows = call("sheets.spreadsheets.values.get", {"spreadsheetId": SID, "range": f"{tab}!A1:Z"}).get("values", [])
         header = rows[0] if rows else cols
