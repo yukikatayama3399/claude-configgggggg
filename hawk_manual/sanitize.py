@@ -32,9 +32,28 @@ REPLACE = [
     (r"act_\d{6,}", "act_000000000000"),
     (r"\b\d{12,}\b", "000000000000"),
     (r"片山\s*優希|片山", "サンプル 太郎"),
-    (r"Aya\s*Sugiura|Tomoyuki\s*Sato|Hiroshi\s*Okada|Shin\s*Takemura|Yugo", "サンプル 花子"),
-    (r"中西\s*秀之|岩田\s*弥和|田染\s*康行|杉浦", "サンプル 花子"),
+    # 社員名は人ごとに別のサンプル名にする（一覧で見たとき同じ名前が並ばないように）
+    (r"Aya\s*Sug\w*", "Sample User A"),
+    (r"Tomoyuki\s*Sato", "Sample User B"),
+    (r"Hiroshi\s*Okada", "Sample User C"),
+    (r"Shin\s*Takemura", "Sample User D"),
+    (r"Yugo", "Sample User E"),
+    (r"岩田\s*弥和", "サンプル 次郎"),
+    (r"中西\s*秀之", "サンプル 花子"),
+    (r"田染\s*康行", "サンプル 三郎"),
+    (r"杉浦", "サンプル"),
 ]
+RULES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sanitize_rules.json")
+
+
+def extra_rules(screen_id: str) -> list[tuple[str, str]]:
+    """sanitize_rules.json の画面別ルール（代理店名のサンプル化など）。"""
+    import json
+    try:
+        rules = json.load(open(RULES_FILE))
+    except OSError:
+        return []
+    return [tuple(r) for r in rules.get(screen_id, [])]
 
 
 def _tesseract(im: Image.Image, scale: float = 1.0, dy: int = 0) -> list[dict]:
@@ -106,7 +125,7 @@ def _bg_and_fg(im: Image.Image, box) -> tuple[tuple, tuple]:
     return bg, fg
 
 
-def sanitize(src: str, dst: str, debug: bool = False) -> list[str]:
+def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> list[str]:
     im = Image.open(src).convert("RGB")
     draw = ImageDraw.Draw(im)
     marks, log = [], []
@@ -129,8 +148,8 @@ def sanitize(src: str, dst: str, debug: bool = False) -> list[str]:
             spans.append((len(text), len(text) + len(w), box))
             text += w
         done: list[tuple[int, int]] = []  # この行で置き換え済みの文字範囲
-        for pat, rep in REPLACE:
-            for m in re.finditer(pat, text, flags=re.I):
+        for pat, rep in extra_rules(screen_id) + REPLACE:
+            for m in re.finditer(pat, text, flags=0 if pat.startswith("^") else re.I):
                 if any(a < m.end() and m.start() < b for a, b in done):
                     continue
                 hit = [b for s, e, b in spans if s < m.end() and e > m.start()]
@@ -179,6 +198,7 @@ if __name__ == "__main__":
     ap.add_argument("src")
     ap.add_argument("dst")
     ap.add_argument("--debug", action="store_true")
+    ap.add_argument("--screen", default="", help="画面ID（sanitize_rules.json の画面別ルールを使う）")
     a = ap.parse_args()
-    for line in sanitize(a.src, a.dst, a.debug):
+    for line in sanitize(a.src, a.dst, a.debug, a.screen):
         print(line)

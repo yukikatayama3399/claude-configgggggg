@@ -146,7 +146,7 @@ def pick_up_screenshot_folder(cfg: dict) -> int:
                                 json.dumps({"fileId": f["id"], "alt": "media", "supportsAllDrives": True})],
                                check=True, cwd=tmp, capture_output=True)
                 out = pathlib.Path(tmp) / "clean.png"
-                for line in sanitize(str(pathlib.Path(tmp) / "raw.png"), str(out)):
+                for line in sanitize(str(pathlib.Path(tmp) / "raw.png"), str(out), screen_id=m.group(1)):
                     print(f"  {m.group(1)}: {line}")
                 done[f["id"]] = upload_processed(cfg, m.group(1), out, f["id"])
         files[m.group(1)] = done[f["id"]]  # 同じ画面IDが複数あれば新しい方
