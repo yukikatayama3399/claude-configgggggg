@@ -408,11 +408,8 @@ def last_archived_hash(sid: str, kind: str) -> str:
 
 def archive(cfg: dict, pid: str, kind: str, n_rows: int, digest: str):
     stamp = dt.datetime.now(JST).strftime("%Y%m%d")
-    name = f"{TITLES[kind]}_{stamp}.pdf"
-    # gws の -o はカレントディレクトリ配下しか書けない
-    subprocess.run(["gws", "drive", "files", "export", "-o", name, "--params",
-                    json.dumps({"fileId": pid, "mimeType": "application/pdf"})], check=True, cwd=HERE)
-    pdf = HERE / name
+    from pdf_export import export_pdf  # Drive export のサイズ上限を避けて分割書き出し
+    pdf = export_pdf(pid, HERE / f"{TITLES[kind]}_{stamp}.pdf")
     link = ""
     if cfg.get("archive_folder_id"):
         up = subprocess.run(["gog", "--account", cfg["account"], "-j", "drive", "upload", str(pdf),
