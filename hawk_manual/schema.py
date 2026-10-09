@@ -13,7 +13,7 @@ APPROVAL_VALUES = [DRAFT, APPROVED, REJECTED, SUPERSEDED]
 
 # 提供状態。お客様向け（本番）に出すのは RELEASED だけ。
 RELEASED = "提供中"
-STATUS_VALUES = [RELEASED, "開発中", "予定", "提供終了", "不明"]
+STATUS_VALUES = [RELEASED, "開発中", "予定", "未対応", "提供終了", "不明"]
 
 TABS = {
     "README": None,  # 運用ルール（自由記述）
