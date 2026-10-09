@@ -24,13 +24,14 @@ FONT_FALLBACK = "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf"
 # OCR の読み違い（i/l/1、a/e 等）も拾えるよう少し緩めに書く
 REPLACE = [
     (r"[\w.+-]+@[\w-]+(\.[\w-]+)+", "hoge@example.com"),
+    (r"[\w.+-]+@\s?(f[o0]ut|freakout)\w*", "hoge@example.com"),  # OCR がドメインのドットを落とした場合
     (r"yuk\S{0,3}kat\w{1,4}ma\S*fout\S*", "hoge@example.com"),
     (r"yuk[il1|]?[._]?kat[a-z]{1,3}ma", "hoge_user"),
     (r"katayama", "hoge"),
     (r"Fre[ae]k\s*Out\s*HAWK\s*S[ae]les", "サンプル株式会社"),
     (r"freakout-hawk-sales", "sample-workspace"),
     (r"act_\d{6,}", "act_000000000000"),
-    (r"\b\d{12,}\b", "000000000000"),
+    (r"(?<!\d)\d{12,}(?!\d)", "000000000000"),  # ピクセルID・ポートフォリオID 等（前後に文字が付いていても拾う）
     (r"片山\s*優希|片山", "サンプル 太郎"),
     # 社員名は人ごとに別のサンプル名にする（一覧で見たとき同じ名前が並ばないように）
     (r"Aya\s*Sug\w*", "Sample User A"),
@@ -40,20 +41,23 @@ REPLACE = [
     (r"Yugo", "Sample User E"),
     (r"岩田\s*弥和", "サンプル 次郎"),
     (r"中西\s*秀之", "サンプル 花子"),
-    (r"田染\s*康行", "サンプル 三郎"),
+    (r"田\S?\s*康\s*行", "サンプル 三郎"),  # OCR が「染」を落とすことがある
     (r"杉浦", "サンプル"),
 ]
 RULES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sanitize_rules.json")
 
 
-def extra_rules(screen_id: str) -> list[tuple[str, str]]:
-    """sanitize_rules.json の画面別ルール（代理店名のサンプル化など）。"""
+def _rules() -> dict:
     import json
     try:
-        rules = json.load(open(RULES_FILE))
+        return json.load(open(RULES_FILE))
     except OSError:
-        return []
-    return [tuple(r) for r in rules.get(screen_id, [])]
+        return {}
+
+
+def extra_rules(screen_id: str) -> list[tuple[str, str]]:
+    """sanitize_rules.json の画面別ルール（代理店名のサンプル化など）。"""
+    return [tuple(r) for r in _rules().get(screen_id, [])]
 
 
 def _tesseract(im: Image.Image, scale: float = 1.0, dy: int = 0) -> list[dict]:
@@ -125,8 +129,34 @@ def _bg_and_fg(im: Image.Image, box) -> tuple[tuple, tuple]:
     return bg, fg
 
 
+def crop_chrome(im: Image.Image, bottom_ratio: float | None = None) -> Image.Image:
+    """ブラウザのブックマークバー（上端の濃い帯）と macOS のメニューバー（下端の黒帯）を切り落とす。"""
+    g = im.convert("L")
+    w, h = g.size
+
+    def mean(y):
+        return sum(g.getpixel((x, y)) for x in range(0, w, max(w // 200, 1))) / len(range(0, w, max(w // 200, 1)))
+
+    top = 0
+    while top < h * 0.06 and mean(top) < 215:
+        top += 1
+    bottom = h
+    while bottom > h * 0.9 and mean(bottom - 1) < 90:
+        bottom -= 1
+    if bottom_ratio:
+        bottom = min(bottom, int(h * bottom_ratio))
+    return im.crop((0, top, w, bottom)) if (top or bottom < h) else im
+
+
 def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> list[str]:
     im = Image.open(src).convert("RGB")
+    crop = _rules().get("_crop_bottom", {}).get(screen_id)
+    cropped = crop_chrome(im, crop)
+    if cropped is not im:
+        im = cropped
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            im.save(f.name)
+        src = f.name  # 以降の OCR は切り落とし後の画像で行う
     draw = ImageDraw.Draw(im)
     marks, log = [], []
 
@@ -139,7 +169,23 @@ def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> li
                 return True
         return False
 
-    for line in ocr_lines(src):
+    lines_all = ocr_lines(src)
+    words_all = [(w, b) for ln in lines_all for w, b in ln["words"]]
+
+    def extend_left(box):
+        """メールアドレスの左に、別の語として読まれた断片（例: "yuki."）がくっついていれば含める。"""
+        x0, y0, x1, y1 = box
+        h = y1 - y0
+        changed = True
+        while changed:
+            changed = False
+            for w, (a, b, c, d) in words_all:
+                cy = (b + d) / 2
+                if y0 <= cy <= y1 and x0 - 1.2 * h <= c <= x0 + 2 and a < x0 and re.fullmatch(r"[\w.\-]+", w):
+                    x0, changed = a - 2, True
+        return (x0, y0, x1, y1)
+
+    for line in lines_all:
         # 行の文字列と、文字位置 → 単語の対応を作る
         text, spans = "", []
         for w, box in line["words"]:
@@ -157,6 +203,8 @@ def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> li
                     continue
                 box = (min(b[0] for b in hit) - 2, min(b[1] for b in hit) - 1,
                        max(b[2] for b in hit) + 2, max(b[3] for b in hit) + 1)
+                if "@" in rep:
+                    box = extend_left(box)
                 if overlaps(box):  # 全体読みとヘッダー読みで同じ所を拾った
                     continue
                 done.append((m.start(), m.end()))
