@@ -26,11 +26,13 @@ REPLACE = [
     (r"[\w.+-]+@[\w-]+(\.[\w-]+)+", "hoge@example.com"),
     (r"[\w.+-]+@\s?(f[o0]ut|freakout)\w*", "hoge@example.com"),  # OCR がドメインのドットを落とした場合
     (r"yuk\S{0,3}kat\w{1,4}ma\S*fout\S*", "hoge@example.com"),
-    (r"yuk[il1|]?[._]?kat[a-z]{1,3}ma", "hoge_user"),
+    (r"yuk[il1|]?[._]?kat[a-z]{1,3}m[a-z]?", "hoge_user"),
     (r"katayama", "hoge"),
     (r"Fre[ae]k\s*Out\s*HAWK\s*S[ae]les", "サンプル株式会社"),
     (r"freakout-hawk-sales", "sample-workspace"),
     (r"act_\d{6,}", "act_000000000000"),
+    # ピクセルタグの noscript 行。ID が URL の途中にあり語の切れ目が無いので、URL ごと書き直す
+    (r"\S*facebook\S*/tr\S*", 'src="https://www.facebook.com/tr?id=000000000000&ev=PageView&noscript=1"'),
     (r"(?<!\d)\d{12,}(?!\d)", "000000000000"),  # ピクセルID・ポートフォリオID 等（前後に文字が付いていても拾う）
     (r"片山\s*優希|片山", "サンプル 太郎"),
     # 社員名は人ごとに別のサンプル名にする（一覧で見たとき同じ名前が並ばないように）
@@ -60,7 +62,7 @@ def extra_rules(screen_id: str) -> list[tuple[str, str]]:
     return [tuple(r) for r in _rules().get(screen_id, [])]
 
 
-def _tesseract(im: Image.Image, scale: float = 1.0, dy: int = 0) -> list[dict]:
+def _tesseract(im: Image.Image, scale: float = 1.0, dy: int = 0, dx: int = 0) -> list[dict]:
     """tesseract の TSV を行単位にまとめる。座標は元画像の座標に戻す。"""
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
         im.save(f.name)
@@ -75,7 +77,7 @@ def _tesseract(im: Image.Image, scale: float = 1.0, dy: int = 0) -> list[dict]:
         if len(c) < 12 or not c[11].strip() or float(c[10]) < 10:
             continue
         x, y, w, h = (int(int(v) / scale) for v in c[6:10])
-        lines[(c[2], c[3], c[4])].append((c[11], (x, y + dy, x + w, y + dy + h)))
+        lines[(c[2], c[3], c[4])].append((c[11], (x + dx, y + dy, x + dx + w, y + dy + h)))
     out = []
     for words in lines.values():
         words.sort(key=lambda t: t[1][0])
@@ -98,6 +100,12 @@ def ocr_lines(path: str) -> list[dict]:
     for scale, off in ((3, 25), (3, 12), (2, 18)):
         lines += _tesseract(_binarize(band, scale, off), scale=scale)
     lines += _tesseract(_binarize(gray, 2, 25), scale=2)
+    # 暗幕の下に沈んだ小さい文字（モーダル背後の「担当者」欄など）は、拡大してから明暗を広げると読める
+    # 横長の帯のままだと読めないので、アカウント表示のある右側だけを切り出す
+    x0 = int(band.width * 0.75)
+    right = band.crop((x0, 0, band.width, band.height))
+    big = right.resize((right.width * 4, right.height * 4), Image.LANCZOS)
+    lines += _tesseract(ImageOps.autocontrast(big, cutoff=1), scale=4, dx=x0)
     return lines
 
 
@@ -129,6 +137,40 @@ def _bg_and_fg(im: Image.Image, box) -> tuple[tuple, tuple]:
     return bg, fg
 
 
+def _far(c, bg) -> bool:
+    return sum((a - b) ** 2 for a, b in zip(c, bg)) > 40 ** 2
+
+
+def _text_size(im: Image.Image, box, bg) -> int:
+    """元の文字の大きさ（インクの縦幅）に合わせた字の大きさ。OCR の枠は漢字だと上下に膨らむので枠の高さは使わない。"""
+    x0, y0, x1, y1 = (max(v, 0) for v in box)
+    px = im.load()
+    inked = [any(_far(px[x, y][:3], bg) for x in range(x0, min(x1, im.width), 2)) for y in range(y0, min(y1, im.height))]
+    # 枠が上下の行にかかっていることがあるので、中央に最も近いインクの塊だけを測る
+    runs, start = [], None
+    for i, v in enumerate(inked + [False]):
+        if v and start is None:
+            start = i
+        elif not v and start is not None:
+            runs.append((start, i))
+            start = None
+    mid = len(inked) / 2
+    ink = (min(runs, key=lambda r: 0 if r[0] <= mid <= r[1] else min(abs(r[0] - mid), abs(r[1] - mid)))
+           if runs else None)
+    ink = ink[1] - ink[0] if ink else (y1 - y0) * 0.7
+    return max(min(int(ink * 1.1), int((y1 - y0) * 0.9)), 8)
+
+
+def _free_right(im: Image.Image, box, bg) -> int:
+    """枠の右側で、背景色だけが続く幅。置き換え後の文字が長いときはそこまではみ出してよい。"""
+    x0, y0, x1, y1 = box
+    px = im.load()
+    x = max(x1, 0)
+    while x < im.width - 1 and x - x1 < 400 and not any(_far(px[x, y][:3], bg) for y in range(max(y0, 0), min(y1, im.height))):
+        x += 1
+    return max(x - x1 - 6, 0)
+
+
 def crop_chrome(im: Image.Image, bottom_ratio: float | None = None) -> Image.Image:
     """ブラウザのブックマークバー（上端の濃い帯）と macOS のメニューバー（下端の黒帯）を切り落とす。"""
     g = im.convert("L")
@@ -150,8 +192,12 @@ def crop_chrome(im: Image.Image, bottom_ratio: float | None = None) -> Image.Ima
 
 def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> list[str]:
     im = Image.open(src).convert("RGB")
-    crop = _rules().get("_crop_bottom", {}).get(screen_id)
+    rules = _rules()
+    crop = rules.get("_crop_bottom", {}).get(screen_id)
     cropped = crop_chrome(im, crop)
+    top = rules.get("_crop_top", {}).get(screen_id)
+    if top:  # 上端で見切れた行（ヘッダーのメールアドレス等）を落とす
+        cropped = cropped.crop((0, int(cropped.height * top), cropped.width, cropped.height))
     if cropped is not im:
         im = cropped
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
@@ -172,8 +218,8 @@ def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> li
     lines_all = ocr_lines(src)
     words_all = [(w, b) for ln in lines_all for w, b in ln["words"]]
 
-    def extend_left(box):
-        """メールアドレスの左に、別の語として読まれた断片（例: "yuki."）がくっついていれば含める。"""
+    def extend_sides(box):
+        """メールアドレスの左右に、別の語として読まれた断片（例: "yuki." や "jp"）がくっついていれば含める。"""
         x0, y0, x1, y1 = box
         h = y1 - y0
         changed = True
@@ -181,8 +227,12 @@ def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> li
             changed = False
             for w, (a, b, c, d) in words_all:
                 cy = (b + d) / 2
-                if y0 <= cy <= y1 and x0 - 1.2 * h <= c <= x0 + 2 and a < x0 and re.fullmatch(r"[\w.\-]+", w):
+                if not (y0 <= cy <= y1 and re.fullmatch(r"[\w.\-]+", w)):
+                    continue
+                if x0 - 1.2 * h <= c <= x0 + 2 and a < x0:
                     x0, changed = a - 2, True
+                elif x1 - 2 <= a <= x1 + 1.5 * h and c > x1 and len(w) <= 6:
+                    x1, changed = c + 2, True
         return (x0, y0, x1, y1)
 
     for line in lines_all:
@@ -204,15 +254,16 @@ def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> li
                 box = (min(b[0] for b in hit) - 2, min(b[1] for b in hit) - 1,
                        max(b[2] for b in hit) + 2, max(b[3] for b in hit) + 1)
                 if "@" in rep:
-                    box = extend_left(box)
+                    box = extend_sides(box)
                 if overlaps(box):  # 全体読みとヘッダー読みで同じ所を拾った
                     continue
                 done.append((m.start(), m.end()))
                 bg, fg = _bg_and_fg(im, box)
+                size = _text_size(im, box, bg)
+                room = (box[2] - box[0]) + _free_right(im, box, bg)
                 draw.rectangle(box, fill=bg)
-                size = max(int((box[3] - box[1]) * 0.78), 8)
                 font = _font(size)
-                while size > 8 and draw.textlength(rep, font=font) > (box[2] - box[0]) * 1.25:
+                while size > 8 and draw.textlength(rep, font=font) > room:
                     size -= 1
                     font = _font(size)
                 draw.text((box[0] + 1, box[1] + (box[3] - box[1] - size) // 2), rep, fill=fg, font=font)
@@ -231,6 +282,22 @@ def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> li
             draw.text((name[0] + 1, name[1] + 1), "hoge_user", fill=fg, font=_font(size))
             marks.append(name)
             log.append("（メール上段の名前） -> hoge_user")
+    # 画面別の固定領域。OCR で拾えない物（ロゴ、合成画像の継ぎ目）を座標で処理する。座標は画像の幅・高さに対する割合
+    for x0, y0, x1, y1, *text in rules.get("_fill", {}).get(screen_id, []):
+        box = (int(x0 * im.width), int(y0 * im.height), int(x1 * im.width), int(y1 * im.height))
+        bg, fg = _bg_and_fg(im, box)
+        draw.rectangle(box, fill=bg)
+        if text:
+            draw.text((box[0] + 1, box[1] + 1), text[0], fill=fg, font=_font(max(int((box[3] - box[1]) * 0.75), 8)))
+        marks.append(box)
+        log.append(f"（固定領域） -> {text[0] if text else '塗りつぶし'}")
+    for x0, y0, x1, y1 in rules.get("_blur", {}).get(screen_id, []):
+        box = (int(x0 * im.width), int(y0 * im.height), int(x1 * im.width), int(y1 * im.height))
+        part = im.crop(box)
+        small = part.resize((max(part.width // 8, 1), max(part.height // 8, 1)))
+        im.paste(small.resize(part.size), box)
+        marks.append(box)
+        log.append("（固定領域） -> モザイク")
     im.save(dst)
     if debug:
         dbg = Image.open(dst).convert("RGB")
