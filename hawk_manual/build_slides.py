@@ -34,6 +34,7 @@ TITLES = {
     "prod_lite": "HAWK 機能取扱説明書（簡易版）",
 }
 # 初期設定・連携はオンボーディングで済むので運用の流れには入れない（章としては残す）
+RECENT_SINCE = "2026-07-31"  # 「最近の更新」に載せる最古の日付
 STEPS = [("BRF", "与件"), ("EST", "設計・見積り"),
          ("DLV", "配信設計"), ("OPS", "運用"), ("RPT", "レポート")]
 MENUS = ["DealDesk", "与件", "キャンペーン", "オブジェクト", "ワークスペース"]
@@ -213,13 +214,15 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
     # 最近の更新
     if changes:
         found_toc["最近の更新"] = d.page_no + 1
-        recent = sorted(changes, key=lambda r: r.get("リリース日") or r.get("検知日") or "", reverse=True)[: (10 if lite else 22)]
+        # 1ページに収める。載せるのは RECENT_SINCE 以降の更新（片山方針 2026-10-09）
+        recent = sorted([r for r in changes if (r.get("リリース日") or r.get("検知日") or "") >= RECENT_SINCE],
+                        key=lambda r: r.get("リリース日") or r.get("検知日") or "", reverse=True)[: (10 if lite else 22)]
         rows = [[r.get("リリース日") or r.get("検知日"), r.get("種別", ""), r["内容"],
                  "、".join(names.get(i, i) for i in split_ids(r.get("対象ID", "")))] for r in recent]
         widths = [62, 36, 410, W - 2 * MX - 62 - 36 - 410]
-        for k, chunk in enumerate(paginate(rows, widths, 7, BODY_BOTTOM - BODY_TOP - 4)):
-            d.frame("最近の更新" + ("（続き）" if k else ""), "最近の更新", "新しく使えるようになった機能・変更点です（新しい順）。")
-            d.table(MX, BODY_TOP + 2, widths, ["日付", "区分", "内容", "関連する機能"], chunk, size=7)
+        chunk = paginate(rows, widths, 7, BODY_BOTTOM - BODY_TOP - 4)[0]  # 入りきらない古い分は載せない
+        d.frame("最近の更新", "最近の更新", "新しく使えるようになった機能・変更点です（新しい順）。")
+        d.table(MX, BODY_TOP + 2, widths, ["日付", "区分", "内容", "関連する機能"], chunk, size=7)
 
     # 機能（カテゴリ → 画面ごと）
     for cat in CATEGORY_ORDER:
@@ -228,7 +231,7 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
             continue
         found_toc[cat] = d.page_no + 1
         groups: dict[str, list[dict]] = {}
-        if cat.startswith("はじめに"):
+        if cat == "対応媒体・プラン":
             groups[""] = cfeats
         else:
             for r in cfeats:
@@ -331,14 +334,18 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
             kids = [s for s in screens if s.get("遷移元", "").startswith(sid_) and s.get("階層3") and s["画面ID"] in urls]
             if k == 0 and kids:
                 kw = (lw - 6) / 2
+                bottom = y
                 for j, kid in enumerate(kids[:2]):
                     kiw, kih = sizes.get(kid["画面ID"], (16, 9))
                     ks = min(kw / kiw, 80 / kih)
                     d.image(MX + j * (kw + 6), y, kiw * ks, kih * ks, urls[kid["画面ID"]])
-                    d.text(MX + j * (kw + 6), y + kih * ks + 1, kw, 10, f"▲ {kid['画面名']}", size=6.5, color=SUB)
-                y += 80 + 14
+                    cap = f"▲ {short_name(kid['画面名'])}"
+                    cap_h = est_lines(cap, kw, 6.5) * 6.5 * 1.4 + 4  # 折り返しても下の箱に重ならないよう高さを見積もる
+                    d.text(MX + j * (kw + 6), y + kih * ks + 1, kw, cap_h, cap, size=6.5, color=SUB)
+                    bottom = max(bottom, y + kih * ks + 1 + cap_h)
+                y = bottom + 4
             info = (f"画面の場所：{path}\n" if path else "") + (lead if k == 0 else "（前ページの続き）")
-            ih_ = est_lines(info, lw, 7.5) * 7.5 * 1.3 + 8
+            ih_ = est_lines(info, lw, 7.5) * 7.5 * 1.4 + 9
             d.text(MX, y, lw, ih_, info, size=7.5, color=TEXT, fill="#f6f8f2",
                    runs=[(0, len("画面の場所：") if path else 0, {"bold": True, "color": GREEN_DARK})])
             y += ih_ + 6
@@ -350,7 +357,7 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
                 lines, used = [], 14.0
                 for u in related:
                     t = f"・{u['やりたいこと']}　{u.get('手順（概要）', '')}"
-                    h_ = est_lines(t, lw, 6.8) * 6.8 * 1.3
+                    h_ = est_lines(t, lw, 6.8) * 6.8 * 1.4
                     if used + h_ > BODY_BOTTOM - y - 4:
                         break
                     lines.append(t)
@@ -373,6 +380,9 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
             marks = {i - start for i in marks_all if start <= i < start + len(chunk)}
             d.table(MX, BODY_TOP + (2 if lead_text else -10), widths, ["機能", "できること", "設定項目・選択肢", "注意"],
                     chunk, size=7, marks=marks)
+            if mode == "draft" and k == 0 and sid_ and sid_ != "__misc":  # 社内向けの撮影依頼。本番には出ない
+                d.text(W - MX - 230, BODY_BOTTOM - 16, 230, 16, "【下書きメモ】この画面のスクショ未取得（撮影して差し込む）",
+                       size=7, color=RED, bold=True, align="END")
             start += len(chunk)
 
 

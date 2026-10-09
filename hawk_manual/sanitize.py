@@ -190,6 +190,77 @@ def crop_chrome(im: Image.Image, bottom_ratio: float | None = None) -> Image.Ima
     return im.crop((0, top, w, bottom)) if (top or bottom < h) else im
 
 
+def trim_dark(im: Image.Image, margin: int = 10) -> Image.Image:
+    """暗い余白を切り落とす（片山方針 2026-10-09: 裏の黒い部分はトリミング）。
+
+    1) 四辺の黒帯（ウィンドウの影・黒い余白）を削る
+    2) モーダル表示で背景が暗く沈んだ画面は、明るいモーダル部分だけを残す
+    """
+    g = im.convert("L")
+    w, h = g.size
+    px = g.load()
+
+    def row_mean(y, x0=0, x1=None):
+        xs = range(x0, x1 or w, max((x1 or w) // 300, 1))
+        return sum(px[x, y] for x in xs) / len(xs)
+
+    def col_mean(x, y0=0, y1=None):
+        ys = range(y0, y1 or h, max((y1 or h) // 300, 1))
+        return sum(px[x, y] for y in ys) / len(ys)
+
+    t, b, l, r = 0, h, 0, w
+    while t < h * 0.15 and row_mean(t) < 70:
+        t += 1
+    while b > h * 0.85 and row_mean(b - 1) < 70:
+        b -= 1
+    while l < w * 0.15 and col_mean(l, t, b) < 70:
+        l += 1
+    while r > w * 0.85 and col_mean(r - 1, t, b) < 70:
+        r -= 1
+    # 動画キャプチャの左右・上下の白い帯（ピラーボックス）も削る
+    while l < w * 0.2 and col_mean(l, t, b) >= 253:
+        l += 1
+    while r > w * 0.8 and col_mean(r - 1, t, b) >= 253:
+        r -= 1
+    while t < h * 0.2 and row_mean(t, l, r) >= 253:
+        t += 1
+    while b > h * 0.8 and row_mean(b - 1, l, r) >= 253:
+        b -= 1
+    im, g = im.crop((l, t, r, b)), g.crop((l, t, r, b))
+    w, h = g.size
+    px = g.load()
+    # 明るい（白い）部分の外接矩形を求める。行は「明るい画素が3割超」、列はその行の範囲で「5割超」
+    step = 2
+    bright = [[px[x, y] >= 236 for x in range(0, w, step)] for y in range(0, h, step)]
+    def longest_run(idx, gap):  # 途切れ（gap 刻みまで）を許した最長の連続区間
+        runs, cur = [], []
+        for i in idx:
+            if cur and i - cur[-1] > gap:
+                runs.append(cur)
+                cur = []
+            cur.append(i)
+        if cur:
+            runs.append(cur)
+        return max(runs, key=len) if runs else []
+
+    # モーダルの中にも色の付いた部品があるので、行は高さの8%までの途切れを許す
+    rows = longest_run([i for i, row in enumerate(bright) if sum(row) > 0.2 * len(row)], max(int(h / step * 0.08), 3))
+    if rows:
+        band = bright[rows[0]:rows[-1] + 1]
+        cols = longest_run([j for j in range(len(bright[0])) if sum(row[j] for row in band) > 0.5 * len(band)],
+                           max(int(w / step * 0.03), 3))
+        if cols:
+            box = (max(cols[0] * step - margin, 0), max(rows[0] * step - margin, 0),
+                   min(cols[-1] * step + step + margin, w), min(rows[-1] * step + step + margin, h))
+            area = (box[2] - box[0]) * (box[3] - box[1]) / (w * h)
+            # 外側が暗く沈んでいる（= モーダルの背景）ときだけ切る
+            outside = [px[x, y] for y in range(0, h, 6) for x in range(0, w, 6)
+                       if not (box[0] <= x < box[2] and box[1] <= y < box[3])]
+            if 0.08 < area < 0.95 and outside and sum(outside) / len(outside) < 205:
+                im = im.crop(box)
+    return im
+
+
 def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> list[str]:
     im = Image.open(src).convert("RGB")
     rules = _rules()
@@ -284,7 +355,9 @@ def sanitize(src: str, dst: str, debug: bool = False, screen_id: str = "") -> li
             log.append("（メール上段の名前） -> hoge_user")
     # 画面別の固定領域。OCR で拾えない物（ロゴ、合成画像の継ぎ目）を座標で処理する。座標は画像の幅・高さに対する割合
     for x0, y0, x1, y1, *text in rules.get("_fill", {}).get(screen_id, []):
-        box = (int(x0 * im.width), int(y0 * im.height), int(x1 * im.width), int(y1 * im.height))
+        box = (int(x0 * im.width), int(y0 * im.height), min(int(x1 * im.width), im.width - 1), min(int(y1 * im.height), im.height - 1))
+        if box[1] >= box[3]:
+            continue
         bg, fg = _bg_and_fg(im, box)
         draw.rectangle(box, fill=bg)
         if text:

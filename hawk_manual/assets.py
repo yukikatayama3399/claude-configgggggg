@@ -71,6 +71,7 @@ def resolve_drive_images(cfg: dict, refs: dict[str, str]) -> dict[str, str]:
             subprocess.run(["gws", "drive", "files", "get", "-o", name, "--params",
                             json.dumps({"fileId": ref.split(":", 1)[1], "alt": "media", "supportsAllDrives": True})],
                            check=True, cwd=tmp, capture_output=True)
+            _trim(pathlib.Path(tmp) / name)
             slide = prs.slides.add_slide(prs.slide_layouts[6])
             slide.shapes.add_picture(str(pathlib.Path(tmp) / name), 0, 0, width=prs.slide_width)
             keys.append(key)
@@ -88,6 +89,20 @@ def resolve_drive_images(cfg: dict, refs: dict[str, str]) -> dict[str, str]:
         if imgs:
             urls[key] = imgs[0]["image"]["contentUrl"]
     return urls
+
+
+# 取り込み時の加工の版。加工方法を変えたら上げると、全スクショが取り込み直される
+IMPORT_TAG = "#trim1"
+
+
+def _trim(png: pathlib.Path):
+    """暗い余白・モーダル背景・白帯を切り落としてから取り込む（片山方針 2026-10-09）。"""
+    from PIL import Image
+    from sanitize import trim_dark
+    im = Image.open(png).convert("RGB")
+    out = trim_dark(im)
+    if out.size != im.size:
+        out.save(png)
 
 
 def _ls(cfg: dict, folder: str) -> list[dict]:
@@ -180,8 +195,9 @@ def sync(cfg: dict) -> dict[str, str]:
     for key in have:
         if not key.startswith("logo_") and key not in want:  # サイトマップから外れた素材は消す
             req.append({"deleteObject": {"objectId": f"page_{key}"}})
+    want = {k: (r + IMPORT_TAG if r.startswith("drive:") else r) for k, r in want.items()}
     todo = {k: r for k, r in want.items() if not (k in have and have[k][0] == r)}
-    drive_urls = resolve_drive_images(cfg, {k: r for k, r in todo.items() if r.startswith("drive:")})
+    drive_urls = resolve_drive_images(cfg, {k: r.removesuffix(IMPORT_TAG) for k, r in todo.items() if r.startswith("drive:")})
     for key, ref in todo.items():
         try:
             url = drive_urls[key] if ref.startswith("drive:") else resolve(ref)
