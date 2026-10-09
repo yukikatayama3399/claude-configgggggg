@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 *.pdf
+
+# hawk_manual のビルドが作業中に作る一時フォルダ（画像のダウンロード先）
+hawk_manual/tmp*/
