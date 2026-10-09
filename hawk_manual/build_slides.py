@@ -33,8 +33,9 @@ TITLES = {
     "prod": "HAWK 機能取扱説明書",
     "prod_lite": "HAWK 機能取扱説明書（簡易版）",
 }
-STEPS = [("SET", "初期設定・連携"), ("BRF", "与件"), ("EST", "設計・見積り"),
-         ("DLV", "配信設計・入稿"), ("OPS", "キャンペーン運用"), ("RPT", "レポート")]
+# 初期設定・連携はオンボーディングで済むので運用の流れには入れない（章としては残す）
+STEPS = [("BRF", "与件"), ("EST", "設計・見積り"),
+         ("DLV", "配信設計"), ("OPS", "運用"), ("RPT", "レポート")]
 MENUS = ["DealDesk", "与件", "キャンペーン", "オブジェクト", "ワークスペース"]
 
 
@@ -87,10 +88,10 @@ def cat_of(feature_id: str) -> str:
 
 # ---- ページ構成 ------------------------------------------------------------------
 def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[str, int] | None,
-           screen_pages: dict[str, int] | None) -> tuple[Deck, dict, dict]:
+           screen_pages: dict[str, int] | None, version: str = "") -> tuple[Deck, dict, dict]:
     kind = "prod_lite" if lite else mode
     footer = (f"{TITLES[kind]}｜{today} 版｜このスライドは随時更新されます（リンク先は常に最新版）"
-              if mode != "draft" else f"【下書き・社外秘】{today} 生成｜赤字の機能名は未承認（全件未承認のときは色分けなし）")
+              if mode != "draft" else f"【下書き{version}・社外秘】{today} 生成｜赤字の機能名は未承認（全件未承認のときは色分けなし）")
     urls, sizes = art["urls"], art["sizes"]
     d = Deck(f"b{dt.datetime.now(JST).strftime('%H%M%S')}", urls, footer)
     feats, screens, ucs, faqs, changes = (data[k] for k in ("機能一覧", "サイトマップ", "逆引き", "FAQ", "更新履歴"))
@@ -109,7 +110,7 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
     d.text(28, 120, 260, 40, "HAWK", size=30, bold=True, color=WHITE)
     d.text(28, 160, 260, 60, TITLES[kind].replace("HAWK ", ""), size=20, bold=True, color=WHITE)
     d.text(28, 230, 250, 40, "SNS広告伴走型AIエージェント HAWK の\n画面と機能をまとめた取扱説明書です。", size=9, color=WHITE)
-    d.text(28, 360, 250, 16, f"{today} 時点", size=9, color=GREEN_PALE)
+    d.text(28, 360, 250, 16, f"{today} 時点" + (f"｜下書き {version}" if version else ""), size=9, color=GREEN_PALE)
     if urls.get("logo_hawk"):
         d.image(330, 40, 120, 39, urls["logo_hawk"], border=False)
     stats = [("機能", len(feats)), ("画面", len(screens)), ("逆引き", len(ucs)), ("FAQ", len(faqs))]
@@ -154,29 +155,30 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
     # 全体像
     found_toc["全体像"] = d.page_no + 1
     d.frame("HAWK でできること（運用の流れ）", "全体像", "メモを貼るだけで、与件整理 → 設計・見積り → 配信設計 → 運用 → レポートまでを1つの画面で進められます。")
-    cw = (W - 2 * MX - 5 * 6) / 6
+    gap = 6
+    cw = (W - 2 * MX - (len(STEPS) - 1) * gap) / len(STEPS)
     for i, (prefix, label) in enumerate(STEPS):
-        x = MX + i * (cw + 6)
-        d.rect(x, BODY_TOP + 6, cw, 30, GREEN)
-        d.text(x, BODY_TOP + 6, cw, 30, f"STEP {i + 1}\n{label}", size=8.5, bold=True, color=WHITE, align="CENTER", valign="MIDDLE")
-        items = [r["機能名"] for r in feats if r["機能ID"].split("-")[1] == prefix]
-        shown, used = [], 0.0
-        for n in items:  # 箱(224pt)に収まるところまで
-            h = est_lines(f"・{n}", cw - 8, 6.8) * 6.8 * 1.25
-            if used + h > 212:
-                shown.append(f"ほか {len(items) - len(shown)} 件")
-                break
-            shown.append(f"・{n}")
-            used += h
-        d.rect(x, BODY_TOP + 38, cw, 230, GREEN_PALE)
-        d.text(x + 4, BODY_TOP + 42, cw - 8, 224, "\n".join(shown), size=6.8, color=TEXT)
-    others = [(c, [r["機能名"] for r in feats if cat_of(r["機能ID"]) == c][:6])
-              for c in ("はじめに（対応媒体・プラン）", "クリエイティブ・オブジェクト", "ワークスペース・権限", "DealDesk（提案書作成）")]
-    y = BODY_TOP + 274
-    for i, (c, items) in enumerate(others):
-        x = MX + i * ((W - 2 * MX) / 4)
-        d.text(x, y, (W - 2 * MX) / 4 - 6, 56, f"{c}\n" + "、".join(items), size=7, color=TEXT, fill="#f6f8f2",
-               runs=[(0, len(c), {"bold": True, "color": GREEN_DARK})])
+        x = MX + i * (cw + gap)
+        d.rect(x, BODY_TOP + 4, cw, 30, GREEN)
+        d.text(x, BODY_TOP + 4, cw, 30, f"STEP {i + 1}　{label}", size=10, bold=True, color=WHITE, align="CENTER", valign="MIDDLE")
+        if i < len(STEPS) - 1:  # 左→右の流れを示す矢印
+            d.text(x + cw - 2, BODY_TOP + 4, gap + 4, 30, "▶", size=7, color=GREEN_LIGHT, align="CENTER", valign="MIDDLE")
+        items = [short_name(r["機能名"]) for r in feats if r["機能ID"].split("-")[1] == prefix]
+        box_h = 262
+        size = 8.5  # 箱に収まるまで文字を小さくする（省略はしない）
+        while size > 6.5 and sum(est_lines(f"・{n}", cw - 10, size) for n in items) * size * 1.3 > box_h - 10:
+            size -= 0.25
+        d.rect(x, BODY_TOP + 36, cw, box_h, GREEN_PALE)
+        d.text(x + 6, BODY_TOP + 41, cw - 10, box_h - 6, "\n".join(f"・{n}" for n in items), size=size, color=TEXT)
+    bands = [(c, [short_name(r["機能名"]) for r in feats if cat_of(r["機能ID"]) == c])
+             for c in ("DealDesk（提案書作成）", "クリエイティブ・オブジェクト", "ワークスペース・権限")]
+    y, bw = BODY_TOP + 36 + 262 + 4, (W - 2 * MX - 2 * gap) / 3
+    for i, (c, items) in enumerate(bands):
+        x = MX + i * (bw + gap)
+        head = f"{c}　→ p.{toc.get(c, '')}"
+        body = "／".join(items[:3]) + ("　など" if len(items) > 3 else "")
+        d.text(x, y, bw, BODY_BOTTOM - y + 2, f"{head}\n{body}", size=7, color=TEXT, fill="#f6f8f2",
+               runs=[(0, len(head), {"bold": True, "size": 7.5, "color": GREEN_DARK})])
 
     # サイトマップ
     found_toc["サイトマップ"] = d.page_no + 1
@@ -195,17 +197,18 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
         for s in [s for s in screens if norm_menu(s.get("階層1", "")) == menu]:
             p = screen_pages.get(s["画面ID"], "")
             ptxt = f"p.{p}" if p else ""
-            if s.get("階層3"):
-                label = s["画面名"] if len(s["画面名"]) <= 11 else s["画面名"][:10] + "…"
-                d.text(x + 6, y, mw - 40, 11, f"└ {label}", size=6.3, color=SUB)
-                d.text(x + mw - 34, y, 34, 11, ptxt, size=6.3, color=GREEN, align="END")
-                y += 11
+            if s.get("階層3"):  # モーダル等は字下げして小さく。名前は省略せず折り返す
+                h = est_lines(s["画面名"], mw - 44, 6.5) * 6.5 * 1.3 + 2
+                d.text(x + 4, y, 8, h, "└", size=6.5, color=SUB)
+                d.text(x + 12, y, mw - 44, h, s["画面名"], size=6.5, color=SUB)
+                d.text(x + mw - 32, y, 32, 10, ptxt, size=6.5, color=GREEN, align="END")
+                y += h + 1
             else:
-                label = s["画面名"] if len(s["画面名"]) <= 13 else s["画面名"][:12] + "…"
-                d.rect(x, y, mw, 15, GREEN_PALE)
-                d.text(x + 4, y, mw - 40, 15, label, size=7, bold=True, color=GREEN_DARK, valign="MIDDLE")
-                d.text(x + mw - 36, y, 34, 15, ptxt, size=7, color=GREEN, bold=True, align="END", valign="MIDDLE")
-                y += 17
+                h = max(est_lines(s["画面名"], mw - 40, 7) * 7 * 1.3 + 6, 15)
+                d.rect(x, y, mw, h, GREEN_PALE)
+                d.text(x + 4, y, mw - 40, h, s["画面名"], size=7, bold=True, color=GREEN_DARK, valign="MIDDLE")
+                d.text(x + mw - 36, y, 34, h, ptxt, size=7, color=GREEN, bold=True, align="END", valign="MIDDLE")
+                y += h + 2
 
     # 最近の更新
     if changes:
@@ -271,6 +274,11 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
             d.frame("よくあるご質問（FAQ）" + ("（続き）" if k else ""), "FAQ")
             d.table(MX, BODY_TOP - 10, widths, ["分類", "ご質問", "回答"], chunk, size=7)
     return d, found_toc, found_screens
+
+
+def short_name(name: str) -> str:
+    """一覧用の短い機能名。カッコ書きの補足を落とす（省略記号は使わない）。"""
+    return re.sub(r"[（(][^）)]*[）)]", "", name).strip() or name
 
 
 def norm_menu(level1: str) -> str:
@@ -368,6 +376,25 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
 
 
 # ---- 出力 ------------------------------------------------------------------------
+def next_draft_version(sid: str) -> int:
+    return sum(1 for r in read_tab(sid, "版管理") if r.get("種類") == "draft") + 1
+
+
+def new_presentation(cfg: dict, title: str) -> str:
+    pid = call("slides.presentations.create", {}, {"title": title})["presentationId"]
+    if cfg.get("folder_id"):
+        subprocess.run(["gog", "--account", cfg["account"], "drive", "move", pid, "--parent", cfg["folder_id"]],
+                       capture_output=True, check=True)
+    return pid
+
+
+def record_version(cfg: dict, label: str, kind: str, pid: str, n_approved: int, memo: str, pdf: str = ""):
+    call("sheets.spreadsheets.values.append",
+         {"spreadsheetId": cfg["master_sheet_id"], "range": "版管理!A1", "valueInputOption": "RAW"},
+         {"values": [[label, dt.datetime.now(JST).isoformat(timespec="minutes"), kind,
+                      f"https://docs.google.com/presentation/d/{pid}/edit", pdf, n_approved, memo]]})
+
+
 def ensure_presentation(cfg: dict, key: str, title: str) -> str:
     pid = cfg.get(key)
     if not pid:
@@ -428,6 +455,9 @@ def main():
     ap.add_argument("mode", choices=["draft", "prod"])
     ap.add_argument("--lite", action="store_true")
     ap.add_argument("--archive", action="store_true")
+    ap.add_argument("--note", default="", help="版管理のメモ欄に書く変更内容")
+    ap.add_argument("--same-version", action="store_true",
+                    help="下書き: 版番号を上げず、最新の下書き版を作り直す（同じ修正回の中での再生成用）")
     a = ap.parse_args()
     cfg = json.loads(CONFIG.read_text())
     kind = "prod_lite" if a.lite else a.mode
@@ -437,12 +467,26 @@ def main():
     art = assets.sync(cfg)
     data = load_rows(cfg["master_sheet_id"], a.mode, a.lite)
     today = dt.datetime.now(JST).strftime("%Y-%m-%d")
+    n = next_draft_version(cfg["master_sheet_id"]) - (1 if a.same_version else 0)
+    version = f"v{n}" if a.mode == "draft" else ""
     # 1回目でページ番号を確定させ、2回目で目次・サイトマップに番号を入れて本番描画
-    _, toc, sp = render(data, a.mode, a.lite, art, today, None, None)
-    deck, _, _ = render(data, a.mode, a.lite, art, today, toc, sp)
-    pid = ensure_presentation(cfg, f"{kind}_presentation_id", TITLES[kind])
-    replace_all(pid, deck)
-    print(f"{kind}: {deck.page_no} pages, {len(data['機能一覧'])} features")
+    _, toc, sp = render(data, a.mode, a.lite, art, today, None, None, version)
+    deck, _, _ = render(data, a.mode, a.lite, art, today, toc, sp, version)
+    if a.mode == "draft" and a.same_version:
+        pid = cfg["draft_presentation_id"]  # 最新版を上書き
+        replace_all(pid, deck)
+    elif a.mode == "draft":
+        # 下書きは版ごとに別ファイルで残す（v1, v2, ...）。URL は版管理タブに記録
+        pid = new_presentation(cfg, f"{TITLES['draft']} {version}（{today}）")
+        replace_all(pid, deck)
+        n_ok = sum(1 for r in data["機能一覧"] if r.get("承認") == APPROVED)
+        record_version(cfg, f"下書き{version}", "draft", pid, n_ok, f"{deck.page_no}ページ" + (f"／{a.note}" if a.note else ""))
+        cfg["draft_presentation_id"] = pid
+        CONFIG.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n")
+    else:
+        pid = ensure_presentation(cfg, f"{kind}_presentation_id", TITLES[kind])
+        replace_all(pid, deck)
+    print(f"{kind}{(' ' + version) if version else ''}: {deck.page_no} pages, {len(data['機能一覧'])} features")
     print(f"https://docs.google.com/presentation/d/{pid}/edit")
     if a.archive and a.mode == "prod":
         digest = data_hash(data)
