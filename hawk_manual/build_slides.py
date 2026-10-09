@@ -1,41 +1,53 @@
 """マスターシートからスライドを作り直す。
 
-    python3 build_slides.py draft        # 下書き版: 全行（差戻し以外）。見え方の確認用
+    python3 build_slides.py draft        # 下書き版: 全行（差戻し・置換済以外）。見え方の確認用。未承認行は機能名が赤字
     python3 build_slides.py prod         # 本番版: 承認済 × 提供中 の行だけ
     python3 build_slides.py prod --lite  # 本番・簡易版: さらに「簡易版」チェックの行だけ
     python3 build_slides.py prod --archive  # 本番を作り直したあと PDF を日付付きで保存し版管理に記録
 
 プレゼンは毎回「同じファイルの中身を全部差し替え」る。URL が変わらないので
 お客様に配ったリンクはそのまま最新になる。初回だけ新規作成し config.json に ID を書き戻す。
+見た目（色・寸法・部品）は layout.py、ページ構成はこのファイルの render()。
 """
 import argparse
 import datetime as dt
+import hashlib
+import math
 import json
 import pathlib
 import re
 import subprocess
 
+import assets
 from gws import call, read_tab
-from schema import APPROVED, CATEGORY_ORDER, RELEASED, REJECTED, SUPERSEDED
+from layout import (BODY_BOTTOM, BODY_TOP, GREEN, GREEN_DARK, GREEN_LIGHT, GREEN_PALE, MUTED, MX, RED, SUB,
+                    TEXT, WHITE, W, H, Deck, est_lines, paginate)
+from schema import APPROVED, CATEGORIES, CATEGORY_ORDER, RELEASED, REJECTED, SUPERSEDED
 
 HERE = pathlib.Path(__file__).parent
 CONFIG = HERE / "config.json"
 JST = dt.timezone(dt.timedelta(hours=9))
-MAX_LINES = 9  # 1枚に載せる箇条書きの上限。超えたら続きページに分ける
 
 TITLES = {
     "draft": "【下書き】HAWK 機能取扱説明書",
     "prod": "HAWK 機能取扱説明書",
     "prod_lite": "HAWK 機能取扱説明書（簡易版）",
 }
+STEPS = [("SET", "初期設定・連携"), ("BRF", "与件"), ("EST", "設計・見積り"),
+         ("DLV", "配信設計・入稿"), ("OPS", "キャンペーン運用"), ("RPT", "レポート")]
+MENUS = ["DealDesk", "与件", "キャンペーン", "オブジェクト", "ワークスペース"]
 
 
+# ---- データ読み込み --------------------------------------------------------------
 def load_rows(sid: str, mode: str, lite: bool) -> dict[str, list[dict]]:
-    def keep(r: dict) -> bool:
+    def ok(r: dict, need_release: bool) -> bool:
         if mode == "draft":
             return r.get("承認") not in (REJECTED, SUPERSEDED)
-        ok = r.get("承認") == APPROVED and r.get("提供状態", RELEASED) in (RELEASED, "")
-        return ok and (not lite or r.get("簡易版", "").upper() == "TRUE")
+        if r.get("承認") != APPROVED:
+            return False
+        if need_release and r.get("提供状態", RELEASED) not in (RELEASED, ""):
+            return False
+        return not lite or r.get("簡易版", "").upper() == "TRUE"
 
     def latest_per_id(rows: list[dict], id_col: str) -> list[dict]:
         # 同じIDの行が複数あれば後ろ（新しい）を採用。仕様変更は同IDの新しい行として足す運用のため
@@ -44,119 +56,318 @@ def load_rows(sid: str, mode: str, lite: bool) -> dict[str, list[dict]]:
             by_id[r[id_col]] = r
         return list(by_id.values())
 
-    out = {}
-    for tab, id_col in (("機能一覧", "機能ID"), ("サイトマップ", "画面ID"), ("逆引き", "UCID"), ("更新履歴", None)):
-        rows = read_tab(sid, tab)
-        if tab == "更新履歴":
-            out[tab] = [r for r in rows if mode == "draft" or r.get("反映状況") == APPROVED]
-        elif tab == "サイトマップ":
-            out[tab] = latest_per_id([r for r in rows if mode == "draft" or r.get("承認") == APPROVED], id_col)
-        else:
-            out[tab] = latest_per_id([r for r in rows if keep(r)], id_col)
+    out = {
+        "機能一覧": latest_per_id([r for r in read_tab(sid, "機能一覧") if ok(r, True)], "機能ID"),
+        "サイトマップ": latest_per_id([r for r in read_tab(sid, "サイトマップ")
+                                  if mode == "draft" and r.get("承認") not in (REJECTED, SUPERSEDED)
+                                  or r.get("承認") == APPROVED], "画面ID"),
+        "逆引き": latest_per_id([r for r in read_tab(sid, "逆引き") if ok(r, False)], "UCID"),
+        "FAQ": latest_per_id([r for r in read_tab(sid, "FAQ") if ok(r, False)], "FAQID"),
+        "更新履歴": [r for r in read_tab(sid, "更新履歴") if mode == "draft" or r.get("反映状況") == APPROVED],
+    }
+    # 本番に出ない機能を参照している逆引きは、参照を落とす（空になれば逆引きごと落とす）
+    live = {r["機能ID"] for r in out["機能一覧"]}
+    ucs = []
+    for r in out["逆引き"]:
+        ids = [i for i in split_ids(r.get("使う機能ID", "")) if i in live]
+        if ids or mode == "draft":
+            ucs.append({**r, "使う機能ID": "、".join(ids) if mode != "draft" else r.get("使う機能ID", "")})
+    out["逆引き"] = ucs
     return out
 
 
-class Deck:
-    """Slides API のリクエストを溜めるだけのビルダー。"""
-
-    def __init__(self):
-        self.requests: list[dict] = []
-        self.n = 0
-
-    def _slide(self, layout: str, mapping: dict[str, str]) -> str:
-        self.n += 1
-        sid = f"g{self.n:03d}"
-        self.requests.append({"createSlide": {
-            "objectId": sid,
-            "slideLayoutReference": {"predefinedLayout": layout},
-            "placeholderIdMappings": [
-                {"layoutPlaceholder": {"type": t, "index": 0}, "objectId": f"{sid}_{k}"}
-                for k, t in mapping.items()],
-        }})
-        return sid
-
-    def _text(self, oid: str, text: str):
-        if text:
-            self.requests.append({"insertText": {"objectId": oid, "text": text}})
-
-    def title(self, title: str, subtitle: str):
-        s = self._slide("TITLE", {"t": "CENTERED_TITLE", "s": "SUBTITLE"})
-        self._text(f"{s}_t", title)
-        self._text(f"{s}_s", subtitle)
-
-    def section(self, title: str):
-        s = self._slide("SECTION_HEADER", {"t": "TITLE"})
-        self._text(f"{s}_t", title)
-
-    def bullets(self, title: str, lines: list[str]):
-        """箇条書き。多ければ続きページに分割する。行頭の全角スペース2個で1段下げ。"""
-        chunks = [lines[i:i + MAX_LINES] for i in range(0, len(lines), MAX_LINES)] or [[]]
-        for i, chunk in enumerate(chunks):
-            s = self._slide("TITLE_AND_BODY", {"t": "TITLE", "b": "BODY"})
-            self._text(f"{s}_t", title + (f"（続き {i + 1}）" if i else ""))
-            self._text(f"{s}_b", "\n".join(chunk))
+def split_ids(s: str) -> list[str]:
+    return [i.strip() for i in re.split(r"[,、\s]+", s or "") if i.strip()]
 
 
-def build(data: dict, mode: str, lite: bool) -> Deck:
-    d = Deck()
-    today = dt.datetime.now(JST).strftime("%Y-%m-%d")
+def cat_of(feature_id: str) -> str:
+    prefix = feature_id.split("-")[1] if "-" in feature_id else ""
+    return dict((p, c) for c, p in CATEGORIES).get(prefix, "その他")
+
+
+# ---- ページ構成 ------------------------------------------------------------------
+def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[str, int] | None,
+           screen_pages: dict[str, int] | None) -> tuple[Deck, dict, dict]:
     kind = "prod_lite" if lite else mode
-    feats, screens, ucs, changes = data["機能一覧"], data["サイトマップ"], data["逆引き"], data["更新履歴"]
+    footer = (f"{TITLES[kind]}｜{today} 版｜このスライドは随時更新されます（リンク先は常に最新版）"
+              if mode != "draft" else f"【下書き・社外秘】{today} 生成｜赤字の機能名は未承認（全件未承認のときは色分けなし）")
+    urls, sizes = art["urls"], art["sizes"]
+    d = Deck(f"b{dt.datetime.now(JST).strftime('%H%M%S')}", urls, footer)
+    feats, screens, ucs, faqs, changes = (data[k] for k in ("機能一覧", "サイトマップ", "逆引き", "FAQ", "更新履歴"))
+    by_screen = {s["画面ID"]: s for s in screens}
+    names = {r["機能ID"]: r["機能名"] for r in feats}
+    unapproved = {r["機能ID"] for r in feats if r.get("承認") != APPROVED}
+    if len(unapproved) == len(feats):  # 全部未承認なら赤字にしても情報にならない
+        unapproved = set()
+    toc = toc or {}
+    screen_pages = screen_pages or {}
+    found_toc, found_screens = {}, {}
 
-    d.title(TITLES[kind], f"{today} 時点 ／ 掲載機能 {len(feats)} 件")
-    d.bullets("この資料の使い方", [
-        "① 画面マップ … HAWK の画面構成と、どの画面から何ができるか",
-        "② 機能一覧 … カテゴリ別に、できること・設定項目・目的",
-        "③ 逆引き … 「こうしたい」から使う機能を探す",
-        "④ 最近の更新 … 新しく使えるようになった機能",
-        "このページは随時更新されます。リンクを開くと常に最新版が見られます。",
-    ])
+    # 表紙
+    d.new_page(bg=WHITE)
+    d.rect(0, 0, 300, H, GREEN)
+    d.text(28, 120, 260, 40, "HAWK", size=30, bold=True, color=WHITE)
+    d.text(28, 160, 260, 60, TITLES[kind].replace("HAWK ", ""), size=20, bold=True, color=WHITE)
+    d.text(28, 230, 250, 40, "SNS広告伴走型AIエージェント HAWK の\n画面と機能をまとめた取扱説明書です。", size=9, color=WHITE)
+    d.text(28, 360, 250, 16, f"{today} 時点", size=9, color=GREEN_PALE)
+    if urls.get("logo_hawk"):
+        d.image(330, 40, 120, 39, urls["logo_hawk"], border=False)
+    stats = [("機能", len(feats)), ("画面", len(screens)), ("逆引き", len(ucs)), ("FAQ", len(faqs))]
+    for i, (label, n) in enumerate(stats):
+        x = 330 + i * 92
+        d.rect(x, 150, 84, 70, GREEN_PALE)
+        d.text(x, 158, 84, 30, str(n), size=22, bold=True, color=GREEN_DARK, align="CENTER")
+        d.text(x, 192, 84, 16, label, size=8, color=SUB, align="CENTER")
+    d.text(330, 250, 360, 80,
+           "・このスライドはマスターデータから自動生成しています。\n"
+           "・機能の追加・仕様変更があると内容が更新されます。共有リンクを開けば常に最新版です。\n"
+           "・印刷・保存用の PDF は日付つきでお渡しできます。", size=8, color=SUB)
+    if mode == "draft":
+        d.text(330, 330, 360, 20, "【下書き】社内確認用。お客様には本番版のリンクを共有してください。", size=8, color=RED, bold=True)
 
+    # 目次
+    d.frame("目次・この資料の使い方")
+    chapters = [("全体像", "HAWK でできること（運用の流れ）"), ("サイトマップ", "画面構成（どの画面で何をするか）"),
+                ("最近の更新", "新しく使えるようになった機能")] + \
+               [(c, c) for c in CATEGORY_ORDER if any(cat_of(r["機能ID"]) == c for r in feats)] + \
+               ([("逆引き", "やりたいことから探す")] if ucs else []) + ([("FAQ", "よくあるご質問")] if faqs else [])
+    lines = [f"{label}" for _, label in chapters]
+    pages = [f"p.{toc.get(key, '')}" for key, _ in chapters]
+    half = math.ceil(len(lines) / 2) if len(lines) > 8 else len(lines)
+    for col, (ls, ps) in enumerate(((lines[:half], pages[:half]), (lines[half:], pages[half:]))):
+        x = MX + 9 + col * 230
+        for i, (l, p) in enumerate(zip(ls, ps)):
+            y = BODY_TOP + 8 + i * 22
+            d.rect(x, y + 3, 3, 12, GREEN_LIGHT)
+            d.text(x + 8, y, 170, 18, l, size=9, valign="MIDDLE")
+            d.text(x + 175, y, 40, 18, p, size=9, color=GREEN, bold=True, align="END", valign="MIDDLE")
+    gx = MX + 480
+    d.rect(gx, BODY_TOP + 8, W - MX - gx, 300, GREEN_PALE)
+    d.text(gx + 10, BODY_TOP + 16, W - MX - gx - 20, 290,
+           "使い方\n\n"
+           "■ まず全体像とサイトマップで、HAWK の流れと画面の場所をつかみます。\n\n"
+           "■ 各章は「1画面 = 1ページ」。左に画面、右にその画面でできること・設定項目・注意点をまとめています。\n\n"
+           "■ 「〇〇したい」から探すときは逆引き、細かい仕様は FAQ をご覧ください。\n\n"
+           "■ 表の見方\n【設定】設定できる項目・選択肢\n【目的】何のための機能か\n【注意】制約・ご注意点",
+           size=8, color=TEXT, runs=[(0, 3, {"bold": True, "size": 10, "color": GREEN_DARK})])
+
+    # 全体像
+    found_toc["全体像"] = d.page_no + 1
+    d.frame("HAWK でできること（運用の流れ）", "全体像", "メモを貼るだけで、与件整理 → 設計・見積り → 配信設計 → 運用 → レポートまでを1つの画面で進められます。")
+    cw = (W - 2 * MX - 5 * 6) / 6
+    for i, (prefix, label) in enumerate(STEPS):
+        x = MX + i * (cw + 6)
+        d.rect(x, BODY_TOP + 6, cw, 30, GREEN)
+        d.text(x, BODY_TOP + 6, cw, 30, f"STEP {i + 1}\n{label}", size=8.5, bold=True, color=WHITE, align="CENTER", valign="MIDDLE")
+        items = [r["機能名"] for r in feats if r["機能ID"].split("-")[1] == prefix]
+        shown, used = [], 0.0
+        for n in items:  # 箱(224pt)に収まるところまで
+            h = est_lines(f"・{n}", cw - 8, 6.8) * 6.8 * 1.25
+            if used + h > 212:
+                shown.append(f"ほか {len(items) - len(shown)} 件")
+                break
+            shown.append(f"・{n}")
+            used += h
+        d.rect(x, BODY_TOP + 38, cw, 230, GREEN_PALE)
+        d.text(x + 4, BODY_TOP + 42, cw - 8, 224, "\n".join(shown), size=6.8, color=TEXT)
+    others = [(c, [r["機能名"] for r in feats if cat_of(r["機能ID"]) == c][:6])
+              for c in ("はじめに（対応媒体・プラン）", "クリエイティブ・オブジェクト", "ワークスペース・権限", "DealDesk（提案書作成）")]
+    y = BODY_TOP + 274
+    for i, (c, items) in enumerate(others):
+        x = MX + i * ((W - 2 * MX) / 4)
+        d.text(x, y, (W - 2 * MX) / 4 - 6, 56, f"{c}\n" + "、".join(items), size=7, color=TEXT, fill="#f6f8f2",
+               runs=[(0, len(c), {"bold": True, "color": GREEN_DARK})])
+
+    # サイトマップ
+    found_toc["サイトマップ"] = d.page_no + 1
+    d.frame("サイトマップ（画面構成）", "サイトマップ",
+            "ログイン後、画面上部のメニューから各画面に移動します。右の数字はこの資料の掲載ページです。ワークスペースメニューは管理者のみ表示されます。")
+    top = [s for s in screens if s.get("階層1") in ("ログイン", "ヘッダー")]
+    d.text(MX, BODY_TOP + 4, W - 2 * MX, 16, "  →  ".join(s["画面名"] for s in top) + "  →  各メニュー",
+           size=8, color=WHITE, bold=True, fill=GREEN_DARK, valign="MIDDLE")
+    mw = (W - 2 * MX - 4 * 6) / 5
+    for i, menu in enumerate(MENUS):
+        x = MX + i * (mw + 6)
+        y = BODY_TOP + 26
+        d.rect(x, y, mw, 18, GREEN)
+        d.text(x, y, mw, 18, menu, size=8.5, bold=True, color=WHITE, align="CENTER", valign="MIDDLE")
+        y += 22
+        for s in [s for s in screens if norm_menu(s.get("階層1", "")) == menu]:
+            p = screen_pages.get(s["画面ID"], "")
+            ptxt = f"p.{p}" if p else ""
+            if s.get("階層3"):
+                label = s["画面名"] if len(s["画面名"]) <= 11 else s["画面名"][:10] + "…"
+                d.text(x + 6, y, mw - 40, 11, f"└ {label}", size=6.3, color=SUB)
+                d.text(x + mw - 34, y, 34, 11, ptxt, size=6.3, color=GREEN, align="END")
+                y += 11
+            else:
+                label = s["画面名"] if len(s["画面名"]) <= 13 else s["画面名"][:12] + "…"
+                d.rect(x, y, mw, 15, GREEN_PALE)
+                d.text(x + 4, y, mw - 40, 15, label, size=7, bold=True, color=GREEN_DARK, valign="MIDDLE")
+                d.text(x + mw - 36, y, 34, 15, ptxt, size=7, color=GREEN, bold=True, align="END", valign="MIDDLE")
+                y += 17
+
+    # 最近の更新
     if changes:
-        recent = sorted(changes, key=lambda r: r.get("リリース日") or r.get("検知日"), reverse=True)[:12]
-        d.bullets("最近の更新", [f"{r.get('リリース日') or r.get('検知日')}　{r['内容']}" for r in recent])
+        found_toc["最近の更新"] = d.page_no + 1
+        recent = sorted(changes, key=lambda r: r.get("リリース日") or r.get("検知日") or "", reverse=True)[: (10 if lite else 22)]
+        rows = [[r.get("リリース日") or r.get("検知日"), r.get("種別", ""), r["内容"],
+                 "、".join(names.get(i, i) for i in split_ids(r.get("対象ID", "")))] for r in recent]
+        widths = [62, 36, 410, W - 2 * MX - 62 - 36 - 410]
+        for k, chunk in enumerate(paginate(rows, widths, 7, BODY_BOTTOM - BODY_TOP - 4)):
+            d.frame("最近の更新" + ("（続き）" if k else ""), "最近の更新", "新しく使えるようになった機能・変更点です（新しい順）。")
+            d.table(MX, BODY_TOP + 2, widths, ["日付", "区分", "内容", "関連する機能"], chunk, size=7)
 
-    if screens:
-        d.section("① 画面マップ")
-        lines = []
-        for r in screens:
-            depth = sum(1 for k in ("階層1", "階層2", "階層3") if r.get(k))
-            label = r.get("画面名") or r.get(f"階層{depth}") or r["画面ID"]
-            desc = r.get("この画面でやること", "")
-            lines.append("　　" * max(depth - 1, 0) + label + (f" … {desc}" if desc else ""))
-        d.bullets("画面マップ", lines)
+    # 機能（カテゴリ → 画面ごと）
+    for cat in CATEGORY_ORDER:
+        cfeats = [r for r in feats if cat_of(r["機能ID"]) == cat]
+        if not cfeats:
+            continue
+        found_toc[cat] = d.page_no + 1
+        groups: dict[str, list[dict]] = {}
+        if cat.startswith("はじめに"):
+            groups[""] = cfeats
+        else:
+            for r in cfeats:
+                groups.setdefault(r.get("画面ID", ""), []).append(r)
+            # スクショが無く機能が少ない画面はまとめて1表に
+            small = [k for k, v in groups.items() if (not k or k not in urls) and len(v) <= 2 and len(groups) > 1]
+            if len(small) > 1:
+                merged = [r for k in small for r in groups.pop(k)]
+                groups["__misc"] = merged
+        for sid_, rows_ in groups.items():
+            screen = by_screen.get(sid_, {})
+            if sid_ and sid_ != "__misc":
+                found_screens.setdefault(sid_, d.page_no + 1)
+            render_feature_group(d, cat, sid_, screen, rows_, urls, sizes, screens, unapproved, mode, ucs)
+            if sid_ == "__misc":
+                for r in rows_:
+                    if r.get("画面ID"):
+                        found_screens.setdefault(r["画面ID"], d.page_no)
 
-    d.section("② 機能一覧")
-    by_cat: dict[str, list[dict]] = {}
-    for r in feats:
-        by_cat.setdefault(r.get("カテゴリ") or "その他", []).append(r)
-    order = [c for c in CATEGORY_ORDER if c in by_cat] + sorted(c for c in by_cat if c not in CATEGORY_ORDER)
-    for cat in order:
-        lines = []
-        for r in by_cat[cat]:
-            mark = "" if mode != "draft" or r.get("承認") == APPROVED else "［未承認］"
-            lines.append(f"{mark}■ {r['機能名']}：{r.get('できること', '')}")
-            if r.get("設定項目・選択肢"):
-                lines.append(f"　　設定：{r['設定項目・選択肢']}")
-            if r.get("何のため（目的）"):
-                lines.append(f"　　目的：{r['何のため（目的）']}")
-            if r.get("制約・注意"):
-                lines.append(f"　　注意：{r['制約・注意']}")
-        d.bullets(cat, lines)
-
+    # 逆引き
     if ucs:
-        d.section("③ 逆引き（やりたいこと → 機能）")
-        names = {r["機能ID"]: r["機能名"] for r in feats}
-        lines = []
-        for r in ucs:
-            ids = [i.strip() for i in re.split(r"[,、\s]+", r.get("使う機能ID", "")) if i.strip()]
-            used = "、".join(names.get(i, i) for i in ids)
-            lines.append(f"■ {r['やりたいこと']}")
-            lines.append(f"　　→ {r.get('手順（概要）', '')}" + (f"（{used}）" if used else ""))
-        d.bullets("逆引き", lines)
-    return d
+        found_toc["逆引き"] = d.page_no + 1
+        order = {c: i for i, c in enumerate(CATEGORY_ORDER)}
+        ucs_sorted = sorted(ucs, key=lambda r: (order.get(r.get("カテゴリ"), 99), r["UCID"]))
+        rows = [[r["やりたいこと"], r.get("手順（概要）", ""),
+                 "、".join(names.get(i, i) for i in split_ids(r.get("使う機能ID", ""))),
+                 (r.get("カテゴリ") or "").split("（")[0]] for r in ucs_sorted]
+        widths = [190, 300, 130, W - 2 * MX - 620]
+        for k, chunk in enumerate(paginate(rows, widths, 7, BODY_BOTTOM - BODY_TOP - 4)):
+            d.frame("逆引き：やりたいことから探す" + ("（続き）" if k else ""), "逆引き",
+                    "「〇〇したい」から、使う画面と手順を引けます。機能の詳細は各章をご覧ください。")
+            d.table(MX, BODY_TOP + 2, widths, ["やりたいこと", "手順", "使う機能", "章"], chunk, size=7)
+
+    # FAQ
+    if faqs:
+        found_toc["FAQ"] = d.page_no + 1
+        order = {c: i for i, c in enumerate(["全般", "対応媒体・目的", "アカウント・連携", "与件・配信設計", "見積", "クリエイティブ・入稿",
+                                             "レポート", "予算・運用", "権限・ユーザー", "セキュリティ・データ", "料金・契約", "導入・サポート"])}
+        fs = sorted(faqs, key=lambda r: (order.get(r.get("カテゴリ"), 99), r["FAQID"]))
+        rows = [[r.get("カテゴリ", ""), r["質問"], r.get("回答", "") or "（確認中）"] for r in fs]
+        widths = [62, 210, W - 2 * MX - 272]
+        for k, chunk in enumerate(paginate(rows, widths, 7, BODY_BOTTOM - BODY_TOP - 4)):
+            d.frame("よくあるご質問（FAQ）" + ("（続き）" if k else ""), "FAQ")
+            d.table(MX, BODY_TOP - 10, widths, ["分類", "ご質問", "回答"], chunk, size=7)
+    return d, found_toc, found_screens
 
 
+def norm_menu(level1: str) -> str:
+    return "DealDesk" if level1.replace("-", "").lower() == "dealdesk" else level1
+
+
+def feature_rows(rows: list[dict], with_settings_col: bool) -> list[list[str]]:
+    out = []
+    for r in rows:
+        body = r.get("できること", "")
+        if r.get("何のため（目的）"):
+            body += f"\n【目的】{r['何のため（目的）']}"
+        if not with_settings_col and r.get("設定項目・選択肢"):
+            body += f"\n【設定】{r['設定項目・選択肢']}"
+        media = r.get("対応媒体", "")
+        name = r["機能名"] + (f"\n（{media}）" if media not in ("", "共通", "Meta・TikTok") and media not in r["機能名"] else "")
+        if r.get("提供状態") not in (RELEASED, ""):
+            name += f"\n［{r['提供状態']}］"
+        row = [name, body]
+        if with_settings_col:
+            row.append(r.get("設定項目・選択肢", ""))
+        row.append(r.get("制約・注意", ""))
+        out.append(row)
+    return out
+
+
+def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[dict], urls: dict, sizes: dict,
+                         screens: list[dict], unapproved: set, mode: str, ucs: list[dict]):
+    title = screen.get("画面名") if screen else ("その他の機能" if sid_ == "__misc" else cat.split("（")[0])
+    path = " ＞ ".join(x for x in (screen.get("階層1"), screen.get("階層2"), screen.get("階層3")) if x) if screen else ""
+    lead = screen.get("この画面でやること", "") if screen else ""
+    has_img = bool(sid_ and sid_ in urls)
+    marks_all = [i for i, r in enumerate(rows) if mode == "draft" and r["機能ID"] in unapproved]
+    if has_img:
+        # 左: 画面 / 右: 機能表（機能・できること＋目的＋設定・注意）
+        lw = 318
+        widths = [76, 196, W - 2 * MX - lw - 8 - 76 - 196]
+        trs = feature_rows(rows, with_settings_col=False)
+        chunks = paginate(trs, widths, 7, BODY_BOTTOM - BODY_TOP - 2)
+        start = 0
+        for k, chunk in enumerate(chunks):
+            d.frame(title + ("（続き）" if k else ""), cat, "")
+            # 画面（縦横比を保って枠に収める）
+            iw, ih = sizes.get(sid_, (16, 9))
+            bw, bh = lw, 190
+            scale = min(bw / iw, bh / ih)
+            w, h = iw * scale, ih * scale
+            d.image(MX, BODY_TOP - 12, w, h, urls[sid_])
+            y = BODY_TOP - 12 + h + 6
+            kids = [s for s in screens if s.get("遷移元", "").startswith(sid_) and s.get("階層3") and s["画面ID"] in urls]
+            if k == 0 and kids:
+                kw = (lw - 6) / 2
+                for j, kid in enumerate(kids[:2]):
+                    kiw, kih = sizes.get(kid["画面ID"], (16, 9))
+                    ks = min(kw / kiw, 80 / kih)
+                    d.image(MX + j * (kw + 6), y, kiw * ks, kih * ks, urls[kid["画面ID"]])
+                    d.text(MX + j * (kw + 6), y + kih * ks + 1, kw, 10, f"▲ {kid['画面名']}", size=6.5, color=SUB)
+                y += 80 + 14
+            info = (f"画面の場所：{path}\n" if path else "") + (lead if k == 0 else "（前ページの続き）")
+            ih_ = est_lines(info, lw, 7.5) * 7.5 * 1.3 + 8
+            d.text(MX, y, lw, ih_, info, size=7.5, color=TEXT, fill="#f6f8f2",
+                   runs=[(0, len("画面の場所：") if path else 0, {"bold": True, "color": GREEN_DARK})])
+            y += ih_ + 6
+            # 余白にはこの画面を使う逆引き（やりたいこと）を入れる
+            ids = {r["機能ID"] for r in rows}
+            related = [u for u in ucs if ids & set(split_ids(u.get("使う機能ID", "")))]
+            if k == 0 and related and BODY_BOTTOM - y > 30:
+                head = "この画面でできる「やりたいこと」"
+                lines, used = [], 14.0
+                for u in related:
+                    t = f"・{u['やりたいこと']}　{u.get('手順（概要）', '')}"
+                    h_ = est_lines(t, lw, 6.8) * 6.8 * 1.3
+                    if used + h_ > BODY_BOTTOM - y - 4:
+                        break
+                    lines.append(t)
+                    used += h_
+                body = head + "\n" + "\n".join(lines)
+                d.text(MX, y, lw, BODY_BOTTOM - y, body, size=6.8, color=TEXT,
+                       runs=[(0, len(head), {"bold": True, "size": 7.5, "color": GREEN_DARK})])
+            marks = {i - start for i in marks_all if start <= i < start + len(chunk)}
+            d.table(MX + lw + 8, BODY_TOP - 12, widths, ["機能", "できること", "注意"], chunk, size=7, marks=marks)
+            start += len(chunk)
+    else:
+        widths = [118, 270, 150, W - 2 * MX - 118 - 270 - 150]
+        trs = feature_rows(rows, with_settings_col=True)
+        lead_text = (f"画面の場所：{path}　" if path else "") + lead
+        chunks = paginate(trs, widths, 7, BODY_BOTTOM - BODY_TOP - (6 if lead_text else -10))
+        start = 0
+        for k, chunk in enumerate(chunks):
+            d.frame(title + ("（続き）" if k else ""), cat, lead_text)
+            marks = {i - start for i in marks_all if start <= i < start + len(chunk)}
+            d.table(MX, BODY_TOP + (2 if lead_text else -10), widths, ["機能", "できること", "設定項目・選択肢", "注意"],
+                    chunk, size=7, marks=marks)
+            start += len(chunk)
+
+
+# ---- 出力 ------------------------------------------------------------------------
 def ensure_presentation(cfg: dict, key: str, title: str) -> str:
     pid = cfg.get(key)
     if not pid:
@@ -170,12 +381,8 @@ def ensure_presentation(cfg: dict, key: str, title: str) -> str:
 
 
 def replace_all(pid: str, deck: Deck):
-    old = [s["objectId"] for s in call("slides.presentations.get", {"presentationId": pid}).get("slides", [])]
-    # 古いスライドの objectId と衝突しないよう、今回分に接頭辞を付ける
-    stamp = dt.datetime.now(JST).strftime("%H%M%S")
-    raw = json.dumps(deck.requests, ensure_ascii=False)
-    raw = re.sub(r'"(g\d{3}(?:_[a-z])?)"', lambda m: f'"v{stamp}{m.group(1)}"', raw)
-    reqs = json.loads(raw) + [{"deleteObject": {"objectId": o}} for o in old]
+    old = [s["objectId"] for s in call("slides.presentations.get", {"presentationId": pid, "fields": "slides(objectId)"}).get("slides", [])]
+    reqs = deck.req + [{"deleteObject": {"objectId": o}} for o in old]
     # コマンドライン引数の長さ制限があるので、約60KBずつ分けて送る
     batch, size = [], 0
     for r in reqs:
@@ -191,7 +398,6 @@ def replace_all(pid: str, deck: Deck):
 
 def data_hash(data: dict) -> str:
     """掲載内容（行データ）のハッシュ。表紙の日付だけ変わった場合は同じ値になる。"""
-    import hashlib
     return hashlib.sha1(json.dumps(data, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:12]
 
 
@@ -202,9 +408,11 @@ def last_archived_hash(sid: str, kind: str) -> str:
 
 def archive(cfg: dict, pid: str, kind: str, n_rows: int, digest: str):
     stamp = dt.datetime.now(JST).strftime("%Y%m%d")
-    pdf = HERE / f"{TITLES[kind]}_{stamp}.pdf"
-    subprocess.run(["gws", "drive", "files", "export", "-o", str(pdf), "--params",
-                    json.dumps({"fileId": pid, "mimeType": "application/pdf"})], check=True)
+    name = f"{TITLES[kind]}_{stamp}.pdf"
+    # gws の -o はカレントディレクトリ配下しか書けない
+    subprocess.run(["gws", "drive", "files", "export", "-o", name, "--params",
+                    json.dumps({"fileId": pid, "mimeType": "application/pdf"})], check=True, cwd=HERE)
+    pdf = HERE / name
     link = ""
     if cfg.get("archive_folder_id"):
         up = subprocess.run(["gog", "--account", cfg["account"], "-j", "drive", "upload", str(pdf),
@@ -226,11 +434,18 @@ def main():
     a = ap.parse_args()
     cfg = json.loads(CONFIG.read_text())
     kind = "prod_lite" if a.lite else a.mode
+    picked = assets.pick_up_screenshot_folder(cfg)
+    if picked:
+        print(f"スクショ用フォルダから {picked} 件をサイトマップに反映")
+    art = assets.sync(cfg)
     data = load_rows(cfg["master_sheet_id"], a.mode, a.lite)
-    deck = build(data, a.mode, a.lite)
+    today = dt.datetime.now(JST).strftime("%Y-%m-%d")
+    # 1回目でページ番号を確定させ、2回目で目次・サイトマップに番号を入れて本番描画
+    _, toc, sp = render(data, a.mode, a.lite, art, today, None, None)
+    deck, _, _ = render(data, a.mode, a.lite, art, today, toc, sp)
     pid = ensure_presentation(cfg, f"{kind}_presentation_id", TITLES[kind])
     replace_all(pid, deck)
-    print(f"{kind}: {deck.n} slides, {len(data['機能一覧'])} features")
+    print(f"{kind}: {deck.page_no} pages, {len(data['機能一覧'])} features")
     print(f"https://docs.google.com/presentation/d/{pid}/edit")
     if a.archive and a.mode == "prod":
         digest = data_hash(data)
