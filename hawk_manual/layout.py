@@ -197,9 +197,8 @@ class Deck:
         if self.logos.get("logo_hawk"):
             self.image(MX, 385, 46, 15, self.logos["logo_hawk"], border=False)
         self.text(MX + 54, 388, 420, 12, self.footer, size=6.5, color=MUTED, valign="MIDDLE")
-        self.text(W - MX - 60, 388, 40, 12, str(self.page_no), size=7, color=MUTED, align="END", valign="MIDDLE")
-        if self.logos.get("logo_fo"):
-            self.image(W - MX - 16, 384, 16, 15, self.logos["logo_fo"], border=False)
+        # 右下の FreakOut ロゴは入れない（片山方針 2026-10-09。左下の HAWK ロゴは必須）
+        self.text(W - MX - 40, 388, 40, 12, str(self.page_no), size=7, color=MUTED, align="END", valign="MIDDLE")
 
 
 def paginate(rows: list[list[str]], widths: list[float], size: float, avail: float, header_h: float | None = None):

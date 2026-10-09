@@ -356,8 +356,9 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
                     lines.append(t)
                     used += h_
                 body = head + "\n" + "\n".join(lines)
-                d.text(MX, y, lw, BODY_BOTTOM - y, body, size=6.8, color=TEXT,
-                       runs=[(0, len(head), {"bold": True, "size": 7.5, "color": GREEN_DARK})])
+                if lines:  # 1件も入らないときは見出しだけ残さない
+                    d.text(MX, y, lw, BODY_BOTTOM - y, body, size=6.8, color=TEXT,
+                           runs=[(0, len(head), {"bold": True, "size": 7.5, "color": GREEN_DARK})])
             marks = {i - start for i in marks_all if start <= i < start + len(chunk)}
             d.table(MX + lw + 8, BODY_TOP - 12, widths, ["機能", "できること", "注意"], chunk, size=7, marks=marks)
             start += len(chunk)
