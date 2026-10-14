@@ -1,21 +1,28 @@
 # claude-configgggggg
 
-## HAWK 概要資料は「202610版_送付用」を使う（2026-10-14 確定）
+## HAWK 概要資料は当面「202610版（DealDesk反映・暫定）」を使う（2026-10-14 時点）
 
 カレンダーの予定への添付・メール送付・商談準備の資料リストなど、
-**HAWK の概要資料（Overview／媒体資料）を出す場面では必ずこれを使う。**
+**HAWK の概要資料（Overview／媒体資料）を出す場面では、確定版ができるまでこれを使う。**
 
-- ファイル名: `HAWK_Overview_202610版_送付用.pptx`（DealDesk 反映済み）
-- URL: https://docs.google.com/presentation/d/1QNobWTFwlqDzcL3a-g6pzYd7R144RGlO/edit
-- fileId: `1QNobWTFwlqDzcL3a-g6pzYd7R144RGlO`（片山のマイドライブ直下・pptx）
+- ファイル名: `【概要資料】HAWK Overview 202610版（DealDesk反映・暫定）`
+- URL: https://docs.google.com/presentation/d/1GuSc_ZafP0ZQtkkJEoACKYazNoavc4QR7UKJL05VuJg/edit
+- 中身は 10/14 に PAC 様へ送付した `【ピーエーシー様】HAWK Overview_20261014`
+  （`1WgrAvwQamIkYZ-6XNdByqIOK-wF2iHt8L6N5rMAVYmk`）と同じ。社名を外したコピー。
+  Ver1.1 に DealDesk の3枚を料金体系の後に追加したもの（業務領域マップは抜けている）。
 
-以下は**旧版なので新規には使わない**（既存予定に残っていたら上記に差し替える）:
+**確定版は未完成**（2026-10-14 時点）。hide さんの `HAWK_Overview_202610版.pptx`
+（赤字の追記を黒に戻し、P7右側・P10イラストを調整して Hatch さんに資料DL用の生成・差し替えを依頼中）が上がってきたら、
+片山に確認のうえ、ここを確定版に書き換える。
+`HAWK_Overview_202610版_送付用.pptx`（`1QNobWTFwlqDzcL3a-g6pzYd7R144RGlO`）は確定前のファイルなので、まだ使わない。
+
+以下は**旧版・作業中なので新規には使わない**（既存予定に残っていたら上記に差し替える）:
 - `HAWK Overview 20260518Ver1.1`（`1jNYfsybGnwpOGYQ2PyvBdpoEoUnjRkGoNNXYOtP7sIg`）… DealDesk 無し
 - `【概要資料】HAWK Overview 202609版_ver2`（`12MgGu8yN-mNnNyVoHrKeWROzFVIz68ztRKOEJ8_TPX0`）
-- `【概要資料】HAWK Overview 202610版（DealDesk反映）`（`1GuSc_ZafP0ZQtkkJEoACKYazNoavc4QR7UKJL05VuJg`）… 確定前の暫定コピー
 - `HAWK Overview_Ver2.0` ／ `HAWK_Overview_202610_DealDesk反映版Ver2.pptx` … 作業中の版
 
 ※ 先方と共有している予定（先方がゲストの予定）の添付は勝手に触らない。差し替えたい時は確認する。
+※ 社名入りの版（`【〇〇様】HAWK Overview_…`）を別の会社に流用しない。社名なしの上記を使う。
 
 ## Google Workspace 操作は gog を最優先で使う
 
