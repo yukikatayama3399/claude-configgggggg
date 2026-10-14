@@ -16,6 +16,22 @@ Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操�
 **gog に無い API メソッドを叩きたいときだけ gws を使う**。
 使い方と認証の仕組みは末尾の「gws (Google 公式 Google Workspace CLI)」を参照。
 
+### メール下書きに URL を入れるときのルール（2026-10-14）
+
+**リンクは必ず直リンク（`https://docs.google.com/...` そのもの）にする。**
+`https://www.google.com/url?q=...&source=gmail&ust=...&sa=E` のような
+Google のリダイレクト（クッションページ）を経由する形は絶対に入れない。
+相手がクリックすると一度中継ページに飛ばされ、スライドに直接たどり着けない。
+
+- 原因: Gmail MCP（claude.ai の Gmail コネクタ）の `create_draft` / `update_draft` で
+  `htmlBody` に `<a href>` を入れると、保存時にリダイレクト形式へ書き換わる（実測）。
+- 対策: リンク入りの下書きは **Gmail API に raw MIME を直接投げて作る**
+  （`agenda/gapi.py` の `gapi.call('POST', 'https://gmail.googleapis.com/gmail/v1/users/me/drafts', {'message': {'raw': ...}})`）。
+  この経路なら href がそのまま残ることを確認済み。
+  スレッドに返信する場合は `message.threadId` と、元メールの `Message-ID` を
+  `In-Reply-To` / `References` ヘッダに入れる。
+- 作成後は必ず下書きを読み返し、`google.com/url` が含まれていないことを確認する。
+
 ### セットアップ
 - クラウド(web)セッションでは SessionStart フック
   (`.claude/hooks/session-start.sh`) が開始時に自動セットアップする。
