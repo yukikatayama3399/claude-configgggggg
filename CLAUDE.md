@@ -1,5 +1,22 @@
 # claude-configgggggg
 
+## HAWK 概要資料は「202610版_送付用」を使う（2026-10-14 確定）
+
+カレンダーの予定への添付・メール送付・商談準備の資料リストなど、
+**HAWK の概要資料（Overview／媒体資料）を出す場面では必ずこれを使う。**
+
+- ファイル名: `HAWK_Overview_202610版_送付用.pptx`（DealDesk 反映済み）
+- URL: https://docs.google.com/presentation/d/1QNobWTFwlqDzcL3a-g6pzYd7R144RGlO/edit
+- fileId: `1QNobWTFwlqDzcL3a-g6pzYd7R144RGlO`（片山のマイドライブ直下・pptx）
+
+以下は**旧版なので新規には使わない**（既存予定に残っていたら上記に差し替える）:
+- `HAWK Overview 20260518Ver1.1`（`1jNYfsybGnwpOGYQ2PyvBdpoEoUnjRkGoNNXYOtP7sIg`）… DealDesk 無し
+- `【概要資料】HAWK Overview 202609版_ver2`（`12MgGu8yN-mNnNyVoHrKeWROzFVIz68ztRKOEJ8_TPX0`）
+- `【概要資料】HAWK Overview 202610版（DealDesk反映）`（`1GuSc_ZafP0ZQtkkJEoACKYazNoavc4QR7UKJL05VuJg`）… 確定前の暫定コピー
+- `HAWK Overview_Ver2.0` ／ `HAWK_Overview_202610_DealDesk反映版Ver2.pptx` … 作業中の版
+
+※ 先方と共有している予定（先方がゲストの予定）の添付は勝手に触らない。差し替えたい時は確認する。
+
 ## Google Workspace 操作は gog を最優先で使う
 
 Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操作は、
