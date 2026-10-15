@@ -357,15 +357,16 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
                     bottom = max(bottom, y + kih * ks + 1 + cap_h)
                 y = bottom + 4
             info = (f"画面の場所：{path}\n" if path else "") + (lead if k == 0 else "（前ページの続き）")
-            ih_ = est_lines(info, lw, 7.5) * 7.5 * 1.4 + 9
-            d.text(MX, y, lw, ih_, info, size=7.5, color=TEXT, fill="#f6f8f2",
-                   runs=[(0, len("画面の場所：") if path else 0, {"bold": True, "color": GREEN_DARK})])
-            y += ih_ + 6
+            runs = [(0, len("画面の場所：") if path else 0, {"bold": True, "color": GREEN_DARK})]
             if k == 0 and SAMPLE_REPORT_URL and sid_ in SAMPLE_REPORT_SCREENS:
+                # サンプルレポートへのリンクは箱の中に入れる（箱の下に置くとページ下端のフッターに重なることがある）
                 label = "▶ サンプルレポートはこちら"
-                d.text(MX, y, lw, 16, label + "（別のスライドが開きます）", size=8, color=GREEN_DARK, bold=True,
-                       runs=[(2, len(label), {"bold": True, "color": GREEN_DARK, "link": SAMPLE_REPORT_URL})])
-                y += 20
+                start = len(info) + 1
+                info += "\n" + label + "（別のスライドが開きます）"
+                runs.append((start + 2, start + len(label), {"bold": True, "color": GREEN_DARK, "link": SAMPLE_REPORT_URL}))
+            ih_ = est_lines(info, lw, 7.5) * 7.5 * 1.4 + 9
+            d.text(MX, y, lw, ih_, info, size=7.5, color=TEXT, fill="#f6f8f2", runs=runs)
+            y += ih_ + 6
             # 余白にはこの画面を使う逆引き（やりたいこと）を入れる
             ids = {r["機能ID"] for r in rows}
             related = [u for u in ucs if ids & set(split_ids(u.get("使う機能ID", "")))]
