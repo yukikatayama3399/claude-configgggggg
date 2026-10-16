@@ -1,0 +1,407 @@
+<title>取扱説明書 横展開キット</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<style>
+/* Layout: one reading column; the prompt section widens into a fill-in panel + prompt stack on desktop */
+:root {
+  --paper: #f6f8f6; --surface: #ffffff; --ink: #17201c; --sub: #56645d; --line: #dbe2de;
+  --accent: #1d6b57; --accent-ink: #ffffff; --accent-soft: #e2efe9; --mark: #fff0b8; --mark-ink: #5a4500;
+  --ok: #1d6b57; --ng: #a23b2c; --edit: #8a5a00;
+  --f-display: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --f-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --f-mono: "IBM Plex Mono", "Noto Sans JP", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #111614; --surface: #171e1b; --ink: #e4ebe7; --sub: #9babA3; --line: #2b3531;
+  --accent: #5cc3a4; --accent-ink: #0d1411; --accent-soft: #1b2c26; --mark: #4a3d0e; --mark-ink: #ffe69a;
+  --ok: #5cc3a4; --ng: #f08a78; --edit: #e8b75a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #111614; --surface: #171e1b; --ink: #e4ebe7; --sub: #9babA3; --line: #2b3531;
+  --accent: #5cc3a4; --accent-ink: #0d1411; --accent-soft: #1b2c26; --mark: #4a3d0e; --mark-ink: #ffe69a;
+  --ok: #5cc3a4; --ng: #f08a78; --edit: #e8b75a; color-scheme: dark }
+
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.75;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 40px 80px; display: grid; gap: 56px; }
+.col { max-width: 760px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.35; margin: 0; }
+h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 900; letter-spacing: .01em; }
+h2 { font-size: 22px; font-weight: 900; display: flex; gap: 12px; align-items: baseline; }
+h2 .no { font-family: var(--f-mono); font-size: 13px; color: var(--accent); font-weight: 500; letter-spacing: .08em; }
+h3 { font-size: 16px; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--accent); text-underline-offset: 3px; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--sub); font-weight: 500; }
+.lead { font-size: 16px; color: var(--sub); max-width: 62ch; }
+section { display: grid; gap: 18px; min-width: 0; }
+.stack { display: grid; gap: 12px; }
+
+/* header */
+header { display: grid; gap: 14px; border-bottom: 1px solid var(--line); padding-bottom: 28px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--sub); }
+.meta b { color: var(--ink); font-weight: 500; }
+
+/* three jobs */
+.jobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.job { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; }
+.job .k { font-family: var(--f-mono); font-size: 12px; color: var(--accent); letter-spacing: .06em; }
+.job p { font-size: 14px; color: var(--sub); }
+.fact { font-size: 13px; color: var(--sub); border-left: 3px solid var(--accent); padding-left: 12px; }
+
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow-x: auto; }
+
+/* steps */
+ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: s; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 44px 1fr; gap: 4px 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+ol.steps li:last-child { border-bottom: 1px solid var(--line); }
+ol.steps li::before { content: counter(s); grid-row: span 2; font-family: var(--f-display); font-weight: 900; font-size: 22px; color: var(--accent); line-height: 1.3; }
+ol.steps .who { font-size: 12px; color: var(--sub); }
+ol.steps .what { font-weight: 500; }
+ol.steps .what code { font-size: 13px; }
+code { font-family: var(--f-mono); font-size: .92em; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+
+/* tables */
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 640px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 12px; color: var(--sub); font-weight: 500; letter-spacing: .04em; background: var(--accent-soft); }
+td:first-child { font-weight: 700; white-space: nowrap; }
+td small { color: var(--sub); display: block; }
+.tag { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--sub); margin-right: 4px; white-space: nowrap; }
+
+ul.check { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+ul.check li { padding-left: 26px; position: relative; font-size: 14px; }
+ul.check li::before { content: ""; position: absolute; left: 2px; top: 6px; width: 13px; height: 13px; border: 1.5px solid var(--accent); border-radius: 3px; }
+
+/* prompt workbench */
+.bench { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+.fill { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
+@media (max-width: 860px) { .fill { position: static; max-height: none; } }
+.fill .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.fill .count { font-size: 12px; color: var(--sub); font-variant-numeric: tabular-nums; }
+.fill fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fill legend { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .06em; padding: 0; margin-bottom: 6px; }
+.fill label { display: grid; gap: 3px; font-size: 12px; color: var(--sub); }
+.fill label span.v { font-family: var(--f-mono); font-size: 11px; }
+.fill input { font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; box-sizing: border-box; }
+.fill input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fill input::placeholder { color: var(--sub); opacity: .7; }
+.btn { font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 6px; padding: 6px 12px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); white-space: nowrap; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.opt { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--sub); }
+
+.prompts { display: grid; gap: 22px; min-width: 0; }
+.prompt { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.prompt .bar { display: flex; flex-wrap: wrap; gap: 8px 12px; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.prompt .bar .t { display: grid; gap: 2px; }
+.prompt .bar .t b { font-family: var(--f-display); font-size: 16px; }
+.prompt .bar .t small { font-size: 12px; color: var(--sub); }
+.prompt .acts { display: flex; gap: 8px; }
+.prompt pre { margin: 0; padding: 14px 16px; font-family: var(--f-mono); font-size: 12.5px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; max-height: 460px; overflow: auto; }
+.prompt.open pre { max-height: none; }
+.prompt pre mark { background: var(--mark); color: var(--mark-ink); border-radius: 3px; padding: 0 2px; }
+.prompt pre .filled { background: var(--accent-soft); border-radius: 3px; padding: 0 2px; }
+
+/* slack mock */
+.chat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; font-size: 14px; max-width: 680px; }
+.msg { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 10px; }
+.av { width: 34px; height: 34px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.msg .who { font-weight: 700; font-size: 13px; }
+.msg .who span { font-weight: 400; color: var(--sub); font-size: 12px; margin-left: 6px; }
+.thread { margin-left: 44px; border-left: 2px solid var(--line); padding-left: 14px; display: grid; gap: 12px; }
+.reply { display: grid; gap: 4px; }
+.reply .body { white-space: pre-wrap; }
+.rx { display: flex; gap: 6px; flex-wrap: wrap; }
+.rx span { font-size: 12px; border: 1px solid var(--line); border-radius: 99px; padding: 0 8px; }
+.rx .on { border-color: var(--accent); background: var(--accent-soft); }
+.legend3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.legend3 div { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13px; background: var(--surface); }
+.legend3 b { display: block; font-size: 14px; }
+.legend3 .ok b { color: var(--ok); } .legend3 .ng b { color: var(--ng); } .legend3 .ed b { color: var(--edit); }
+
+/* pitfalls */
+.pits { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 28px; }
+.pit { padding: 12px 0; border-top: 1px solid var(--line); display: grid; gap: 2px; }
+.pit b { font-size: 14px; }
+.pit p { font-size: 13px; color: var(--sub); }
+
+.refs { display: grid; gap: 8px; font-size: 14px; }
+.refs div { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.refs span { color: var(--sub); min-width: 9em; }
+footer { font-size: 12px; color: var(--sub); border-top: 1px solid var(--line); padding-top: 16px; }
+
+@media (prefers-reduced-motion: no-preference) { .btn { transition: background .15s, color .15s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">HAWK 方式・ほかのプロダクトに展開するためのプロンプト集</div>
+    <h1>機能取扱説明書 横展開キット</h1>
+    <p class="lead">HAWK で作った「機能取扱説明書」と同じものを、自分のプロダクトでも作るためのプロンプト集です。資料をフォルダに置いて、プロンプトを Claude Code に貼れば、管理シートと取説スライドができます。そのあとは定期巡回で新機能や FAQ の候補が Slack に届き、承認した分だけ取説に入ります。</p>
+    <div class="meta"><span>元になった仕組み <b>HAWK 機能取扱説明書</b></span><span>作成 <b>片山</b></span><span>更新 <b>2026-10-16</b></span></div>
+  </header>
+
+  <section class="col">
+    <h2><span class="no">01</span>やりたいこと</h2>
+    <div class="jobs">
+      <div class="job"><span class="k">作る</span><h3>資料を全部読ませて、取説を一発で作る</h3><p>スクショ・操作動画・サンプルレポート・既存資料と、Slack・メール・会議メモをまとめて読み、管理シートと取説スライドを作ります。</p></div>
+      <div class="job"><span class="k">回す</span><h3>管理シートを常に最新に保つ</h3><p>毎日または毎週、Slack・メール・会議メモ・Drive を巡回し、新機能・仕様変更・新しい質問を拾ってシートに候補として足します。</p></div>
+      <div class="job"><span class="k">承認する</span><h3>入れるかどうかは Slack で決める</h3><p>候補ごとに Slack に通知が来ます。✅ 入れる／❌ 入れない／✏️ 直して入れる、を押すだけ。承認した分だけ取説が更新されます。</p></div>
+    </div>
+    <p class="fact">HAWK の実績：2026-10-09 に初版を作り、同じ日に確定版をお客様向けの固定 URL で公開。2026-10-16 時点で機能113行・画面のスクショ付き 81 ページ。月・木の巡回で承認依頼が届き、承認分は自動で下書きに入っています。</p>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  A["人が渡す資料<br/>スクショ・操作動画<br/>サンプルレポート・既存資料"] --> M[("管理シート<br/>（これが正）")]
+  B["Claude が取りに行く資料<br/>Slack・Gmail<br/>会議メモ・Drive"] --> M
+  M --> D["下書きスライド<br/>v1, v2 …（社内用）"]
+  D -- "承認者の指示があるときだけ" --> P["本番スライド<br/>固定 URL（お客様用）"]
+  R["定期巡回<br/>毎日 or 毎週"] --> C["候補<br/>承認＝下書き"]
+  C --> S["Slack 承認依頼<br/>✅ ❌ ✏️"]
+  S -- "次の巡回で反映" --> M
+</pre>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2><span class="no">02</span>進め方</h2>
+    <ol class="steps">
+      <li><span class="who">人・1〜2時間（大半はスクショ撮影）</span><span class="what">資料を集めて Drive のフォルダに置き、下の「設定」の空欄を埋める</span></li>
+      <li><span class="who">Claude・1セッション（放置で OK）</span><span class="what">プロンプト①「初回構築」を貼る → 管理シートと下書き v1 ができる</span></li>
+      <li><span class="who">人・30分〜</span><span class="what">シートを見て直し、<code>全件承認して、下書きを作り直して</code> と頼む。「要確認」の質問は開発に聞いて回答を返す</span></li>
+      <li><span class="who">人の一言</span><span class="what"><code>マニュアル本番に反映して</code> → お客様用の固定 URL ができる。以後 URL は変わらず中身だけ更新される</span></li>
+      <li><span class="who">Claude・15分</span><span class="what">プロンプト②「巡回と承認フロー」を貼る → 定期巡回が登録され、1回目が動く</span></li>
+      <li><span class="who">人・普段</span><span class="what">Slack の承認依頼に ✅ ❌ ✏️ を押すだけ。急ぐときやスクショ追加は ③ の一言で頼む</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="no">03</span>準備するもの</h2>
+    <h3>人が用意して渡す資料（インプット）</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>資料</th><th>量の目安</th><th>何に使われるか</th><th>撮り方・選び方</th></tr></thead>
+      <tbody>
+        <tr><td>画面キャプチャ</td><td>全メニュー × 主要画面<br/><small>HAWK は約35画面＋媒体別20枚</small></td><td>サイトマップと「1画面1ページ」の左側の画像</td><td>一覧・詳細・モーダル・設定画面まで撮る。媒体などで画面が変わるならそれぞれ撮る。ファイル名は何でもよい（Claude が中身を見て改名）。実データが映っていても自動で伏せ字にするが、できればデモ用の環境で撮る。</td></tr>
+        <tr><td>操作デモ動画</td><td>工程ごとに 2〜7分 × 3本前後</td><td>操作の順番、画面遷移、ボタン名 → 逆引き（やりたいこと → 手順）</td><td>例：入稿編・運用編・レポート編。ナレーションありだと精度が上がる。文字起こしや台本があれば同じフォルダへ。</td></tr>
+        <tr><td>サンプルレポート</td><td>3〜5本</td><td>レポート章、指標の意味、出力条件の FAQ</td><td>種類違い（媒体別・期間別など）を混ぜる。お客様に見せてよい伏せ字済みの見本を1本決めておく（取説からリンクされる）。</td></tr>
+        <tr><td>既存資料</td><td>あるだけ全部</td><td>機能一覧・FAQ の下地</td><td>概要資料、セットアップガイド、オンボーディング資料、FAQ、仕様まとめシート、リリースノート、ウェビナー台本など。どれが「正本」かを指定する。</td></tr>
+        <tr><td>ブランド素材</td><td>ロゴ1つ＋色</td><td>スライドの見た目</td><td>メインカラーのコードと、ロゴ画像を作業フォルダに置く。</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Claude が取りに行く資料（読み取りだけ）</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>場所</th><th>何を読むか</th><th>拾うもの</th></tr></thead>
+      <tbody>
+        <tr><td>Slack（主）</td><td>プロダクト用チャンネル（product・社内利用・営業相談など）の全投稿とスレッド</td><td>リリース告知、「できる／できない」の回答、不具合と回避策</td></tr>
+        <tr><td>Slack（全体）</td><td>ワークスペース全体をキーワード検索（DM は除く）</td><td>ほかのチャンネルで出た仕様の回答、お客様からの質問</td></tr>
+        <tr><td>Gmail</td><td>キーワード検索</td><td>リリースノート、お客様からの操作の質問</td></tr>
+        <tr><td>会議メモ</td><td>Gemini の自動議事録・議事録 Doc（本文にプロダクト名が出るもの）</td><td>オンボーディング・商談・社内会議の Q&amp;A。行頭が <code>【取説】</code> の行は必ず拾う</td></tr>
+        <tr><td>Drive</td><td>名前にプロダクト名を含む仕様書・リリースノート</td><td>仕様の詳細、提供開始日</td></tr>
+        <tr><td>公開ページ</td><td>製品サイト、公開ヘルプ</td><td>お客様向けの言い回し</td></tr>
+      </tbody>
+    </table></div>
+    <h3>環境（最初に1回）</h3>
+    <ul class="check col">
+      <li>Claude Code on the web（claude.ai/code）で作業する。スキルとスクリプトの置き場に GitHub リポジトリを1つ用意する。</li>
+      <li>claude.ai のコネクタで Slack・Gmail・Google Drive をつなぐ（読み取りと、Slack の承認依頼の投稿に使う）。</li>
+      <li>Google のシートのセルやスライドへの書き込みはコネクタではできないので、gog / gws（Google Workspace のコマンドラインツール）を使う。セットアップは片山のリポジトリ claude-configgggggg の手順を流用できる。認証は自分の Mac 1台だけで取り、出てきた値をクラウド環境の環境変数に入れる（端末ごとに認証しない）。</li>
+      <li>承認依頼用の非公開チャンネルを作る。Slack コネクタはつないだ本人の名前で投稿するので、承認者がつないだ本人だとメンション通知が鳴らないことがある。チャンネルの通知を「すべての新規メッセージ」にしておく。</li>
+      <li>承認者の Slack メンバーID を調べる（プロフィール → ︙ → メンバー ID をコピー）。</li>
+    </ul>
+  </section>
+
+  <section id="prompts">
+    <h2><span class="no">04</span>プロンプト</h2>
+    <p class="lead">左の空欄を埋めると、右のプロンプトに反映されます（入力はこのブラウザにだけ保存されます）。空欄のままの項目は <mark style="background:var(--mark);color:var(--mark-ink);border-radius:3px;padding:0 3px">{{黄色}}</mark> で残るので、貼る前に確認してください。</p>
+    <div class="bench">
+      <form class="fill" id="fill" autocomplete="off">
+        <div class="head"><h3>設定を埋める</h3><span class="count" id="count"></span></div>
+        <div id="fields" class="stack"></div>
+        <label class="opt"><input type="checkbox" id="embed" checked style="width:auto"> ①②の先頭に設定を差し込んでコピーする</label>
+        <button type="button" class="btn ghost" id="reset">入力を消す</button>
+      </form>
+      <div class="prompts">
+        <div class="prompt" data-key="00"><div class="bar"><div class="t"><b>設定ブロック</b><small>①②に差し込まれる。単体でコピーも可</small></div><div class="acts"><button type="button" class="btn ghost" data-act="open">全部表示</button><button type="button" class="btn" data-act="copy">コピー</button></div></div><pre><!--PROMPT:00--></pre></div>
+        <div class="prompt" data-key="01"><div class="bar"><div class="t"><b>① 初回構築</b><small>資料を全部読んで、管理シートと下書きスライド v1 を作る</small></div><div class="acts"><button type="button" class="btn ghost" data-act="open">全部表示</button><button type="button" class="btn" data-act="copy">コピー</button></div></div><pre><!--PROMPT:01--></pre></div>
+        <div class="prompt" data-key="02"><div class="bar"><div class="t"><b>② 巡回と承認フロー</b><small>定期巡回の Routine と Slack 承認依頼を登録する</small></div><div class="acts"><button type="button" class="btn ghost" data-act="open">全部表示</button><button type="button" class="btn" data-act="copy">コピー</button></div></div><pre><!--PROMPT:02--></pre></div>
+        <div class="prompt" data-key="03"><div class="bar"><div class="t"><b>③ 日常の一言</b><small>運用が始まったあとに Claude へ頼む言い方</small></div><div class="acts"><button type="button" class="btn ghost" data-act="open">全部表示</button><button type="button" class="btn" data-act="copy">コピー</button></div></div><pre><!--PROMPT:03--></pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2><span class="no">05</span>Slack に届く承認依頼の見本</h2>
+    <div class="chat" aria-label="承認依頼の見本">
+      <div class="msg"><div class="av">C</div><div><div class="who">承認者（Claude が代理投稿）<span>8:53</span></div><div>@承認者 【アルパカ 取説】取り込み候補が 3 件あります。各候補に ✅（入れる）/ ❌（入れない）/ ✏️（直して入れる）を付けてください。次の巡回で ✅ の分だけ下書きに反映します。本番には反映しません。</div></div></div>
+      <div class="thread">
+        <div class="reply"><div class="body">#1 【新機能】F-RPT-012 レポートの CSV 出力
+レポート画面から表示中の期間の数値を CSV でダウンロードできます。
+入れ先: 機能一覧（新規）
+出典: #alpaca-product 10/15 のリリース告知</div><div class="rx"><span class="on">✅ 1</span></div></div>
+        <div class="reply"><div class="body">#2 【FAQ追加】Q. 配信中のキャンペーンに広告を追加できますか？
+A. 現在はできません。新しいキャンペーンとして作成してください。
+入れ先: FAQ 新規 Q-071（関連 F-OPS-017）
+出典: 10/14 オンボーディング議事録の【取説】行</div><div class="rx"><span class="on">✏️ 1</span></div></div>
+        <div class="reply"><div class="body">#3 【仕様変更】F-OPS-012 日予算の自動調整
+旧: 毎朝 3:00 頃に実行 → 新: 毎朝 8:00 に実行
+出典: #alpaca-product 10/16 のスレッド</div><div class="rx"><span class="on">❌ 1</span></div></div>
+      </div>
+    </div>
+    <div class="legend3">
+      <div class="ok"><b>✅ 入れる</b>承認済にして、次の巡回で下書きの新しい版に入る</div>
+      <div class="ng"><b>❌ 入れない</b>差戻しにする。同じ候補は二度と出ない</div>
+      <div class="ed"><b>✏️ 直して入れる</b>スレッドに直した文を書く。その文で入る</div>
+    </div>
+    <p class="fact">何も押さなければ保留になり、次の巡回でもう一度見ます。「1,3 OK / 2 NG」のようなまとめ返信でも通じます。会議中に「これは取説に入れたい」と思ったら、議事録に <code>【取説】〇〇はできる</code> と1行書いておけば次の巡回で候補になります。</p>
+  </section>
+
+  <section>
+    <h2><span class="no">06</span>HAWK で実際につまずいたところ</h2>
+    <p class="lead">プロンプトには対策を入れてあります。運用中に変だと思ったらここを見てください。</p>
+    <div class="pits">
+      <div class="pit"><b>スライドを手で直すと消える</b><p>スライドは管理シートから毎回作り直すので、直接の修正は次の生成で消えます。直すのはシートかスクリプト。</p></div>
+      <div class="pit"><b>承認済の行を上書きすると履歴が消える</b><p>仕様変更は同じ ID で新しい行を足し、承認されたら古い行を「置換済」にします。</p></div>
+      <div class="pit"><b>追記が 1000 行目に飛ぶ</b><p>チェックボックス列があるとシートの追記 API が末尾を誤判定します。行番号を指定して書きます。</p></div>
+      <div class="pit"><b>伏せ字の漏れ</b><p>メールアドレスの一部、薄く表示されたヘッダーの名前、URL の中の ID、ブランドのロゴ、画面下端で見切れた行で漏れました。自動加工のあとに必ず目で見ます。</p></div>
+      <div class="pit"><b>非公開の画像がスライドに入らない</b><p>Slides API は共有されていない Drive 画像を読めません。pptx を経由して取り込みます。</p></div>
+      <div class="pit"><b>文字起こしの誤変換</b><p>「フォーク／ホーク／航空」が HAWK、「予見」が与件、「マジ」がマージン。表記揺れは最初に教えておきます。</p></div>
+      <div class="pit"><b>資料どうしで「できる／できない」が食い違う</b><p>HAWK では初回だけで5件以上。推測で書かずに「要確認」に起票し、開発に聞いて回答を返します。</p></div>
+      <div class="pit"><b>下書きと本番を取り違える</b><p>お客様に渡すのは本番の固定 URL だけ。下書きは版ごとに URL が変わる社内用です。</p></div>
+      <div class="pit"><b>毎日巡回だと版が増えすぎる</b><p>承認が1件以上あった日だけ新しい版を作り、候補がゼロの日は Slack に投稿しません。</p></div>
+      <div class="pit"><b>Google への書き込みがコネクタでできない</b><p>Drive コネクタは読み取り中心で、シートのセルやスライドに書けません。gog / gws を使います。</p></div>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2><span class="no">07</span>HAWK の実物</h2>
+    <p class="lead">形の参考に。閲覧権限が無い場合は片山に依頼してください。</p>
+    <div class="refs">
+      <div><span>管理シート</span><a href="https://docs.google.com/spreadsheets/d/1S47bjrubJTz7pkcdNxIRiGT77gAjnM4Z753wv1ACydw/edit">HAWK 機能取扱説明書マスター</a></div>
+      <div><span>本番（お客様用・固定）</span><a href="https://docs.google.com/presentation/d/1qvg3kR1HtS-hbxJW7tTT3-bykIJPP0gOPu5NvxFzrM0/view">HAWK 機能取扱説明書</a></div>
+      <div><span>最新の下書き</span><a href="https://docs.google.com/presentation/d/1FRKZclD3zVIFDprLCCVgpnp2RspQZfiVGrB89vuXPAA/edit">【下書き】v8（2026-10-16・81ページ）</a></div>
+      <div><span>手順書（スキル）</span><a href="https://github.com/yukikatayama3399/claude-configgggggg/blob/claude/wonderful-noether-a5izp6/.claude/skills/hawk-manual-update/SKILL.md">hawk-manual-update/SKILL.md</a></div>
+      <div><span>このキットの原本</span><a href="https://github.com/yukikatayama3399/claude-configgggggg/tree/claude/quirky-archimedes-nxyilb/manual_kit">manual_kit/（プロンプトの正本）</a></div>
+    </div>
+  </section>
+
+  <footer>プロンプトの正本は GitHub の manual_kit/prompts/ にあります。HAWK 側の運用が変わったら、そちらを直してこのページを作り直します。</footer>
+</div>
+
+<script>
+(() => {
+  const FIELDS = [
+    ["基本", [
+      ["PRODUCT", "プロダクト名", "例: アルパカ"],
+      ["product", "英字の短い名前（フォルダ・スキル名）", "例: alpaca"],
+      ["READERS", "取説の読者", "例: 導入済みのお客様向けの操作ガイド"],
+      ["OWNER", "承認者の名前", "例: 山田"],
+      ["OWNER_SLACK_ID", "承認者の Slack メンバーID", "例: U0XXXXXXXX"],
+      ["GOOGLE_ACCOUNT", "Google アカウント", "例: name@fout.jp"],
+      ["DRIVE_FOLDER", "作業フォルダ（Drive の URL）", "https://drive.google.com/drive/folders/…"],
+      ["REPO", "GitHub リポジトリ", "例: yourname/claude-config"],
+      ["BRANCH", "ブランチ", "例: claude/product-manual"],
+    ]],
+    ["人が渡す資料", [
+      ["SCREENSHOT_FOLDER", "画面キャプチャのフォルダ", "Drive の URL"],
+      ["VIDEO_FOLDER", "操作デモ動画のフォルダ", "Drive の URL"],
+      ["SAMPLE_REPORTS", "サンプルレポート（複数可）", "URL をカンマ区切り"],
+      ["SAMPLE_REPORT_PUBLIC", "お客様に見せてよい見本", "URL 1本"],
+      ["EXISTING_DOCS", "既存資料", "概要資料・セットアップガイド・FAQ など"],
+      ["CANONICAL_DOCS", "正本として優先する資料", "例: FAQ マスター、セットアップガイド"],
+      ["BRAND", "ブランド（色・ロゴ）", "例: メイン #2a6df4、ロゴは作業フォルダの logo.png"],
+    ]],
+    ["探しに行く場所", [
+      ["WATCH_CHANNELS", "全件読む Slack チャンネル", "例: #alpaca-product, #alpaca-社内利用"],
+      ["APPROVAL_CHANNEL", "承認依頼を投稿するチャンネル", "例: #alpaca-manual-承認（非公開）"],
+      ["KEYWORDS", "検索キーワード", "例: 「アルパカ」「ALPACA」"],
+      ["NAME_VARIANTS", "文字起こしの表記揺れ", "例: あるぱか／アルパガ = アルパカ"],
+      ["PUBLIC_PAGES", "公開ページ", "製品サイト・公開ヘルプの URL"],
+      ["LOOKBACK", "最初に遡る期間", "例: 6か月"],
+    ]],
+    ["方針", [
+      ["OUT_OF_SCOPE", "取説に入れないもの", "例: 料金・契約・セキュリティ・他社比較"],
+      ["SCHEDULE", "巡回の頻度", "例: 平日毎朝 8:52 JST"],
+      ["ASK_WHO", "仕様を聞く相手", "例: 開発=〇〇さん、仕様=〇〇さん"],
+    ]],
+  ];
+  const KEY = "manual-kit-fill-v1";
+  const SLOT = "（ここに「設定」ブロックを貼る）";
+  let vals = {};
+  try { vals = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { vals = {}; }
+
+  const pres = {};
+  document.querySelectorAll(".prompt").forEach(p => { pres[p.dataset.key] = { el: p, src: p.querySelector("pre").textContent }; });
+
+  const fieldsEl = document.getElementById("fields");
+  FIELDS.forEach(([group, items]) => {
+    const fs = document.createElement("fieldset");
+    const lg = document.createElement("legend"); lg.textContent = group; fs.appendChild(lg);
+    items.forEach(([k, label, ph]) => {
+      const lb = document.createElement("label"); lb.htmlFor = "f-" + k;
+      lb.innerHTML = `<span>${label} <span class="v">{{${k}}}</span></span>`;
+      const inp = document.createElement("input"); inp.id = "f-" + k; inp.name = k; inp.placeholder = ph; inp.value = vals[k] || "";
+      inp.addEventListener("input", () => { vals[k] = inp.value; save(); renderAll(); });
+      lb.appendChild(inp); fs.appendChild(lb);
+    });
+    fieldsEl.appendChild(fs);
+  });
+  const ALL = FIELDS.flatMap(([, items]) => items.map(i => i[0]));
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(vals)); } catch (e) {} }
+  function settingsBlock() { return pres["00"].src.replace(/^# 設定[^\n]*\n/, "# 設定\n"); }
+  function fill(text) { return text.replace(/\{\{(\w+)\}\}/g, (m, k) => (vals[k] || "").trim() || m); }
+  function fullText(key) {
+    let t = pres[key].src;
+    if ((key === "01" || key === "02") && document.getElementById("embed").checked) t = t.replace(SLOT, settingsBlock().trim());
+    return fill(t);
+  }
+  function render(key) {
+    const pre = pres[key].el.querySelector("pre");
+    let t = pres[key].src;
+    if ((key === "01" || key === "02") && document.getElementById("embed").checked) t = t.replace(SLOT, settingsBlock().trim());
+    pre.textContent = "";
+    let last = 0;
+    t.replace(/\{\{(\w+)\}\}/g, (m, k, idx) => {
+      pre.appendChild(document.createTextNode(t.slice(last, idx)));
+      const v = (vals[k] || "").trim();
+      const s = document.createElement(v ? "span" : "mark");
+      if (v) s.className = "filled";
+      s.textContent = v || m;
+      pre.appendChild(s);
+      last = idx + m.length;
+      return m;
+    });
+    pre.appendChild(document.createTextNode(t.slice(last)));
+  }
+  function renderAll() {
+    Object.keys(pres).forEach(render);
+    const left = ALL.filter(k => !(vals[k] || "").trim()).length;
+    document.getElementById("count").textContent = left ? `未記入 ${left} / ${ALL.length}` : "すべて記入済み";
+  }
+  document.getElementById("embed").addEventListener("change", renderAll);
+  document.getElementById("reset").addEventListener("click", () => {
+    vals = {}; save(); document.querySelectorAll("#fields input").forEach(i => { i.value = ""; }); renderAll();
+  });
+  document.querySelectorAll(".prompt").forEach(p => {
+    p.querySelector('[data-act="open"]').addEventListener("click", e => {
+      const on = p.classList.toggle("open"); e.target.textContent = on ? "たたむ" : "全部表示";
+    });
+    p.querySelector('[data-act="copy"]').addEventListener("click", e => {
+      const btn = e.target, text = fullText(p.dataset.key);
+      const done = () => { btn.textContent = "コピーしました"; setTimeout(() => { btn.textContent = "コピー"; }, 1600); };
+      const fallback = () => {
+        const r = document.createRange(); r.selectNodeContents(p.querySelector("pre"));
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+        btn.textContent = "選択しました。⌘C でコピー";
+      };
+      try { navigator.clipboard.writeText(text).then(done, fallback); } catch (err) { fallback(); }
+    });
+  });
+  renderAll();
+})();
+</script>

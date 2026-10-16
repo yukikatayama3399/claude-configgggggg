@@ -1,0 +1,34 @@
+# 設定（このブロックを①②の先頭に貼る。{{ }} を自分のプロダクト用に書き換える）
+
+- プロダクト名: {{PRODUCT}}
+- 英字の短い名前（フォルダ・スキル名に使う）: {{product}}
+- 取説の読者: {{READERS}}
+  （例: 導入済みのお客様向けの操作ガイド／社内の営業・CS向けの機能早見表）
+- 承認者: {{OWNER}}（Slack メンバーID: {{OWNER_SLACK_ID}}）
+- Google アカウント: {{GOOGLE_ACCOUNT}}
+- 作業フォルダ（Drive）: {{DRIVE_FOLDER}}
+- GitHub リポジトリ / ブランチ: {{REPO}} / {{BRANCH}}
+
+【人が用意して渡す資料】
+- 画面キャプチャのフォルダ: {{SCREENSHOT_FOLDER}}
+- 操作デモ動画のフォルダ: {{VIDEO_FOLDER}}
+- サンプルレポート（複数可）: {{SAMPLE_REPORTS}}
+- お客様に見せてよいレポート見本（1本）: {{SAMPLE_REPORT_PUBLIC}}
+- 既存資料（概要資料・セットアップガイド・FAQ・仕様まとめ・リリースノート・台本など）: {{EXISTING_DOCS}}
+- 上のうち「正本」として優先する資料: {{CANONICAL_DOCS}}
+- ブランド（色・ロゴ画像）: {{BRAND}}
+
+【Claude が探しに行く場所】
+- 全件読む Slack チャンネル: {{WATCH_CHANNELS}}
+- 承認依頼を投稿する Slack チャンネル: {{APPROVAL_CHANNEL}}
+- 検索キーワード: {{KEYWORDS}}
+- 文字起こしで出がちな表記揺れ: {{NAME_VARIANTS}}
+  （例: HAWK では「フォーク／ホーク／航空」= HAWK、「予見」= 与件、「マジ」= マージン）
+- 公開ページ（製品サイト・公開ヘルプ）: {{PUBLIC_PAGES}}
+- 最初に遡る期間: {{LOOKBACK}}（例: 6か月）
+
+【方針】
+- 取説に入れないもの: {{OUT_OF_SCOPE}}
+  （HAWK では サービス概要・導入メリット・工数削減・他社比較・料金/契約・セキュリティ を対象外にした）
+- 巡回の頻度: {{SCHEDULE}}（例: 平日毎朝 8:52 JST／毎週月曜 8:52 JST）
+- 仕様を聞く相手: {{ASK_WHO}}（例: 開発=〇〇さん、仕様=〇〇さん）

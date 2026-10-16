@@ -1,0 +1,631 @@
+<title>取扱説明書 横展開キット</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<style>
+/* Layout: one reading column; the prompt section widens into a fill-in panel + prompt stack on desktop */
+:root {
+  --paper: #f6f8f6; --surface: #ffffff; --ink: #17201c; --sub: #56645d; --line: #dbe2de;
+  --accent: #1d6b57; --accent-ink: #ffffff; --accent-soft: #e2efe9; --mark: #fff0b8; --mark-ink: #5a4500;
+  --ok: #1d6b57; --ng: #a23b2c; --edit: #8a5a00;
+  --f-display: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --f-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --f-mono: "IBM Plex Mono", "Noto Sans JP", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #111614; --surface: #171e1b; --ink: #e4ebe7; --sub: #9babA3; --line: #2b3531;
+  --accent: #5cc3a4; --accent-ink: #0d1411; --accent-soft: #1b2c26; --mark: #4a3d0e; --mark-ink: #ffe69a;
+  --ok: #5cc3a4; --ng: #f08a78; --edit: #e8b75a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --paper: #111614; --surface: #171e1b; --ink: #e4ebe7; --sub: #9babA3; --line: #2b3531;
+  --accent: #5cc3a4; --accent-ink: #0d1411; --accent-soft: #1b2c26; --mark: #4a3d0e; --mark-ink: #ffe69a;
+  --ok: #5cc3a4; --ng: #f08a78; --edit: #e8b75a; color-scheme: dark }
+
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.75;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-block: 40px 80px; display: grid; gap: 56px; }
+.col { max-width: 760px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.35; margin: 0; }
+h1 { font-size: clamp(28px, 5vw, 40px); font-weight: 900; letter-spacing: .01em; }
+h2 { font-size: 22px; font-weight: 900; display: flex; gap: 12px; align-items: baseline; }
+h2 .no { font-family: var(--f-mono); font-size: 13px; color: var(--accent); font-weight: 500; letter-spacing: .08em; }
+h3 { font-size: 16px; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--accent); text-underline-offset: 3px; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--sub); font-weight: 500; }
+.lead { font-size: 16px; color: var(--sub); max-width: 62ch; }
+section { display: grid; gap: 18px; min-width: 0; }
+.stack { display: grid; gap: 12px; }
+
+/* header */
+header { display: grid; gap: 14px; border-bottom: 1px solid var(--line); padding-bottom: 28px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--sub); }
+.meta b { color: var(--ink); font-weight: 500; }
+
+/* three jobs */
+.jobs { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.job { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; align-content: start; }
+.job .k { font-family: var(--f-mono); font-size: 12px; color: var(--accent); letter-spacing: .06em; }
+.job p { font-size: 14px; color: var(--sub); }
+.fact { font-size: 13px; color: var(--sub); border-left: 3px solid var(--accent); padding-left: 12px; }
+
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; overflow-x: auto; }
+
+/* steps */
+ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: s; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 44px 1fr; gap: 4px 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+ol.steps li:last-child { border-bottom: 1px solid var(--line); }
+ol.steps li::before { content: counter(s); grid-row: span 2; font-family: var(--f-display); font-weight: 900; font-size: 22px; color: var(--accent); line-height: 1.3; }
+ol.steps .who { font-size: 12px; color: var(--sub); }
+ol.steps .what { font-weight: 500; }
+ol.steps .what code { font-size: 13px; }
+code { font-family: var(--f-mono); font-size: .92em; background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; }
+
+/* tables */
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 640px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+tr:last-child td { border-bottom: 0; }
+th { font-size: 12px; color: var(--sub); font-weight: 500; letter-spacing: .04em; background: var(--accent-soft); }
+td:first-child { font-weight: 700; white-space: nowrap; }
+td small { color: var(--sub); display: block; }
+.tag { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--sub); margin-right: 4px; white-space: nowrap; }
+
+ul.check { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+ul.check li { padding-left: 26px; position: relative; font-size: 14px; }
+ul.check li::before { content: ""; position: absolute; left: 2px; top: 6px; width: 13px; height: 13px; border: 1.5px solid var(--accent); border-radius: 3px; }
+
+/* prompt workbench */
+.bench { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 860px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+.fill { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
+@media (max-width: 860px) { .fill { position: static; max-height: none; } }
+.fill .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.fill .count { font-size: 12px; color: var(--sub); font-variant-numeric: tabular-nums; }
+.fill fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fill legend { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .06em; padding: 0; margin-bottom: 6px; }
+.fill label { display: grid; gap: 3px; font-size: 12px; color: var(--sub); }
+.fill label span.v { font-family: var(--f-mono); font-size: 11px; }
+.fill input { font: inherit; font-size: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; box-sizing: border-box; }
+.fill input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fill input::placeholder { color: var(--sub); opacity: .7; }
+.btn { font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; border-radius: 6px; padding: 6px 12px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); white-space: nowrap; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.opt { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--sub); }
+
+.prompts { display: grid; gap: 22px; min-width: 0; }
+.prompt { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.prompt .bar { display: flex; flex-wrap: wrap; gap: 8px 12px; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.prompt .bar .t { display: grid; gap: 2px; }
+.prompt .bar .t b { font-family: var(--f-display); font-size: 16px; }
+.prompt .bar .t small { font-size: 12px; color: var(--sub); }
+.prompt .acts { display: flex; gap: 8px; }
+.prompt pre { margin: 0; padding: 14px 16px; font-family: var(--f-mono); font-size: 12.5px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; max-height: 460px; overflow: auto; }
+.prompt.open pre { max-height: none; }
+.prompt pre mark { background: var(--mark); color: var(--mark-ink); border-radius: 3px; padding: 0 2px; }
+.prompt pre .filled { background: var(--accent-soft); border-radius: 3px; padding: 0 2px; }
+
+/* slack mock */
+.chat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; font-size: 14px; max-width: 680px; }
+.msg { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 10px; }
+.av { width: 34px; height: 34px; border-radius: 8px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.msg .who { font-weight: 700; font-size: 13px; }
+.msg .who span { font-weight: 400; color: var(--sub); font-size: 12px; margin-left: 6px; }
+.thread { margin-left: 44px; border-left: 2px solid var(--line); padding-left: 14px; display: grid; gap: 12px; }
+.reply { display: grid; gap: 4px; }
+.reply .body { white-space: pre-wrap; }
+.rx { display: flex; gap: 6px; flex-wrap: wrap; }
+.rx span { font-size: 12px; border: 1px solid var(--line); border-radius: 99px; padding: 0 8px; }
+.rx .on { border-color: var(--accent); background: var(--accent-soft); }
+.legend3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.legend3 div { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13px; background: var(--surface); }
+.legend3 b { display: block; font-size: 14px; }
+.legend3 .ok b { color: var(--ok); } .legend3 .ng b { color: var(--ng); } .legend3 .ed b { color: var(--edit); }
+
+/* pitfalls */
+.pits { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 28px; }
+.pit { padding: 12px 0; border-top: 1px solid var(--line); display: grid; gap: 2px; }
+.pit b { font-size: 14px; }
+.pit p { font-size: 13px; color: var(--sub); }
+
+.refs { display: grid; gap: 8px; font-size: 14px; }
+.refs div { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.refs span { color: var(--sub); min-width: 9em; }
+footer { font-size: 12px; color: var(--sub); border-top: 1px solid var(--line); padding-top: 16px; }
+
+@media (prefers-reduced-motion: no-preference) { .btn { transition: background .15s, color .15s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">HAWK 方式・ほかのプロダクトに展開するためのプロンプト集</div>
+    <h1>機能取扱説明書 横展開キット</h1>
+    <p class="lead">HAWK で作った「機能取扱説明書」と同じものを、自分のプロダクトでも作るためのプロンプト集です。資料をフォルダに置いて、プロンプトを Claude Code に貼れば、管理シートと取説スライドができます。そのあとは定期巡回で新機能や FAQ の候補が Slack に届き、承認した分だけ取説に入ります。</p>
+    <div class="meta"><span>元になった仕組み <b>HAWK 機能取扱説明書</b></span><span>作成 <b>片山</b></span><span>更新 <b>2026-10-16</b></span></div>
+  </header>
+
+  <section class="col">
+    <h2><span class="no">01</span>やりたいこと</h2>
+    <div class="jobs">
+      <div class="job"><span class="k">作る</span><h3>資料を全部読ませて、取説を一発で作る</h3><p>スクショ・操作動画・サンプルレポート・既存資料と、Slack・メール・会議メモをまとめて読み、管理シートと取説スライドを作ります。</p></div>
+      <div class="job"><span class="k">回す</span><h3>管理シートを常に最新に保つ</h3><p>毎日または毎週、Slack・メール・会議メモ・Drive を巡回し、新機能・仕様変更・新しい質問を拾ってシートに候補として足します。</p></div>
+      <div class="job"><span class="k">承認する</span><h3>入れるかどうかは Slack で決める</h3><p>候補ごとに Slack に通知が来ます。✅ 入れる／❌ 入れない／✏️ 直して入れる、を押すだけ。承認した分だけ取説が更新されます。</p></div>
+    </div>
+    <p class="fact">HAWK の実績：2026-10-09 に初版を作り、同じ日に確定版をお客様向けの固定 URL で公開。2026-10-16 時点で機能113行・画面のスクショ付き 81 ページ。月・木の巡回で承認依頼が届き、承認分は自動で下書きに入っています。</p>
+    <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  A["人が渡す資料<br/>スクショ・操作動画<br/>サンプルレポート・既存資料"] --> M[("管理シート<br/>（これが正）")]
+  B["Claude が取りに行く資料<br/>Slack・Gmail<br/>会議メモ・Drive"] --> M
+  M --> D["下書きスライド<br/>v1, v2 …（社内用）"]
+  D -- "承認者の指示があるときだけ" --> P["本番スライド<br/>固定 URL（お客様用）"]
+  R["定期巡回<br/>毎日 or 毎週"] --> C["候補<br/>承認＝下書き"]
+  C --> S["Slack 承認依頼<br/>✅ ❌ ✏️"]
+  S -- "次の巡回で反映" --> M
+</pre>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2><span class="no">02</span>進め方</h2>
+    <ol class="steps">
+      <li><span class="who">人・1〜2時間（大半はスクショ撮影）</span><span class="what">資料を集めて Drive のフォルダに置き、下の「設定」の空欄を埋める</span></li>
+      <li><span class="who">Claude・1セッション（放置で OK）</span><span class="what">プロンプト①「初回構築」を貼る → 管理シートと下書き v1 ができる</span></li>
+      <li><span class="who">人・30分〜</span><span class="what">シートを見て直し、<code>全件承認して、下書きを作り直して</code> と頼む。「要確認」の質問は開発に聞いて回答を返す</span></li>
+      <li><span class="who">人の一言</span><span class="what"><code>マニュアル本番に反映して</code> → お客様用の固定 URL ができる。以後 URL は変わらず中身だけ更新される</span></li>
+      <li><span class="who">Claude・15分</span><span class="what">プロンプト②「巡回と承認フロー」を貼る → 定期巡回が登録され、1回目が動く</span></li>
+      <li><span class="who">人・普段</span><span class="what">Slack の承認依頼に ✅ ❌ ✏️ を押すだけ。急ぐときやスクショ追加は ③ の一言で頼む</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2><span class="no">03</span>準備するもの</h2>
+    <h3>人が用意して渡す資料（インプット）</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>資料</th><th>量の目安</th><th>何に使われるか</th><th>撮り方・選び方</th></tr></thead>
+      <tbody>
+        <tr><td>画面キャプチャ</td><td>全メニュー × 主要画面<br/><small>HAWK は約35画面＋媒体別20枚</small></td><td>サイトマップと「1画面1ページ」の左側の画像</td><td>一覧・詳細・モーダル・設定画面まで撮る。媒体などで画面が変わるならそれぞれ撮る。ファイル名は何でもよい（Claude が中身を見て改名）。実データが映っていても自動で伏せ字にするが、できればデモ用の環境で撮る。</td></tr>
+        <tr><td>操作デモ動画</td><td>工程ごとに 2〜7分 × 3本前後</td><td>操作の順番、画面遷移、ボタン名 → 逆引き（やりたいこと → 手順）</td><td>例：入稿編・運用編・レポート編。ナレーションありだと精度が上がる。文字起こしや台本があれば同じフォルダへ。</td></tr>
+        <tr><td>サンプルレポート</td><td>3〜5本</td><td>レポート章、指標の意味、出力条件の FAQ</td><td>種類違い（媒体別・期間別など）を混ぜる。お客様に見せてよい伏せ字済みの見本を1本決めておく（取説からリンクされる）。</td></tr>
+        <tr><td>既存資料</td><td>あるだけ全部</td><td>機能一覧・FAQ の下地</td><td>概要資料、セットアップガイド、オンボーディング資料、FAQ、仕様まとめシート、リリースノート、ウェビナー台本など。どれが「正本」かを指定する。</td></tr>
+        <tr><td>ブランド素材</td><td>ロゴ1つ＋色</td><td>スライドの見た目</td><td>メインカラーのコードと、ロゴ画像を作業フォルダに置く。</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Claude が取りに行く資料（読み取りだけ）</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>場所</th><th>何を読むか</th><th>拾うもの</th></tr></thead>
+      <tbody>
+        <tr><td>Slack（主）</td><td>プロダクト用チャンネル（product・社内利用・営業相談など）の全投稿とスレッド</td><td>リリース告知、「できる／できない」の回答、不具合と回避策</td></tr>
+        <tr><td>Slack（全体）</td><td>ワークスペース全体をキーワード検索（DM は除く）</td><td>ほかのチャンネルで出た仕様の回答、お客様からの質問</td></tr>
+        <tr><td>Gmail</td><td>キーワード検索</td><td>リリースノート、お客様からの操作の質問</td></tr>
+        <tr><td>会議メモ</td><td>Gemini の自動議事録・議事録 Doc（本文にプロダクト名が出るもの）</td><td>オンボーディング・商談・社内会議の Q&amp;A。行頭が <code>【取説】</code> の行は必ず拾う</td></tr>
+        <tr><td>Drive</td><td>名前にプロダクト名を含む仕様書・リリースノート</td><td>仕様の詳細、提供開始日</td></tr>
+        <tr><td>公開ページ</td><td>製品サイト、公開ヘルプ</td><td>お客様向けの言い回し</td></tr>
+      </tbody>
+    </table></div>
+    <h3>環境（最初に1回）</h3>
+    <ul class="check col">
+      <li>Claude Code on the web（claude.ai/code）で作業する。スキルとスクリプトの置き場に GitHub リポジトリを1つ用意する。</li>
+      <li>claude.ai のコネクタで Slack・Gmail・Google Drive をつなぐ（読み取りと、Slack の承認依頼の投稿に使う）。</li>
+      <li>Google のシートのセルやスライドへの書き込みはコネクタではできないので、gog / gws（Google Workspace のコマンドラインツール）を使う。セットアップは片山のリポジトリ claude-configgggggg の手順を流用できる。認証は自分の Mac 1台だけで取り、出てきた値をクラウド環境の環境変数に入れる（端末ごとに認証しない）。</li>
+      <li>承認依頼用の非公開チャンネルを作る。Slack コネクタはつないだ本人の名前で投稿するので、承認者がつないだ本人だとメンション通知が鳴らないことがある。チャンネルの通知を「すべての新規メッセージ」にしておく。</li>
+      <li>承認者の Slack メンバーID を調べる（プロフィール → ︙ → メンバー ID をコピー）。</li>
+    </ul>
+  </section>
+
+  <section id="prompts">
+    <h2><span class="no">04</span>プロンプト</h2>
+    <p class="lead">左の空欄を埋めると、右のプロンプトに反映されます（入力はこのブラウザにだけ保存されます）。空欄のままの項目は <mark style="background:var(--mark);color:var(--mark-ink);border-radius:3px;padding:0 3px">{{黄色}}</mark> で残るので、貼る前に確認してください。</p>
+    <div class="bench">
+      <form class="fill" id="fill" autocomplete="off">
+        <div class="head"><h3>設定を埋める</h3><span class="count" id="count"></span></div>
+        <div id="fields" class="stack"></div>
+        <label class="opt"><input type="checkbox" id="embed" checked style="width:auto"> ①②の先頭に設定を差し込んでコピーする</label>
+        <button type="button" class="btn ghost" id="reset">入力を消す</button>
+      </form>
+      <div class="prompts">
+        <div class="prompt" data-key="00"><div class="bar"><div class="t"><b>設定ブロック</b><small>①②に差し込まれる。単体でコピーも可</small></div><div class="acts"><button type="button" class="btn ghost" data-act="open">全部表示</button><button type="button" class="btn" data-act="copy">コピー</button></div></div><pre># 設定（このブロックを①②の先頭に貼る。{{ }} を自分のプロダクト用に書き換える）
+
+- プロダクト名: {{PRODUCT}}
+- 英字の短い名前（フォルダ・スキル名に使う）: {{product}}
+- 取説の読者: {{READERS}}
+  （例: 導入済みのお客様向けの操作ガイド／社内の営業・CS向けの機能早見表）
+- 承認者: {{OWNER}}（Slack メンバーID: {{OWNER_SLACK_ID}}）
+- Google アカウント: {{GOOGLE_ACCOUNT}}
+- 作業フォルダ（Drive）: {{DRIVE_FOLDER}}
+- GitHub リポジトリ / ブランチ: {{REPO}} / {{BRANCH}}
+
+【人が用意して渡す資料】
+- 画面キャプチャのフォルダ: {{SCREENSHOT_FOLDER}}
+- 操作デモ動画のフォルダ: {{VIDEO_FOLDER}}
+- サンプルレポート（複数可）: {{SAMPLE_REPORTS}}
+- お客様に見せてよいレポート見本（1本）: {{SAMPLE_REPORT_PUBLIC}}
+- 既存資料（概要資料・セットアップガイド・FAQ・仕様まとめ・リリースノート・台本など）: {{EXISTING_DOCS}}
+- 上のうち「正本」として優先する資料: {{CANONICAL_DOCS}}
+- ブランド（色・ロゴ画像）: {{BRAND}}
+
+【Claude が探しに行く場所】
+- 全件読む Slack チャンネル: {{WATCH_CHANNELS}}
+- 承認依頼を投稿する Slack チャンネル: {{APPROVAL_CHANNEL}}
+- 検索キーワード: {{KEYWORDS}}
+- 文字起こしで出がちな表記揺れ: {{NAME_VARIANTS}}
+  （例: HAWK では「フォーク／ホーク／航空」= HAWK、「予見」= 与件、「マジ」= マージン）
+- 公開ページ（製品サイト・公開ヘルプ）: {{PUBLIC_PAGES}}
+- 最初に遡る期間: {{LOOKBACK}}（例: 6か月）
+
+【方針】
+- 取説に入れないもの: {{OUT_OF_SCOPE}}
+  （HAWK では サービス概要・導入メリット・工数削減・他社比較・料金/契約・セキュリティ を対象外にした）
+- 巡回の頻度: {{SCHEDULE}}（例: 平日毎朝 8:52 JST／毎週月曜 8:52 JST）
+- 仕様を聞く相手: {{ASK_WHO}}（例: 開発=〇〇さん、仕様=〇〇さん）</pre></div>
+        <div class="prompt" data-key="01"><div class="bar"><div class="t"><b>① 初回構築</b><small>資料を全部読んで、管理シートと下書きスライド v1 を作る</small></div><div class="acts"><button type="button" class="btn ghost" data-act="open">全部表示</button><button type="button" class="btn" data-act="copy">コピー</button></div></div><pre>{{PRODUCT}} の「機能取扱説明書」を、資料を全部読み込んで一から作ってください。
+フリークアウトの HAWK で作った取説と同じ方式です（下の「参考実装」）。
+長い作業なので、最初に計画を5行程度で示したら、確認を待たずに最後まで進めてください。
+判断に迷ったものは推測で埋めず「要確認」タブに起票して先に進んでください。
+
+（ここに「設定」ブロックを貼る）
+
+# ゴール
+1. Google スプレッドシート「{{PRODUCT}} 機能取扱説明書マスター」を作業フォルダに作り、資料から全部埋める。これを「正」とする。
+2. マスターから Google スライド「【下書き】{{PRODUCT}} 機能取扱説明書 v1（日付）」をスクリプトで自動生成する（手で作らない）。
+3. 1〜2 をいつでも再実行できるよう、スクリプトと手順書（スキル）をリポジトリに保存する。
+
+# 読む資料
+
+## A. 渡す資料（全部読む。読んだものはすべて「ソース一覧」タブに登録する）
+- 画面キャプチャ（{{SCREENSHOT_FOLDER}}）
+  - 1枚ずつ中身を見て、どのメニューのどの画面かを判定し、画面ID を振る。作業フォルダ内に「スクショ_加工済み」フォルダを作り、「S-01_ログイン.png」のような名前でコピーを置く（元ファイルは触らない）。
+  - メールアドレス・人名・アカウント名・ワークスペース名・広告アカウントID・クライアント名やブランド名を OCR で見つけ、サンプル表記（sample@example.com、サンプル広告株式会社 など）に置き換えた加工版を作る。画面ごとに追加ルールを足せるよう、ルールは JSON にしてリポジトリに置く。
+  - 加工後は必ず1枚ずつ自分の目で見直す。残っていたらルールを足して作り直す。
+  - 暗い余白・モーダルの背景・ブラウザ枠は切り落とす。
+- 操作デモ動画（{{VIDEO_FOLDER}}）
+  - ダウンロードし、ffmpeg で画面が切り替わったところのコマを切り出して読む。操作の順番・画面遷移・ボタン名・入力例を拾う。
+  - 同じフォルダに文字起こしや台本があれば一緒に読む。Meet の録画なら同名の文字起こし Doc を探す。
+  - 動画のコマはスクショの代わりに使わない（画質が粗く、実データが映る）。スクショが無い画面は「要確認」に「この画面のスクショが欲しい」と起票する。
+- サンプルレポート（{{SAMPLE_REPORTS}}）
+  - 全部読み、レポートの種類・ページ構成・各指標の意味・出力条件を、機能一覧のレポート章と FAQ に落とす。
+  - お客様に見せてよい見本は {{SAMPLE_REPORT_PUBLIC}}。取説のレポート画面のページからリンクする。
+- 既存資料（{{EXISTING_DOCS}}）
+  - {{CANONICAL_DOCS}} は正本として他より優先する。古い記述（後のリリースで変わったもの）は新しい出典で上書きし、メモに「旧: …」と残す。
+
+## B. 自分で探しに行く資料（読み取りだけ。投稿・送信・編集はしない）
+- Slack: {{WATCH_CHANNELS}} の過去 {{LOOKBACK}} 分を、スレッド返信まで全部読む。さらにワークスペース全体を {{KEYWORDS}} で検索し、他のチャンネルで出た仕様の回答・リリース告知・お客様からの質問も拾う。DM は読まない。
+- Gmail: {{KEYWORDS}} で検索。リリースノート、仕様の回答、お客様からの操作の質問を拾う。
+- 会議メモ: Drive の自動議事録（「Gemini によるメモ」など）と議事録 Doc を、本文の全文検索（fullText contains）で {{KEYWORDS}} を含むものから集める（日本語は title contains が効かないので fullText を使う）。オンボーディング・商談・社内の仕様会議の Q&amp;A は FAQ の材料になる。文字起こしの誤変換は {{NAME_VARIANTS}} を手がかりに補って読む。
+- Drive: 名前に {{PRODUCT}} を含む仕様書・リリースノート・スライド。
+- 公開ページ: {{PUBLIC_PAGES}}
+- リンク先の Docs / Slides / Sheets に仕様が書かれていれば、それも開いて読む。
+
+# マスターシートの構成（このとおりに作る）
+
+タブと列:
+- README … 運用ルール（自由記述）。冒頭に「最新の下書きURL」と「本番の固定URL」を置き、スライドを作るたびに自動で書き換える。
+- 機能一覧 … 機能ID / カテゴリ / 画面ID / 機能名 / できること / 設定項目・選択肢 / 何のため（目的） / 対応範囲 / 制約・注意 / 提供状態 / 承認 / 簡易版 / ソース / 初出日 / 最終更新日 / 承認日 / メモ
+- サイトマップ … 画面ID / 階層1 / 階層2 / 階層3 / 画面名 / URLパス / 遷移元 / 遷移先 / この画面でやること / 関連機能ID / スクショ / 承認 / ソース
+- 逆引き … UCID / カテゴリ / やりたいこと / 手順（概要） / 使う機能ID / 承認 / 簡易版 / ソース / メモ
+- FAQ … FAQID / カテゴリ / 質問 / 回答 / 提供状態 / 関連機能ID / 承認 / 簡易版 / 出典 / 最終確認日 / 要確認 / メモ
+- 更新履歴 … 検知日 / リリース日 / 種別（追加・変更・提供終了・不具合） / 対象ID / 内容 / 提供状態 / ソース / 反映状況 / 承認日
+- 要確認 … QID / 対象ID / 確認したいこと / 誰に聞くか / 回答 / ステータス / 起票日
+- ソース一覧 … SID / 種別 / タイトル / URL / 日付 / 重要度 / メモ
+- 版管理 … 版 / 生成日時 / 種類（draft・prod・巡回・承認依頼） / スライドURL / PDF / 承認済行数 / メモ
+
+値の決まり:
+- 承認: 下書き（＝候補）/ 承認済 / 差戻し / 置換済 のプルダウン。
+- 提供状態: 提供中 / 開発中 / 予定 / 未対応 / 提供終了 / 不明 のプルダウン。
+- 簡易版: チェックボックス（よく使う基本機能だけ TRUE）。
+- ID: 機能ID は F-カテゴリ略号-連番（例 F-RPT-003）、画面ID は S-連番、逆引きは UC-連番、FAQ は Q-連番。一度振った ID は変えない・使い回さない（やめた機能は提供状態を「提供終了」にする）。
+- カテゴリと略号は、使う頻度の高い順に 8〜10 個決めて固定する。スライドの章もこの順に並ぶ。
+- 1行目は固定表示、列幅・折り返しを整えて人が読める見た目にする。
+- 初回に作った行は全部「承認=下書き」。{{OWNER}} がシートを見て直したあと「全件承認して」と言ったときだけ承認済にする。
+
+# 書き方のルール
+- 1行に1機能。「できること」は {{READERS}} が読んで分かる、です・ます調の1〜2文。社内用語・開発用語は使わない。
+- 「ソース」列には必ず出典を書く（Slack の permalink、Doc の URL、資料名とページ）。出典が無いことは書かない。
+- 資料同士で食い違ったら（例: 商談では「できない」、後の社内会議では「できる」）、新しい方を仮に書き、要確認タブに両方の出典つきで起票する。誰に聞くか（{{ASK_WHO}}）も書く。
+- お客様の社名・個人名・メールアドレスはシートに書かない。機能の可否だけを書く。
+- {{OUT_OF_SCOPE}} は取説に入れない。拾った場合は 承認=差戻し、メモ「取説対象外」。
+- シートへの追記に values.append は使わない（チェックボックス列があると 1000 行目付近に書かれてしまう）。最終行を調べて行番号を指定して書く。TSV（1行目=列名）を読んで指定タブに追記するスクリプトを作って使う。
+- 書く前に既存の行を読み、同じ内容があれば足さない（何度流しても重複しないようにする）。
+
+# スライドの作り方
+- Google Slides API（gws の presentations batchUpdate）を叩く Python スクリプトで、マスターから毎回まるごと作り直す。スライドを手で直さない（直したい点はマスターかスクリプトを直す）。
+- 構成: 表紙（機能数・画面数・逆引き数・FAQ数）→ 目次と読み方 → 全体像（工程の流れと各工程の機能） → サイトマップ（画面構成と掲載ページ） → 最近の更新 → カテゴリごとの章（1画面1ページ: 左にスクショ、右にその画面の機能の表。【設定】【目的】【注意】） → 逆引き → FAQ。
+- 載せるのは 承認=承認済 の行だけ。下書き版は 開発中・予定 も載せてよい。本番版は 提供状態=提供中 だけ。
+- 下書きは版ごとに別ファイル（v1, v2, …）。作るたびに版管理タブに1行足し、README の最新 URL を書き換える。
+- 本番版は {{READERS}} に渡す固定 URL。URL を変えず中身だけ上書きし、作り直すたびに PDF を日付つきで保存して版管理に残す。今回は本番版を作らない（{{OWNER}} の指示があったときだけ作る）。
+- 非公開の Drive 画像は Slides API から直接読めないので、pptx を経由して取り込むなどの回避を入れる。
+- デザインは {{BRAND}}。文字が枠からあふれるときは自動で文字を小さくする。「…」で切らない。
+
+# 参考実装（読めるなら読む）
+GitHub の yukikatayama3399/claude-configgggggg、ブランチ claude/wonderful-noether-a5izp6 の hawk_manual/ と .claude/skills/hawk-manual-update/SKILL.md が HAWK の実装。
+読めるなら構成を真似て {{PRODUCT}} 用に作る（HAWK 固有の章の順番・色・伏せ字ルール・ID は置き換える）。読めなければこのプロンプトの仕様だけで作る。
+
+# リポジトリに保存するもの（{{REPO}} の {{BRANCH}} にコミットして push）
+- {{product}}_manual/config.json … シートID・作業フォルダID・スクショフォルダID・下書き/本番スライドID・監視チャンネル・承認チャンネル・キーワード
+- schema.py（タブ・列・カテゴリ） / load_tsv.py（追記） / build_slides.py（draft と prod） / sanitize.py ＋ sanitize_rules.json（伏せ字） / housekeep.py（承認日の記入、置換済の処理） / readme.py（README タブの URL 更新）
+- .claude/skills/{{product}}-manual-update/SKILL.md … 全体像、承認フロー、巡回の手順、本番反映の手順、禁止事項を書いた手順書
+
+# やってはいけないこと
+- 承認列を自分の判断で「承認済」にしない。
+- 本番スライドを作らない・作り直さない。
+- Slack・メールに書き込まない（この回の投稿はゼロ）。
+- マスターと自分で作ったファイル以外の Drive ファイルを編集しない（元資料は読むだけ）。
+
+# 最後に報告すること
+- マスターの URL、下書き v1 の URL とページ数
+- 各タブの行数
+- 要確認の件数と一覧（誰に聞くか付き）
+- 撮ってほしい画面のリスト（スクショが足りない画面）
+- 読めなかった資料とその理由</pre></div>
+        <div class="prompt" data-key="02"><div class="bar"><div class="t"><b>② 巡回と承認フロー</b><small>定期巡回の Routine と Slack 承認依頼を登録する</small></div><div class="acts"><button type="button" class="btn ghost" data-act="open">全部表示</button><button type="button" class="btn" data-act="copy">コピー</button></div></div><pre>{{PRODUCT}} 機能取扱説明書の自動更新ループを作ってください。
+前提: マスターシートとスキル（.claude/skills/{{product}}-manual-update/SKILL.md）は前回の作業でできています。まずそれと config.json を読んでください。
+
+（ここに「設定」ブロックを貼る）
+
+# やりたいこと
+{{SCHEDULE}} に自動で巡回し、毎回次の3つをやる。
+1. 前回の承認依頼への回答（✅ / ❌ / ✏️）を読んでマスターに反映する。1件でも承認済にしたら、下書きスライドを新しい版で作り直す。
+2. 前回の巡回以降の新着（Slack・メール・会議メモ・Drive）から、新機能・仕様変更・FAQ候補・逆引き候補・提供終了・不具合と回避策を拾い、マスターに「承認=下書き」（候補）で追記する。
+3. 候補が1件以上あれば、Slack {{APPROVAL_CHANNEL}} に {{OWNER}} 宛ての承認依頼を投稿する。候補ゼロなら何も投稿しない。
+
+# 拾う範囲（読み取りだけ）
+- 「前回」= 版管理タブの 種類=巡回 の最後の行の日時。無ければ7日前。
+- Slack: {{WATCH_CHANNELS}} の前回以降の全投稿とスレッド返信。加えてワークスペース全体を {{KEYWORDS}} で検索（DM は除く）。
+- Gmail: 「{{KEYWORDS}} after:&lt;前回の日付&gt;」で検索。リリースノート、仕様の回答、お客様からの操作の質問。
+- 会議メモ: 前回以降に更新された自動議事録（Gemini によるメモ）と議事録 Doc のうち、本文に {{PRODUCT}} が出るもの。
+  特に、行頭が「【取説】」の行は必ず候補にする。会議に出た人が議事録に「【取説】〇〇はできる」と1行書いておけば、次の巡回で確実に拾われる。
+  （全文検索の索引は追記直後に遅れることがあるので、直近に更新された議事録は本文を直接読んで確かめる）
+- Drive: 名前に {{PRODUCT}} を含む仕様書・リリースノートで、前回以降に更新されたもの。
+- 拾わないもの: 日程調整、会食、営業案件の進捗、{{OUT_OF_SCOPE}}。
+- 判断がつかないものは推測で書かず要確認タブへ（誰に聞くか: {{ASK_WHO}}）。
+- シートに既にある内容は足さない（毎回同じ候補を出さない）。
+- お客様の社名・個人名・メールアドレスはシートにも Slack にも書かない。
+
+# シートへの書き方
+- 新機能 → 機能一覧に新しい機能ID で行を追加。提供状態は告知の文言どおり（リリース済=提供中、開発中・予定はそのまま）。
+- 既存機能の仕様変更 → 承認済の行は書き換えない。同じ機能ID で新しい行を末尾に足し、メモに「旧: …」と差分を書く。承認されたら古い行を「置換済」にする。
+- 新しい質問と回答 → FAQ に追加。「こうしたい → この手順」が読み取れたら逆引きにも追加。画面が増えた・変わった → サイトマップに追加。
+- どの変更も更新履歴に1行（検知日=今日、リリース日=告知日、ソース=permalink、反映状況=下書き）。
+
+# 承認フロー（Slack）
+親メッセージを1件:
+「&lt;@{{OWNER_SLACK_ID}}&gt; 【{{PRODUCT}} 取説】取り込み候補が N 件あります。各候補に ✅（入れる）/ ❌（入れない）/ ✏️（直して入れる）を付けてください。次の巡回で ✅ の分だけ下書きに反映します。本番（お客様に渡しているURL）には反映しません。」
+
+候補ごとにスレッド返信を1件ずつ（番号つき）:
+「#2 【FAQ追加】Q. 〇〇はできますか？
+A. （回答案を1〜2文）
+入れ先: FAQ 新規 Q-071（関連 F-OPS-012）
+出典: &lt;permalink&gt;
+✅ 入れる ／ ❌ 入れない ／ ✏️ 直して入れる（このスレッドに直した文を書く）」
+
+種別ラベルは【新機能】【仕様変更】【FAQ追加】【逆引き追加】【提供終了】【不具合・回避策】のどれか。
+仕様変更は「旧: … → 新: …」を必ず並べて書く。
+
+回答の読み方（次の巡回の最初にやる）:
+- 候補ごとのスレッド返信に付いたリアクション（white_check_mark / x / pencil2）と、{{OWNER}} の返信を読む。「1,3 OK / 2 NG」のようなまとめ返信も受け付ける。
+- ✅ → 承認=承認済、承認日=今日、更新履歴の反映状況=承認済。
+- ❌ → 承認=差戻し、メモ「NG（日付）」。
+- ✏️ と修正文 → 修正文で行を直して承認済にし、その候補のスレッドに「直して反映しました」と1行返す。
+- 反応なし → 保留。次回もう一度見る。3回続けて反応が無ければ、親メッセージのスレッドに1回だけリマインドする。
+- 投稿したら版管理タブに [今日, 今の日時, 承認依頼, "", "", 候補数, "未処理 / ts=&lt;親のts&gt; / #1=ID, #2=ID…"] を記録する。処理したらメモを「処理済 / 承認 n件・NG m件・保留 k件」に書き換える（保留が残れば「未処理」のまま）。
+- 巡回のたびに版管理タブに [今日, 今の日時, 巡回, "", "", 候補数, "新着N件 / 承認反映M件 / 要確認K件"] を記録する。
+
+# Routine の登録
+create_trigger で Routine「{{PRODUCT}}マニュアル巡回」を作る。
+- スケジュール: {{SCHEDULE}}（cron は CRON_TZ=Asia/Tokyo で書く。ちょうど 0 分は避けて数分ずらす）
+- 毎回新しいセッションで動かす（create_new_session_on_fire=true）。環境はこのセッションと同じ。
+- コネクタ: Slack・Gmail・Google Drive
+- 毎回送るプロンプトは下の「巡回プロンプト」。同じ文をスキル（SKILL.md）と、マスターの README タブにも写す。
+
+巡回プロンプト:
+----------------------------------------
+{{PRODUCT}}マニュアル巡回の時間です。リポジトリ {{REPO}} で {{BRANCH}} を checkout してから、{{product}}-manual-update スキル（.claude/skills/{{product}}-manual-update/SKILL.md）の「巡回の手順」に沿って実行してください。
+1) まず {{APPROVAL_CHANNEL}} の前回の承認依頼スレッドを読み、✅ は承認済、❌ は差戻し、✏️ は修正文で直して承認済にしてください。1件でも承認済にしたら下書きスライドを新しい版で作り直してください。
+2) 前回巡回以降の新着を、Slack（{{WATCH_CHANNELS}} の全投稿と、ワークスペース全体の {{KEYWORDS}} 検索）、Gmail、会議メモ（Gemini 議事録と【取説】マーカー行）、Drive から読み取り専用で拾い、マスターシートに承認=下書き（候補）で追記してください。
+3) 候補があれば {{APPROVAL_CHANNEL}} に &lt;@{{OWNER_SLACK_ID}}&gt; 宛ての承認依頼を投稿してください（候補ごとにスレッド返信、✅/❌/✏️ で回答をもらう）。候補ゼロなら投稿しないでください。
+本番スライド（お客様に渡している固定URL）は作り直さないこと。承認列を自分の判断で承認済にしないこと。Slack への書き込みは承認依頼とその処理の返信だけ。メールや他の Drive ファイルには書き込まないこと。
+リポジトリ内のファイルが変わったら同じブランチにコミットして push してください。
+最後に、反映した承認・新しい下書き版の URL・新しく出した候補・要確認の件数を報告してください。何もなければ「新着なし」の1行だけ。
+----------------------------------------
+
+# 登録したらやること
+- いま1回、巡回を手で回して動作を確かめる（候補が出たら承認依頼の投稿まで行ってよい）。
+- Routine の ID を config.json と README タブに書き、コミットして push する。
+- 報告: Routine の名前・ID・次に動く日時・今回の巡回結果。</pre></div>
+        <div class="prompt" data-key="03"><div class="bar"><div class="t"><b>③ 日常の一言</b><small>運用が始まったあとに Claude へ頼む言い方</small></div><div class="acts"><button type="button" class="btn ghost" data-act="open">全部表示</button><button type="button" class="btn" data-act="copy">コピー</button></div></div><pre>承認分を下書きに反映して
+→ 承認依頼スレッドの ✅ / ❌ / ✏️ を今すぐ読み、承認分だけで下書きを新しい版にする（巡回を待たない）
+
+全件承認して、下書きを作り直して
+→ 初回構築のあと、シートを見て直し終えたときに使う
+
+マニュアル本番に反映して
+→ お客様に渡している固定URLのスライドを、承認済×提供中の行で作り直し、PDF を日付つきで保存する
+
+スクショを追加したので反映して
+→ スクショフォルダの新しい画像を画面判定・改名・伏せ字加工し、サイトマップに紐づけて下書きを作り直す
+
+この会議メモを取説に取り込んで &lt;議事録のURL&gt;
+→ その議事録だけを読んで候補を作り、承認依頼を出す
+
+要確認 Q-012 の回答: できる（〇〇さん確認）
+→ 要確認タブに回答を書き、該当の機能・FAQ の行を直して候補にする
+
+巡回を毎日に変えて ／ 巡回を止めて
+→ Routine のスケジュールを変える・止める</pre></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2><span class="no">05</span>Slack に届く承認依頼の見本</h2>
+    <div class="chat" aria-label="承認依頼の見本">
+      <div class="msg"><div class="av">C</div><div><div class="who">承認者（Claude が代理投稿）<span>8:53</span></div><div>@承認者 【アルパカ 取説】取り込み候補が 3 件あります。各候補に ✅（入れる）/ ❌（入れない）/ ✏️（直して入れる）を付けてください。次の巡回で ✅ の分だけ下書きに反映します。本番には反映しません。</div></div></div>
+      <div class="thread">
+        <div class="reply"><div class="body">#1 【新機能】F-RPT-012 レポートの CSV 出力
+レポート画面から表示中の期間の数値を CSV でダウンロードできます。
+入れ先: 機能一覧（新規）
+出典: #alpaca-product 10/15 のリリース告知</div><div class="rx"><span class="on">✅ 1</span></div></div>
+        <div class="reply"><div class="body">#2 【FAQ追加】Q. 配信中のキャンペーンに広告を追加できますか？
+A. 現在はできません。新しいキャンペーンとして作成してください。
+入れ先: FAQ 新規 Q-071（関連 F-OPS-017）
+出典: 10/14 オンボーディング議事録の【取説】行</div><div class="rx"><span class="on">✏️ 1</span></div></div>
+        <div class="reply"><div class="body">#3 【仕様変更】F-OPS-012 日予算の自動調整
+旧: 毎朝 3:00 頃に実行 → 新: 毎朝 8:00 に実行
+出典: #alpaca-product 10/16 のスレッド</div><div class="rx"><span class="on">❌ 1</span></div></div>
+      </div>
+    </div>
+    <div class="legend3">
+      <div class="ok"><b>✅ 入れる</b>承認済にして、次の巡回で下書きの新しい版に入る</div>
+      <div class="ng"><b>❌ 入れない</b>差戻しにする。同じ候補は二度と出ない</div>
+      <div class="ed"><b>✏️ 直して入れる</b>スレッドに直した文を書く。その文で入る</div>
+    </div>
+    <p class="fact">何も押さなければ保留になり、次の巡回でもう一度見ます。「1,3 OK / 2 NG」のようなまとめ返信でも通じます。会議中に「これは取説に入れたい」と思ったら、議事録に <code>【取説】〇〇はできる</code> と1行書いておけば次の巡回で候補になります。</p>
+  </section>
+
+  <section>
+    <h2><span class="no">06</span>HAWK で実際につまずいたところ</h2>
+    <p class="lead">プロンプトには対策を入れてあります。運用中に変だと思ったらここを見てください。</p>
+    <div class="pits">
+      <div class="pit"><b>スライドを手で直すと消える</b><p>スライドは管理シートから毎回作り直すので、直接の修正は次の生成で消えます。直すのはシートかスクリプト。</p></div>
+      <div class="pit"><b>承認済の行を上書きすると履歴が消える</b><p>仕様変更は同じ ID で新しい行を足し、承認されたら古い行を「置換済」にします。</p></div>
+      <div class="pit"><b>追記が 1000 行目に飛ぶ</b><p>チェックボックス列があるとシートの追記 API が末尾を誤判定します。行番号を指定して書きます。</p></div>
+      <div class="pit"><b>伏せ字の漏れ</b><p>メールアドレスの一部、薄く表示されたヘッダーの名前、URL の中の ID、ブランドのロゴ、画面下端で見切れた行で漏れました。自動加工のあとに必ず目で見ます。</p></div>
+      <div class="pit"><b>非公開の画像がスライドに入らない</b><p>Slides API は共有されていない Drive 画像を読めません。pptx を経由して取り込みます。</p></div>
+      <div class="pit"><b>文字起こしの誤変換</b><p>「フォーク／ホーク／航空」が HAWK、「予見」が与件、「マジ」がマージン。表記揺れは最初に教えておきます。</p></div>
+      <div class="pit"><b>資料どうしで「できる／できない」が食い違う</b><p>HAWK では初回だけで5件以上。推測で書かずに「要確認」に起票し、開発に聞いて回答を返します。</p></div>
+      <div class="pit"><b>下書きと本番を取り違える</b><p>お客様に渡すのは本番の固定 URL だけ。下書きは版ごとに URL が変わる社内用です。</p></div>
+      <div class="pit"><b>毎日巡回だと版が増えすぎる</b><p>承認が1件以上あった日だけ新しい版を作り、候補がゼロの日は Slack に投稿しません。</p></div>
+      <div class="pit"><b>Google への書き込みがコネクタでできない</b><p>Drive コネクタは読み取り中心で、シートのセルやスライドに書けません。gog / gws を使います。</p></div>
+    </div>
+  </section>
+
+  <section class="col">
+    <h2><span class="no">07</span>HAWK の実物</h2>
+    <p class="lead">形の参考に。閲覧権限が無い場合は片山に依頼してください。</p>
+    <div class="refs">
+      <div><span>管理シート</span><a href="https://docs.google.com/spreadsheets/d/1S47bjrubJTz7pkcdNxIRiGT77gAjnM4Z753wv1ACydw/edit">HAWK 機能取扱説明書マスター</a></div>
+      <div><span>本番（お客様用・固定）</span><a href="https://docs.google.com/presentation/d/1qvg3kR1HtS-hbxJW7tTT3-bykIJPP0gOPu5NvxFzrM0/view">HAWK 機能取扱説明書</a></div>
+      <div><span>最新の下書き</span><a href="https://docs.google.com/presentation/d/1FRKZclD3zVIFDprLCCVgpnp2RspQZfiVGrB89vuXPAA/edit">【下書き】v8（2026-10-16・81ページ）</a></div>
+      <div><span>手順書（スキル）</span><a href="https://github.com/yukikatayama3399/claude-configgggggg/blob/claude/wonderful-noether-a5izp6/.claude/skills/hawk-manual-update/SKILL.md">hawk-manual-update/SKILL.md</a></div>
+      <div><span>このキットの原本</span><a href="https://github.com/yukikatayama3399/claude-configgggggg/tree/claude/quirky-archimedes-nxyilb/manual_kit">manual_kit/（プロンプトの正本）</a></div>
+    </div>
+  </section>
+
+  <footer>プロンプトの正本は GitHub の manual_kit/prompts/ にあります。HAWK 側の運用が変わったら、そちらを直してこのページを作り直します。</footer>
+</div>
+
+<script>
+(() => {
+  const FIELDS = [
+    ["基本", [
+      ["PRODUCT", "プロダクト名", "例: アルパカ"],
+      ["product", "英字の短い名前（フォルダ・スキル名）", "例: alpaca"],
+      ["READERS", "取説の読者", "例: 導入済みのお客様向けの操作ガイド"],
+      ["OWNER", "承認者の名前", "例: 山田"],
+      ["OWNER_SLACK_ID", "承認者の Slack メンバーID", "例: U0XXXXXXXX"],
+      ["GOOGLE_ACCOUNT", "Google アカウント", "例: name@fout.jp"],
+      ["DRIVE_FOLDER", "作業フォルダ（Drive の URL）", "https://drive.google.com/drive/folders/…"],
+      ["REPO", "GitHub リポジトリ", "例: yourname/claude-config"],
+      ["BRANCH", "ブランチ", "例: claude/product-manual"],
+    ]],
+    ["人が渡す資料", [
+      ["SCREENSHOT_FOLDER", "画面キャプチャのフォルダ", "Drive の URL"],
+      ["VIDEO_FOLDER", "操作デモ動画のフォルダ", "Drive の URL"],
+      ["SAMPLE_REPORTS", "サンプルレポート（複数可）", "URL をカンマ区切り"],
+      ["SAMPLE_REPORT_PUBLIC", "お客様に見せてよい見本", "URL 1本"],
+      ["EXISTING_DOCS", "既存資料", "概要資料・セットアップガイド・FAQ など"],
+      ["CANONICAL_DOCS", "正本として優先する資料", "例: FAQ マスター、セットアップガイド"],
+      ["BRAND", "ブランド（色・ロゴ）", "例: メイン #2a6df4、ロゴは作業フォルダの logo.png"],
+    ]],
+    ["探しに行く場所", [
+      ["WATCH_CHANNELS", "全件読む Slack チャンネル", "例: #alpaca-product, #alpaca-社内利用"],
+      ["APPROVAL_CHANNEL", "承認依頼を投稿するチャンネル", "例: #alpaca-manual-承認（非公開）"],
+      ["KEYWORDS", "検索キーワード", "例: 「アルパカ」「ALPACA」"],
+      ["NAME_VARIANTS", "文字起こしの表記揺れ", "例: あるぱか／アルパガ = アルパカ"],
+      ["PUBLIC_PAGES", "公開ページ", "製品サイト・公開ヘルプの URL"],
+      ["LOOKBACK", "最初に遡る期間", "例: 6か月"],
+    ]],
+    ["方針", [
+      ["OUT_OF_SCOPE", "取説に入れないもの", "例: 料金・契約・セキュリティ・他社比較"],
+      ["SCHEDULE", "巡回の頻度", "例: 平日毎朝 8:52 JST"],
+      ["ASK_WHO", "仕様を聞く相手", "例: 開発=〇〇さん、仕様=〇〇さん"],
+    ]],
+  ];
+  const KEY = "manual-kit-fill-v1";
+  const SLOT = "（ここに「設定」ブロックを貼る）";
+  let vals = {};
+  try { vals = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { vals = {}; }
+
+  const pres = {};
+  document.querySelectorAll(".prompt").forEach(p => { pres[p.dataset.key] = { el: p, src: p.querySelector("pre").textContent }; });
+
+  const fieldsEl = document.getElementById("fields");
+  FIELDS.forEach(([group, items]) => {
+    const fs = document.createElement("fieldset");
+    const lg = document.createElement("legend"); lg.textContent = group; fs.appendChild(lg);
+    items.forEach(([k, label, ph]) => {
+      const lb = document.createElement("label"); lb.htmlFor = "f-" + k;
+      lb.innerHTML = `<span>${label} <span class="v">{{${k}}}</span></span>`;
+      const inp = document.createElement("input"); inp.id = "f-" + k; inp.name = k; inp.placeholder = ph; inp.value = vals[k] || "";
+      inp.addEventListener("input", () => { vals[k] = inp.value; save(); renderAll(); });
+      lb.appendChild(inp); fs.appendChild(lb);
+    });
+    fieldsEl.appendChild(fs);
+  });
+  const ALL = FIELDS.flatMap(([, items]) => items.map(i => i[0]));
+
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(vals)); } catch (e) {} }
+  function settingsBlock() { return pres["00"].src.replace(/^# 設定[^\n]*\n/, "# 設定\n"); }
+  function fill(text) { return text.replace(/\{\{(\w+)\}\}/g, (m, k) => (vals[k] || "").trim() || m); }
+  function fullText(key) {
+    let t = pres[key].src;
+    if ((key === "01" || key === "02") && document.getElementById("embed").checked) t = t.replace(SLOT, settingsBlock().trim());
+    return fill(t);
+  }
+  function render(key) {
+    const pre = pres[key].el.querySelector("pre");
+    let t = pres[key].src;
+    if ((key === "01" || key === "02") && document.getElementById("embed").checked) t = t.replace(SLOT, settingsBlock().trim());
+    pre.textContent = "";
+    let last = 0;
+    t.replace(/\{\{(\w+)\}\}/g, (m, k, idx) => {
+      pre.appendChild(document.createTextNode(t.slice(last, idx)));
+      const v = (vals[k] || "").trim();
+      const s = document.createElement(v ? "span" : "mark");
+      if (v) s.className = "filled";
+      s.textContent = v || m;
+      pre.appendChild(s);
+      last = idx + m.length;
+      return m;
+    });
+    pre.appendChild(document.createTextNode(t.slice(last)));
+  }
+  function renderAll() {
+    Object.keys(pres).forEach(render);
+    const left = ALL.filter(k => !(vals[k] || "").trim()).length;
+    document.getElementById("count").textContent = left ? `未記入 ${left} / ${ALL.length}` : "すべて記入済み";
+  }
+  document.getElementById("embed").addEventListener("change", renderAll);
+  document.getElementById("reset").addEventListener("click", () => {
+    vals = {}; save(); document.querySelectorAll("#fields input").forEach(i => { i.value = ""; }); renderAll();
+  });
+  document.querySelectorAll(".prompt").forEach(p => {
+    p.querySelector('[data-act="open"]').addEventListener("click", e => {
+      const on = p.classList.toggle("open"); e.target.textContent = on ? "たたむ" : "全部表示";
+    });
+    p.querySelector('[data-act="copy"]').addEventListener("click", e => {
+      const btn = e.target, text = fullText(p.dataset.key);
+      const done = () => { btn.textContent = "コピーしました"; setTimeout(() => { btn.textContent = "コピー"; }, 1600); };
+      const fallback = () => {
+        const r = document.createRange(); r.selectNodeContents(p.querySelector("pre"));
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+        btn.textContent = "選択しました。⌘C でコピー";
+      };
+      try { navigator.clipboard.writeText(text).then(done, fallback); } catch (err) { fallback(); }
+    });
+  });
+  renderAll();
+})();
+</script>
