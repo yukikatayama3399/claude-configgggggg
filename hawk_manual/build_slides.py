@@ -41,6 +41,12 @@ SCREEN_ORDER = ["S-31", "S-34", "S-27", "S-35", "S-30", "S-28",  # DealDesk: 壁
                 "S-24", "S-16", "S-23", "S-33", "S-19"]          # 初期設定・連携: 紐付けを連携履歴の前に
 # 画面を別の章に載せる（片山 v4: ログインは初期設定ではなくワークスペース・権限の頭に置く）
 SCREEN_CHAPTER = {"S-01": "ワークスペース・権限"}
+# TikTok 版の画面（片山 2026-10-16）。Meta 版のページの直後に「（TikTok）」のページを置く。
+# 機能表はサイトマップの「関連機能ID」から引き、Meta だけの機能は除く。値 = 直前に来る画面
+VARIANTS = {"S-36": "S-04", "S-37": "S-06", "S-40": "S-07", "S-42": "S-08", "S-43": "S-09",
+            "S-44": "S-11", "S-46": "S-12", "S-48": "S-13", "S-15": "S-14", "S-53": "S-21"}
+# 上の画面の補足キャプチャ（親ページの画像の下に小さく並べるだけ。サイトマップ・画面数には出さない）
+SUB_SHOTS = {"S-38", "S-39", "S-41", "S-45", "S-47", "S-49", "S-50", "S-51", "S-52"}
 RECENT_SINCE = "2026-07-31"
 # レポートの画面にお客様向けサンプルレポート（config.json の sample_report_url）へのリンクを置く
 SAMPLE_REPORT_SCREENS = {"S-17", "S-20"}
@@ -120,7 +126,7 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
     d.text(28, 360, 250, 16, f"{today} 時点" + (f"｜下書き {version}" if version else ""), size=9, color=GREEN_PALE)
     if urls.get("logo_hawk"):
         d.image(330, 40, 120, 39, urls["logo_hawk"], border=False)
-    stats = [("機能", len(feats)), ("画面", len(screens)), ("逆引き", len(ucs)), ("FAQ", len(faqs))]
+    stats = [("機能", len(feats)), ("画面", len([s for s in screens if s["画面ID"] not in SUB_SHOTS])), ("逆引き", len(ucs)), ("FAQ", len(faqs))]
     for i, (label, n) in enumerate(stats):
         x = 330 + i * 92
         d.rect(x, 150, 84, 70, GREEN_PALE)
@@ -201,7 +207,13 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
         d.rect(x, y, mw, 18, GREEN)
         d.text(x, y, mw, 18, menu, size=8.5, bold=True, color=WHITE, align="CENTER", valign="MIDDLE")
         y += 22
-        for s in [s for s in screens if norm_menu(s.get("階層1", "")) == menu]:
+        col = [s for s in screens if norm_menu(s.get("階層1", "")) == menu and s["画面ID"] not in SUB_SHOTS]
+        for v, anchor in VARIANTS.items():  # TikTok 版は元の画面のすぐ下に並べる
+            vs = next((s for s in col if s["画面ID"] == v), None)
+            if vs and any(s["画面ID"] == anchor for s in col):
+                col.remove(vs)
+                col.insert(next(i for i, s in enumerate(col) if s["画面ID"] == anchor) + 1, vs)
+        for s in col:
             p = screen_pages.get(s["画面ID"], "")
             ptxt = f"p.{p}" if p else ""
             if s.get("階層3"):  # モーダル等は字下げして小さく。名前は省略せず折り返す
@@ -235,6 +247,7 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
         return SCREEN_CHAPTER.get(r.get("画面ID", ""), cat_of(r["機能ID"]))
 
     rank = {sid: i for i, sid in enumerate(SCREEN_ORDER)}
+    placed: set[str] = set()
     for cat in CATEGORY_ORDER:
         cfeats = [r for r in feats if chapter_of(r) == cat]
         if not cfeats:
@@ -253,6 +266,20 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
                 groups["__misc"] = merged
             order = list(groups)
             groups = {k: groups[k] for k in sorted(order, key=lambda k: (k == "__misc", rank.get(k, len(rank)), order.index(k)))}
+            # TikTok 版のページを元の画面の直後に差し込む
+            live = {r["機能ID"]: r for r in feats}
+            for v, anchor in VARIANTS.items():
+                vs = by_screen.get(v)
+                if anchor not in groups or v in placed or not vs or v not in urls:
+                    continue
+                vrows = [live[i] for i in split_ids(vs.get("関連機能ID", "")) if i in live and live[i].get("対応媒体") != "Meta"]
+                if not vrows:
+                    continue
+                keys = list(groups)
+                keys.insert(keys.index(anchor) + 1, v)
+                groups[v] = vrows
+                groups = {k: groups[k] for k in keys}
+                placed.add(v)  # 元の画面が複数の章に出ても TikTok 版は最初の1回だけ
         for sid_, rows_ in groups.items():
             screen = by_screen.get(sid_, {})
             if sid_ and sid_ != "__misc":
@@ -343,7 +370,8 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
             w, h = iw * scale, ih * scale
             d.image(MX, BODY_TOP - 12, w, h, urls[sid_])
             y = BODY_TOP - 12 + h + 6
-            kids = [s for s in screens if s.get("遷移元", "").startswith(sid_) and s.get("階層3") and s["画面ID"] in urls]
+            kids = [s for s in screens if s.get("遷移元", "").startswith(sid_) and s.get("階層3") and s["画面ID"] in urls
+                    and s["画面ID"] not in VARIANTS]
             if k == 0 and kids:
                 kw = (lw - 6) / 2
                 bottom = y
