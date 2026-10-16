@@ -25,6 +25,21 @@ MX = 18                 # 左右余白
 BODY_TOP, BODY_BOTTOM = 50, 382
 
 
+
+# 媒体バッジ画像の横:縦（logos/badge_*.png から）
+def _badge_ratios() -> dict:
+    import pathlib
+    from PIL import Image
+    out = {}
+    for p in (pathlib.Path(__file__).parent / "logos").glob("badge_*.png"):
+        w, h = Image.open(p).size
+        out[p.stem.removeprefix("badge_")] = w / h
+    return out
+
+
+BADGE_RATIO = _badge_ratios()
+
+
 def rgb(hex_: str) -> dict:
     h = hex_.lstrip("#")
     return {"red": int(h[0:2], 16) / 255, "green": int(h[2:4], 16) / 255, "blue": int(h[4:6], 16) / 255}
@@ -188,12 +203,20 @@ class Deck:
         return oid
 
     # ---- ページ共通の枠 -------------------------------------------------------
-    def frame(self, title: str, chapter: str = "", lead: str = ""):
+    def frame(self, title: str, chapter: str = "", lead: str = "", badge: str = ""):
+        """badge: 右上に置く媒体ロゴ（meta / tiktok / both）。素材置き場の logo_badge_<badge> を使う。"""
         self.new_page()
         self.rect(MX, 13, 4, 22, GREEN)
         self.text(MX + 9, 9, 520, 28, title, size=15, bold=True, valign="MIDDLE")
+        right = W - MX
+        url = self.logos.get(f"logo_badge_{badge}") if badge else None
+        if url:
+            bh = 15
+            bw = bh * BADGE_RATIO.get(badge, 3)
+            self.image(right - bw, 10, bw, bh, url, border=False)
+            right -= bw + 8
         if chapter:
-            self.text(W - MX - 200, 12, 200, 14, chapter, size=7.5, color=GREEN, bold=True, align="END")
+            self.text(right - 200, 12, 200, 14, chapter, size=7.5, color=GREEN, bold=True, align="END")
         if lead:
             self.text(MX + 9, 34, W - 2 * MX - 9, 14, lead, size=7.5, color=SUB)
         self.footer_band()
