@@ -1,0 +1,43 @@
+{
+  "_comment": "マイドライブ直下の自動振り分け（drive-inbox-sort スキル）が使う移動先。2026-10-20 の大掃除で確定した構成。キーは drive_inbox.py move の DEST に渡す。",
+  "account": "yuki.katayama@fout.jp",
+  "shared_drive_id": "0AI789Q3C1TnVUk9PVA",
+  "my": {
+    "00_受信箱": "1HmHB_PJu0aT9BEBHY8wF6Mc6qdA5QFit",
+    "50_会議メモ": "1xN4TseD9Xjv3g9M3v1UzEDr1ODF16vh_",
+    "60_自動化データ": "1LqZagDdVDug2U8r7cJrAEpsY8KCbBVUh",
+    "70_他部署・媒体資料": "1T09NSFo-Vn0Tf7Yf1WZmEzvl6QWEnM46",
+    "80_動画・スクショ素材": "1XW-mdTbwYkLbqyMVcvqi0xcq5Usq8QFQ",
+    "90_個人": "1jyca607PLWaPXGNttKZDawonFvU3jMog",
+    "99_アーカイブ": "1Fcefq9Ke6VST17vd4CGehFcmtxI4V_9f",
+    "REGALCORE": "1fvCJgbYzMhhIit-ppcum79mOmfLMFbQA"
+  },
+  "shared": {
+    "07_HAWK": "1GfJbH3CUUfX7D1l1FnFyYtsS7pKnydtG",
+    "01_概要資料": "1E3WvuymV8e1HuhBDYwVskVC4WdTnV5PA",
+    "02_顧客会議ログ": "1t518Akok9TaozAFYWP_oQQgJCPOAYq9N",
+    "03_セールス活動": "155bndTo1iSYPTkLn2sBp1smuM7XWN6qm",
+    "03_会社概要リサーチ": "1UK_094CcfKP3-XKTyhVhcXCZ7Y2DwvnH",
+    "03_UUUM社外秘": "1hMtHdbot1i2ncwbRxpcqy13h3T0Iv6AE",
+    "04_ビジネス戦略": "1TXVwBz9PJJr5qqjxrJ_K1XMdJ3tsq5rN",
+    "05_資料集": "16qcINhxzY696B6uSNpgM1RoAj7NfnrcO",
+    "05_デモ画面録画": "1HZRgwi5Ube_RztyrlQL0_v0fNZBosKxz",
+    "05_機能取扱説明書": "1s4GTPep-M6ryXqtY1c79gY4pU_MgpR7o",
+    "05_取説スクショ": "1E24wJqa6BRrSwvSngG0w0RTXFjWxqqOV",
+    "06_契約書": "1umQ-Cgf-qGLDDbvG3rNPDXLH5K4-zrIA",
+    "07_プレスリリース": "1brIy_YNenrTEnR8czHsKuj7vwtlIONMb",
+    "08_他部門の概要資料": "1UsCM-c1dkUkWXiN7BCldQYKswvM6hLb_",
+    "09_顧客からのFAQ": "1Oqy_pagqsPE_HEIctunjKrvmkTpNJ057",
+    "10_顧客": "1Zcuk8SMcL8PQoymujhntAK3eAD2RUjbB",
+    "10_戦略的パートナーシップ": "1kqj8j_rQMjqXNcCMa_InIy0UMYmgSuDE",
+    "11_週次mtg用報告メモ": "1sqtIs-recvaCiibNXWvV7M6nex4ja8R4",
+    "11_週次_Yuki": "1F70c4D3EuWR14kefYyKCiEw4Wy9Jzvvk",
+    "12_代理販売": "1wcW1WQhXB6m7Vf932yW16oUIyLubssKu",
+    "13_競合資料": "1zbaWE-_CXqPLtfiCr1hApX78lslSKArI",
+    "14_HIROGARU": "1K3ruMFmpiNhnCAcRYA9HEgErt6gYAkhQ",
+    "15_パートナープログラム": "1UGskTU3IVz0wMgrLeVvoye0K-cEiM-7K",
+    "16_イベント・ウェビナー": "1KgTDu_tRVBP8ODSPhyOO3OYXcNgk3gt4",
+    "20_技術・セキュリティ資料": "1R_y7utkqOBq7fuw2fREG5XnnqzSi8zxQ"
+  },
+  "system_folders": ["Google Meet", "Meet Recordings", "Google Vids のエクスポート", "Chrome から保存", "Gemini Gems"]
+}

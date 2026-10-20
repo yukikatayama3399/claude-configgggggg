@@ -318,3 +318,29 @@ gog 管理下の credentials.json → token export の順に見る。
   **2箇所を同時に**揃える。
 - gws は 100+ の Agent Skills を配布しているが、このリポジトリには入れていない
   （必要になったら `npx skills add https://github.com/googleworkspace/cli`）。
+
+## Google Drive の置き場所ルール（2026-10-20 決定）
+
+ファイルを作る・移すときは次に従う。詳細な振り分け表とフォルダ ID は
+`.claude/skills/drive-inbox-sort/SKILL.md` と `drive_inbox/folders.json`。
+
+- **会議メモ・文字起こし・録音（Gemini 自動メモ、Meet 録画、ボイスメモ）は、どこまでいってもマイドライブ**
+  （`50_会議メモ（Gemini・文字起こし）`）。共有ドライブへは出さない。
+- **それ以外の作成物は共有ドライブ FreakOut BizAll の `07_HAWK` 配下**に置く。
+  顧客ごとの資料・議事録（生成・整理版）・報告資料はマイドライブに残さない。
+  顧客は `10_顧客/<NN_社名>/{1_議事録,2_提案書,9_契約書}`、イベント・ウェビナーは `16_イベント・ウェビナー`。
+- マイドライブに残してよいのは、会議メモのほか、個人（領収書等）・自動化の台帳/ログ・他部署の媒体資料・
+  スクショ素材・アーカイブ・REGALCORE（副業・社外秘）だけ。
+- 片山はファイルをマイドライブ直下に置いてよい。毎日の「マイドライブ自動振り分け」Routine が上のルールで移す。
+
+共有ドライブの注意点（実測）:
+- 片山の権限は「コンテンツ管理者」相当。**ゴミ箱には入れられるが完全削除はできない**（`files.delete` は 403。
+  後片付けは `files.update {"trashed": true}` を使う）。
+- **共有ドライブからマイドライブへは戻せない**（`canMoveItemOutOfDrive=false`）。行き先に迷うものは入れない。
+- **フォルダごと共有ドライブへは移せない**（`teamDrivesFolderMoveInNotSupported`）。同じ構成を作って中身を移す
+  （`drive_inbox.py move` が自動でやる）。移すとフォルダ ID が変わるので、ID を持っているスクリプトの設定を直すこと。
+- Drive API で共有ドライブのファイルを検索するときは `"corpora":"allDrives","includeItemsFromAllDrives":true,
+  "supportsAllDrives":true` を付ける。gog の `drive ls` / `drive search` は既定で共有ドライブを含む
+  （ただし `drive ls` は既定20件なので `--max` を付ける）。
+- BizAll は閲覧者のダウンロード・印刷・コピーが禁止されている（`downloadRestriction.restrictedForReaders`）。
+  社外に渡す資料を閲覧者権限で共有すると、相手はダウンロードできない。
