@@ -15,7 +15,7 @@ import pathlib
 import re
 import subprocess
 
-from gws import call, read_tab
+from gws import call, read_tab, trash
 from schema import TABS
 
 CFG_PATH = pathlib.Path(__file__).parent / "config.json"
@@ -106,7 +106,8 @@ def _trim(png: pathlib.Path):
 
 
 def _ls(cfg: dict, folder: str) -> list[dict]:
-    out = subprocess.run(["gog", "--account", cfg["account"], "-j", "drive", "ls", "--parent", folder],
+    # gog drive ls は既定で20件しか返さない。加工済みが20件を超えると加工し直しが起きていたので上限を明示する
+    out = subprocess.run(["gog", "--account", cfg["account"], "-j", "drive", "ls", "--parent", folder, "--max", "1000"],
                          capture_output=True, text=True, check=True)
     return json.loads(out.stdout).get("files", [])
 
@@ -217,7 +218,7 @@ def sync(cfg: dict) -> dict[str, str]:
             call("slides.presentations.batchUpdate", {"presentationId": pid}, {"requests": req[i:i + 30]})
     finally:
         if drive_urls.get("__tmp__"):
-            call("drive.files.delete", {"fileId": drive_urls["__tmp__"], "supportsAllDrives": True})
+            trash(drive_urls["__tmp__"])
     if req:
         print(f"  素材置き場: {len([r for r in req if 'createImage' in r])} 枚を取り込み")
         pres = call("slides.presentations.get", {"presentationId": pid})

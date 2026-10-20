@@ -8,15 +8,15 @@ import pathlib
 import subprocess
 import tempfile
 
-from gws import call
+from gws import call, trash
 
 CHUNK = 12  # 1回に書き出すページ数
 
 
 def export_pdf(pid: str, out: pathlib.Path, pages: range | None = None, account: str = "yuki.katayama@fout.jp") -> pathlib.Path:
     from pypdf import PdfWriter
-    # 一時コピーは元ファイルの隣ではなく、マニュアル用フォルダ（自分のマイドライブ）に作る。
-    # 共有ドライブの他人のフォルダだと、作ったコピーを消す権限が無いことがある
+    # 一時コピーは元ファイルの隣ではなく、マニュアル用フォルダ（共有ドライブ 07_HAWK/05_資料集 配下）に作る。
+    # 共有ドライブでは完全削除の権限が無いので、後片付けはゴミ箱送り（gws.trash）
     cfg = json.load(open(pathlib.Path(__file__).with_name("config.json")))
     body = {"parents": [cfg["folder_id"]]} if cfg.get("folder_id") else {}
     slides = [s["objectId"] for s in call("slides.presentations.get", {"presentationId": pid, "fields": "slides(objectId)"})["slides"]]
@@ -37,7 +37,7 @@ def export_pdf(pid: str, out: pathlib.Path, pages: range | None = None, account:
                                check=True, cwd=tmp, capture_output=True)
                 writer.append(str(pathlib.Path(tmp) / part))
             finally:
-                call("drive.files.delete", {"fileId": copy, "supportsAllDrives": True})
+                trash(copy)
     with open(out, "wb") as f:
         writer.write(f)
     return out

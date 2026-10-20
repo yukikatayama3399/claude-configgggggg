@@ -14,6 +14,12 @@ def call(method: str, params: dict, body: dict | None = None) -> dict:
     return json.loads(out.stdout) if out.stdout.strip() else {}
 
 
+def trash(file_id: str) -> None:
+    """一時ファイルの後片付け。共有ドライブではコンテンツ管理者に完全削除の権限が無い（canDelete=false）ので、
+    files.delete ではなくゴミ箱へ移す（30日後に自動で消える）。"""
+    call("drive.files.update", {"fileId": file_id, "supportsAllDrives": True}, {"trashed": True})
+
+
 def read_tab(spreadsheet_id: str, tab: str) -> list[dict]:
     """タブを読み、ヘッダー行をキーにした dict のリストで返す。"""
     res = call("sheets.spreadsheets.values.get",
