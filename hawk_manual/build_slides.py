@@ -41,6 +41,38 @@ SCREEN_ORDER = ["S-31", "S-34", "S-27", "S-35", "S-30", "S-28",  # DealDesk: 壁
                 "S-24", "S-16", "S-23", "S-33", "S-19"]          # 初期設定・連携: 紐付けを連携履歴の前に
 # 画面を別の章に載せる（片山 v4: ログインは初期設定ではなくワークスペース・権限の頭に置く）
 SCREEN_CHAPTER = {"S-01": "ワークスペース・権限"}
+# TikTok 版の画面（片山 2026-10-16）。Meta 版のページの直後に「（TikTok）」のページを置く。
+# 機能表はサイトマップの「関連機能ID」から引き、Meta だけの機能は除く。値 = 直前に来る画面
+VARIANTS = {"S-36": "S-04", "S-37": "S-06", "S-40": "S-07", "S-42": "S-08", "S-43": "S-09",
+            "S-44": "S-11", "S-46": "S-12", "S-48": "S-13", "S-15": "S-14", "S-53": "S-21"}
+# 上の画面の補足キャプチャ（親ページの画像の下に小さく並べるだけ。サイトマップ・画面数には出さない）
+SUB_SHOTS = {"S-38", "S-39", "S-41", "S-45", "S-47", "S-49", "S-50", "S-51", "S-52"}
+ANCHOR_OF = {anchor: v for v, anchor in VARIANTS.items()}
+# 共通ページ（Meta と TikTok のキャプチャを並べるページ）の見出し。無ければ元の画面名
+COMMON_TITLE = {"S-14": "キャンペーン一覧"}
+# ページ右上の媒体バッジ（logos/badge_*.png）。縦横比はローカルの画像から取る
+LOGO_DIR = pathlib.Path(__file__).parent / "logos"
+
+
+def plat(r: dict) -> str:
+    """機能の対応媒体: meta / tiktok / both（共通・両方・空欄）。"""
+    m = r.get("対応媒体", "")
+    return "meta" if m == "Meta" else "tiktok" if m == "TikTok" else "both"
+
+
+def badge_of(rows: list[dict]) -> str:
+    ps = {plat(r) for r in rows}
+    return ps.pop() if len(ps) == 1 else "both"
+
+
+def clean_name(name: str) -> str:
+    """TikTok 版の画面名から媒体名の注記を落とす（媒体はロゴで示す）。メニュー名そのもの（TikTokキャンペーン等）は残す。"""
+    return re.sub(r"（Meta／TikTok）|（TikTok）|・TikTok(?=）)", "", name)
+
+
+def screen_path(screen: dict) -> str:
+    parts = [screen.get("階層1"), screen.get("階層2"), screen.get("階層3")]
+    return " ＞ ".join(x for x in parts if x and x != "TikTok版")
 RECENT_SINCE = "2026-07-31"
 # レポートの画面にお客様向けサンプルレポート（config.json の sample_report_url）へのリンクを置く
 SAMPLE_REPORT_SCREENS = {"S-17", "S-20"}
@@ -120,7 +152,7 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
     d.text(28, 360, 250, 16, f"{today} 時点" + (f"｜下書き {version}" if version else ""), size=9, color=GREEN_PALE)
     if urls.get("logo_hawk"):
         d.image(330, 40, 120, 39, urls["logo_hawk"], border=False)
-    stats = [("機能", len(feats)), ("画面", len(screens)), ("逆引き", len(ucs)), ("FAQ", len(faqs))]
+    stats = [("機能", len(feats)), ("画面", len([s for s in screens if s["画面ID"] not in SUB_SHOTS])), ("逆引き", len(ucs)), ("FAQ", len(faqs))]
     for i, (label, n) in enumerate(stats):
         x = 330 + i * 92
         d.rect(x, 150, 84, 70, GREEN_PALE)
@@ -201,13 +233,23 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
         d.rect(x, y, mw, 18, GREEN)
         d.text(x, y, mw, 18, menu, size=8.5, bold=True, color=WHITE, align="CENTER", valign="MIDDLE")
         y += 22
-        for s in [s for s in screens if norm_menu(s.get("階層1", "")) == menu]:
+        col = [s for s in screens if norm_menu(s.get("階層1", "")) == menu and s["画面ID"] not in SUB_SHOTS]
+        for v, anchor in VARIANTS.items():  # TikTok 版は元の画面のすぐ下に並べる
+            vs = next((s for s in col if s["画面ID"] == v), None)
+            if vs and any(s["画面ID"] == anchor for s in col):
+                col.remove(vs)
+                col.insert(next(i for i, s in enumerate(col) if s["画面ID"] == anchor) + 1, vs)
+        for s in col:
             p = screen_pages.get(s["画面ID"], "")
             ptxt = f"p.{p}" if p else ""
             if s.get("階層3"):  # モーダル等は字下げして小さく。名前は省略せず折り返す
-                h = est_lines(s["画面名"], mw - 44, 6.5) * 6.5 * 1.3 + 2
+                name, ix = s["画面名"], 0
+                if s["画面ID"] in VARIANTS and urls.get("logo_icon_tiktok"):  # TikTok 版は文字ではなくロゴで示す
+                    name, ix = clean_name(name), 9
+                    d.image(x + 12, y + 1.5, 6.5, 6.5, urls["logo_icon_tiktok"], border=False)
+                h = est_lines(name, mw - 44 - ix, 6.5) * 6.5 * 1.3 + 2
                 d.text(x + 4, y, 8, h, "└", size=6.5, color=SUB)
-                d.text(x + 12, y, mw - 44, h, s["画面名"], size=6.5, color=SUB)
+                d.text(x + 12 + ix, y, mw - 44 - ix, h, name, size=6.5, color=SUB)
                 d.text(x + mw - 32, y, 32, 10, ptxt, size=6.5, color=GREEN, align="END")
                 y += h + 1
             else:
@@ -235,6 +277,7 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
         return SCREEN_CHAPTER.get(r.get("画面ID", ""), cat_of(r["機能ID"]))
 
     rank = {sid: i for i, sid in enumerate(SCREEN_ORDER)}
+    placed: set[str] = set()
     for cat in CATEGORY_ORDER:
         cfeats = [r for r in feats if chapter_of(r) == cat]
         if not cfeats:
@@ -253,11 +296,42 @@ def render(data: dict, mode: str, lite: bool, art: dict, today: str, toc: dict[s
                 groups["__misc"] = merged
             order = list(groups)
             groups = {k: groups[k] for k in sorted(order, key=lambda k: (k == "__misc", rank.get(k, len(rank)), order.index(k)))}
+        live = {r["機能ID"]: r for r in feats}
         for sid_, rows_ in groups.items():
             screen = by_screen.get(sid_, {})
+            v = ANCHOR_OF.get(sid_)
+            if v and v not in placed and v in urls and sid_ in urls and by_screen.get(v):
+                # Meta と TikTok の両方のキャプチャがある画面: 共通／Meta だけ／TikTok だけ に分けてページを作る
+                placed.add(v)  # 元の画面が複数の章に出ても分けるのは最初の1回だけ
+                vs = by_screen[v]
+                ids = {r["機能ID"] for r in rows_}
+                extra = [live[i] for i in split_ids(vs.get("関連機能ID", "")) if i in live and i not in ids and plat(live[i]) == "tiktok"]
+                common = [r for r in rows_ if plat(r) == "both"]
+                meta = [r for r in rows_ if plat(r) == "meta"]
+                tik = [r for r in rows_ if plat(r) == "tiktok"] + extra
+                if common:
+                    found_screens.setdefault(sid_, d.page_no + 1)
+                    found_screens.setdefault(v, d.page_no + 1)
+                    path = screen_path(screen)
+                    vpath = screen_path(vs)
+                    render_feature_group(d, cat, sid_, screen, common, urls, sizes, screens, unapproved, mode, ucs,
+                                         badge="both", title=COMMON_TITLE.get(sid_, clean_name(screen.get("画面名", ""))),
+                                         mains=[(sid_, "meta"), (v, "tiktok")],
+                                         kid_parents=([] if meta else [sid_]) + ([] if tik else [v]),
+                                         path=path + ("　／　" + vpath if vpath not in path else ""))
+                if meta:
+                    found_screens.setdefault(sid_, d.page_no + 1)
+                    render_feature_group(d, cat, sid_, screen, meta, urls, sizes, screens, unapproved, mode, ucs,
+                                         badge="meta", kid_parents=[sid_])
+                if tik:
+                    found_screens[v] = d.page_no + 1
+                    render_feature_group(d, cat, v, vs, tik, urls, sizes, screens, unapproved, mode, ucs,
+                                         badge="tiktok", title=clean_name(vs["画面名"]), kid_parents=[v])
+                continue
             if sid_ and sid_ != "__misc":
                 found_screens.setdefault(sid_, d.page_no + 1)
-            render_feature_group(d, cat, sid_, screen, rows_, urls, sizes, screens, unapproved, mode, ucs)
+            render_feature_group(d, cat, sid_, screen, rows_, urls, sizes, screens, unapproved, mode, ucs,
+                                 badge=badge_of(rows_))
             if sid_ == "__misc":
                 for r in rows_:
                     if r.get("画面ID"):
@@ -300,7 +374,8 @@ def norm_menu(level1: str) -> str:
     return "DealDesk" if level1.replace("-", "").lower() == "dealdesk" else level1
 
 
-def feature_rows(rows: list[dict], with_settings_col: bool) -> list[list[str]]:
+def feature_rows(rows: list[dict], with_settings_col: bool, tag: bool = True) -> list[list[str]]:
+    """tag: 媒体が1つに絞られたページ（右上のロゴで分かる）では機能名に（Meta）等を付けない。"""
     out = []
     for r in rows:
         body = r.get("できること", "")
@@ -309,7 +384,7 @@ def feature_rows(rows: list[dict], with_settings_col: bool) -> list[list[str]]:
         if not with_settings_col and r.get("設定項目・選択肢"):
             body += f"\n【設定】{r['設定項目・選択肢']}"
         media = r.get("対応媒体", "")
-        name = r["機能名"] + (f"\n（{media}）" if media not in ("", "共通", "Meta・TikTok") and media not in r["機能名"] else "")
+        name = r["機能名"] + (f"\n（{media}）" if tag and media not in ("", "共通", "Meta・TikTok") and media not in r["機能名"] else "")
         if r.get("提供状態") not in (RELEASED, ""):
             name += f"\n［{r['提供状態']}］"
         row = [name, body]
@@ -321,29 +396,50 @@ def feature_rows(rows: list[dict], with_settings_col: bool) -> list[list[str]]:
 
 
 def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[dict], urls: dict, sizes: dict,
-                         screens: list[dict], unapproved: set, mode: str, ucs: list[dict]):
-    title = screen.get("画面名") if screen else ("その他の機能" if sid_ == "__misc" else cat.split("（")[0])
-    path = " ＞ ".join(x for x in (screen.get("階層1"), screen.get("階層2"), screen.get("階層3")) if x) if screen else ""
+                         screens: list[dict], unapproved: set, mode: str, ucs: list[dict], badge: str = "",
+                         title: str | None = None, mains: list[tuple[str, str]] | None = None,
+                         kid_parents: list[str] | None = None, path: str | None = None):
+    """1画面ぶんの機能ページ。
+    badge: 右上の媒体ロゴ（meta / tiktok / both）。mains: 左に並べる画面 [(画面ID, 媒体)]（2つなら横に並べる）。
+    kid_parents: この画面IDから開くモーダル等の補足キャプチャを画像の下に小さく並べる。"""
+    if title is None:
+        title = screen.get("画面名") if screen else ("その他の機能" if sid_ == "__misc" else cat.split("（")[0])
+    if path is None:
+        path = screen_path(screen) if screen else ""
     lead = screen.get("この画面でやること", "") if screen else ""
-    has_img = bool(sid_ and sid_ in urls)
+    if mains is None:
+        mains = [(sid_, "")] if sid_ and sid_ in urls else []
+    mains = [(k, m) for k, m in mains if k in urls]
+    if kid_parents is None:
+        kid_parents = [sid_] if sid_ else []
+    tag = badge == "both"
     marks_all = [i for i, r in enumerate(rows) if mode == "draft" and r["機能ID"] in unapproved]
-    if has_img:
+    if mains:
         # 左: 画面 / 右: 機能表（機能・できること＋目的＋設定・注意）
         lw = 318
         widths = [76, 196, W - 2 * MX - lw - 8 - 76 - 196]
-        trs = feature_rows(rows, with_settings_col=False)
+        trs = feature_rows(rows, with_settings_col=False, tag=tag)
         chunks = paginate(trs, widths, 7, BODY_BOTTOM - BODY_TOP - 2)
         start = 0
         for k, chunk in enumerate(chunks):
-            d.frame(title + ("（続き）" if k else ""), cat, "")
-            # 画面（縦横比を保って枠に収める）
-            iw, ih = sizes.get(sid_, (16, 9))
-            bw, bh = lw, 190
-            scale = min(bw / iw, bh / ih)
-            w, h = iw * scale, ih * scale
-            d.image(MX, BODY_TOP - 12, w, h, urls[sid_])
-            y = BODY_TOP - 12 + h + 6
-            kids = [s for s in screens if s.get("遷移元", "").startswith(sid_) and s.get("階層3") and s["画面ID"] in urls]
+            d.frame(title + ("（続き）" if k else ""), cat, "", badge=badge)
+            # 画面（縦横比を保って枠に収める）。Meta と TikTok を並べるときは左右に半分ずつ
+            n = len(mains)
+            bw, bh = (lw - 6 * (n - 1)) / n, 190
+            y = BODY_TOP - 12
+            bottom = y
+            for j, (key, media) in enumerate(mains):
+                iw, ih = sizes.get(key, (16, 9))
+                scale = min(bw / iw, (bh - (12 if n > 1 else 0)) / ih)
+                w, h = iw * scale, ih * scale
+                x = MX + j * (bw + 6)
+                d.image(x, y, w, h, urls[key])
+                if n > 1 and urls.get(f"logo_icon_{media}"):  # どちらの媒体の画面かをロゴで示す
+                    d.image(x, y + h + 2, 9, 9, urls[f"logo_icon_{media}"], border=False)
+                bottom = max(bottom, y + h + (12 if n > 1 else 0))
+            y = bottom + 6
+            kids = [s for p in kid_parents for s in screens if s.get("遷移元", "").startswith(p) and s.get("階層3")
+                    and s["画面ID"] in urls and s["画面ID"] not in VARIANTS]
             if k == 0 and kids:
                 kw = (lw - 6) / 2
                 bottom = y
@@ -351,7 +447,7 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
                     kiw, kih = sizes.get(kid["画面ID"], (16, 9))
                     ks = min(kw / kiw, 80 / kih)
                     d.image(MX + j * (kw + 6), y, kiw * ks, kih * ks, urls[kid["画面ID"]])
-                    cap = f"▲ {short_name(kid['画面名'])}"
+                    cap = f"▲ {short_name(clean_name(kid['画面名']))}"
                     cap_h = est_lines(cap, kw, 6.5) * 6.5 * 1.4 + 4  # 折り返しても下の箱に重ならないよう高さを見積もる
                     d.text(MX + j * (kw + 6), y + kih * ks + 1, kw, cap_h, cap, size=6.5, color=SUB)
                     bottom = max(bottom, y + kih * ks + 1 + cap_h)
@@ -361,9 +457,9 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
             if k == 0 and SAMPLE_REPORT_URL and sid_ in SAMPLE_REPORT_SCREENS:
                 # サンプルレポートへのリンクは箱の中に入れる（箱の下に置くとページ下端のフッターに重なることがある）
                 label = "▶ サンプルレポートはこちら"
-                start = len(info) + 1
+                start_ = len(info) + 1
                 info += "\n" + label + "（別のスライドが開きます）"
-                runs.append((start + 2, start + len(label), {"bold": True, "color": GREEN_DARK, "link": SAMPLE_REPORT_URL}))
+                runs.append((start_ + 2, start_ + len(label), {"bold": True, "color": GREEN_DARK, "link": SAMPLE_REPORT_URL}))
             ih_ = est_lines(info, lw, 7.5) * 7.5 * 1.4 + 9
             d.text(MX, y, lw, ih_, info, size=7.5, color=TEXT, fill="#f6f8f2", runs=runs)
             y += ih_ + 6
@@ -389,12 +485,12 @@ def render_feature_group(d: Deck, cat: str, sid_: str, screen: dict, rows: list[
             start += len(chunk)
     else:
         widths = [118, 270, 150, W - 2 * MX - 118 - 270 - 150]
-        trs = feature_rows(rows, with_settings_col=True)
+        trs = feature_rows(rows, with_settings_col=True, tag=tag)
         lead_text = (f"画面の場所：{path}　" if path else "") + lead
         chunks = paginate(trs, widths, 7, BODY_BOTTOM - BODY_TOP - (6 if lead_text else -10))
         start = 0
         for k, chunk in enumerate(chunks):
-            d.frame(title + ("（続き）" if k else ""), cat, lead_text)
+            d.frame(title + ("（続き）" if k else ""), cat, lead_text, badge=badge)
             marks = {i - start for i in marks_all if start <= i < start + len(chunk)}
             d.table(MX, BODY_TOP + (2 if lead_text else -10), widths, ["機能", "できること", "設定項目・選択肢", "注意"],
                     chunk, size=7, marks=marks)

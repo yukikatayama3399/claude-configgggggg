@@ -50,7 +50,7 @@ def resolve(ref: str) -> str:
     raise ValueError(f"unknown ref: {ref}")
 
 
-def resolve_drive_images(cfg: dict, refs: dict[str, str]) -> dict[str, str]:
+def resolve_drive_images(cfg: dict, refs: dict[str, str], trim: bool = True) -> dict[str, str]:
     """drive: の画像を Slides に取り込めるURLにする。
 
     非公開の Drive 画像は Slides API から直接読めない（Access forbidden）。公開設定にはせず、
@@ -71,7 +71,8 @@ def resolve_drive_images(cfg: dict, refs: dict[str, str]) -> dict[str, str]:
             subprocess.run(["gws", "drive", "files", "get", "-o", name, "--params",
                             json.dumps({"fileId": ref.split(":", 1)[1], "alt": "media", "supportsAllDrives": True})],
                            check=True, cwd=tmp, capture_output=True)
-            _trim(pathlib.Path(tmp) / name)
+            if trim:
+                _trim(pathlib.Path(tmp) / name)
             slide = prs.slides.add_slide(prs.slide_layouts[6])
             slide.shapes.add_picture(str(pathlib.Path(tmp) / name), 0, 0, width=prs.slide_width)
             keys.append(key)
@@ -182,8 +183,40 @@ def pick_up_screenshot_folder(cfg: dict) -> int:
     return len(updates)
 
 
+LOGO_DIR = pathlib.Path(__file__).parent / "logos"
+
+
+def ensure_logos(cfg: dict):
+    """logos/*.png（Meta・TikTok の媒体バッジ等）を素材置き場に「logo_<名前>」で取り込む。既にあれば何もしない。
+    ロゴを差し替えたいときは素材置き場の page_logo_<名前> を消してから生成し直す。"""
+    pid = cfg["assets_presentation_id"]
+    pres = call("slides.presentations.get", {"presentationId": pid})
+    have = {e["objectId"][6:] for s in pres.get("slides", []) for e in s.get("pageElements", []) if e["objectId"].startswith("asset_")}
+    todo = {f"logo_{p.stem}": p for p in sorted(LOGO_DIR.glob("*.png")) if f"logo_{p.stem}" not in have}
+    if not todo:
+        return
+    refs = {}
+    for key, p in todo.items():
+        out = subprocess.run(["gog", "--account", cfg["account"], "-j", "drive", "upload", str(p),
+                              "--parent", cfg["folder_id"], "--name", f"_素材_{key}.png"], capture_output=True, text=True, check=True)
+        res = json.loads(out.stdout)
+        refs[key] = f"drive:{(res.get('file') or res)['id']}"
+    urls = resolve_drive_images(cfg, refs, trim=False)
+    try:
+        req = []
+        for key, ref in refs.items():
+            req += [{"createSlide": {"objectId": f"page_{key}"}},
+                    {"createImage": {"objectId": f"asset_{key}", "url": urls[key], "elementProperties": {"pageObjectId": f"page_{key}"}}},
+                    {"updatePageElementAltText": {"objectId": f"asset_{key}", "title": key, "description": ref}}]
+        call("slides.presentations.batchUpdate", {"presentationId": pid}, {"requests": req})
+        print(f"  素材置き場: ロゴ {len(refs)} 枚を取り込み")
+    finally:
+        call("drive.files.delete", {"fileId": urls["__tmp__"], "supportsAllDrives": True})
+
+
 def sync(cfg: dict) -> dict[str, str]:
     """サイトマップのスクショ ref を素材置き場へ取り込み、{key: contentUrl} を返す。"""
+    ensure_logos(cfg)
     pid = cfg["assets_presentation_id"]
     pres = call("slides.presentations.get", {"presentationId": pid})
     have = {}  # key -> (ref, contentUrl)
