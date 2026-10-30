@@ -318,3 +318,14 @@ gog 管理下の credentials.json → token export の順に見る。
   **2箇所を同時に**揃える。
 - gws は 100+ の Agent Skills を配布しているが、このリポジトリには入れていない
   （必要になったら `npx skills add https://github.com/googleworkspace/cli`）。
+
+## カレンダーの色（仮予定は黄で統一）
+
+カレンダー（yuki.katayama@fout.jp）に予定を作る・色を変えるときは `calendar/COLOR_SCHEME.md` が正。
+
+- **仮予定（日程未確定の仮押さえ）は必ず黄（colorId 5 / Banana）**。オンラインでも対面でも黄。
+  タイトルに `【仮】` を付けて作り、確定したら `【仮】` を外す
+- 確定後: オンライン=オレンジ(6) / 外出・対面=紫(3) / 作業=グレー(8) / その他=赤(11)
+- 色分けスイープ Routine（毎日 9:20 / 15:20 JST）は `calendar/color_sweep.py` で、
+  タイトルに仮マーカーがある予定を最優先で黄に塗る（[オンライン社外] でもオレンジにしない）。
+  仮が外れた予定は次の回で主タグどおりの色に塗り替わる

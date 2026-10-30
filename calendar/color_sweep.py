@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-"""カレンダー色分けスイープ（作業 / オンライン / 外出対面 / その他 の4バケツ）。
+"""カレンダー色分けスイープ（仮 / 作業 / オンライン / 外出対面 / その他 の5バケツ）。
 
-色の設計（2026-09-02 見直し版）:
+色の設計（2026-10-30 改定: 仮予定=黄を追加）:
+  黄(5)       = 仮予定（日程未確定の仮押さえ）。タグ・中身に関係なく最優先で黄
   グレー(8)   = 作業（一人の作業ブロック）
-  オレンジ(6) = オンラインミーティング
+  オレンジ(6) = オンラインミーティング（確定したもの）
   紫(3)       = 実際に外出する予定・対面・オフライン
                 （往訪/来訪/社内対面/社外に加え、ランチ・会食・夜の外出・通院なども紫）
   赤(11)      = その他・関係ないもの（カレンダーの既定色も赤なので、
                 「色なし」と「明示的な赤」は見た目が同じ）
+
+仮予定の判定はタイトルの仮マーカーだけで行う（is_tentative() 参照）。
+2026-10-30 まで仮予定も [オンライン社外] タグでオレンジに塗っていたため、
+hawk-inbound-lead が黄(5)で作った仮押さえをこのスイープが毎回オレンジへ上書きしていた。
+タイトルから仮が外れれば（=確定）、次の回でタグどおりの色に塗り替わる。
 
 判定は決定論。変更するのは colorId だけで、タイトル・時間・出席者・公開範囲・
 availability には一切触れない。--apply を付けない限り読み取りのみ。
@@ -30,7 +36,17 @@ ACC = "yuki.katayama@fout.jp"
 DAYS = 14
 
 # バケツ -> colorId
-COLOR = {"作業": "8", "オンライン": "6", "外出対面": "3", "その他": "11"}
+COLOR = {"仮": "5", "作業": "8", "オンライン": "6", "外出対面": "3", "その他": "11"}
+
+# 仮マーカー（タイトルのどこにあってもよい）:
+#   【仮】 [仮] (仮) 仮) 仮/… のように仮の直後が閉じ括弧のもの、
+#   【仮候補】 仮押さえ 仮予定 のように仮の後ろが仮押さえを表す語のもの
+# 「（仮称）」「仮説」「仮想」「仮枠整理」のような熟語は仮予定ではないので拾わない。
+TENTATIVE_RE = re.compile(r"仮\s*[】\]］)）〕>＞]|仮(?:押さえ|押え|予定|日程|候補|置き)")
+
+# タイトル先頭（[主タグ] の直後も含む）の「仮」。仮/ビルコム、仮みのまた、仮[往訪] … のような書き方。
+# 直後が漢字なら熟語（[作業] 仮枠整理 など）なので仮予定扱いしない。
+LEADING_TENTATIVE_RE = re.compile(r"\s*(?:[\[［][^\]］]*[\]］]\s*)?仮(?![一-鿿])")
 
 # 外出を伴う私用（ランチ・会食・夜の外出・通院など）→ 紫
 OUTING_RE = re.compile(
@@ -80,6 +96,13 @@ def main_tag(summary):
     return re.sub(r"\s+", "", head)
 
 
+def is_tentative(summary):
+    """タイトルに仮マーカーがあれば仮予定。「確定」を含むもの（【仮→確定】等）は除く。"""
+    if "確定" in summary:
+        return False
+    return bool(TENTATIVE_RE.search(summary) or LEADING_TENTATIVE_RE.match(summary))
+
+
 def classify(e):
     """(バケツ, 理由) を返す。対象外なら (None, 理由)。"""
     summary = e.get("summary", "") or ""
@@ -92,6 +115,10 @@ def classify(e):
         return None, "キャンセル済み"
     if not e.get("start", {}).get("dateTime"):
         return None, "終日予定"
+
+    # 仮予定はタグより優先して黄。[オンライン社外] でもオレンジにしない。
+    if is_tentative(summary):
+        return "仮", "仮マーカー"
 
     tag = main_tag(summary)
     humans = [a for a in e.get("attendees", []) if not a.get("resource") and not a.get("self")]
@@ -156,9 +183,9 @@ def build_plan(events):
         if cur == want:
             continue
 
-        # 推定で「作業(グレー)」にしようとしたが、既にオレンジ/紫が付いている場合は
-        # 手動で付けた会議色の可能性が高いので上書きせず報告だけする
-        if bucket == "作業" and why.startswith("推定") and cur in ("3", "6"):
+        # 推定で「作業(グレー)」にしようとしたが、既に黄/オレンジ/紫が付いている場合は
+        # 手動で付けた仮予定・会議色の可能性が高いので上書きせず報告だけする
+        if bucket == "作業" and why.startswith("推定") and cur in ("3", "5", "6"):
             conflict.append((when, summary, cur))
             continue
 
@@ -225,7 +252,7 @@ def main():
         for p in guessed:
             print(f"  ? {p['when']} →{p['bucket']} ({p['why']}) {p['summary'][:40]}")
     if conflict:
-        print(f"\n触らなかった {len(conflict)}件（推定はグレーだが会議色が付いている・要タグ付け）:")
+        print(f"\n触らなかった {len(conflict)}件（推定はグレーだが黄/会議色が付いている・要タグ付け）:")
         for when, summary, cur in conflict:
             print(f"  ! {when} 色{cur} {summary[:40]}")
 
