@@ -1,5 +1,45 @@
 # claude-configgggggg
 
+## HAWK 概要資料は 2026-11 以降「2026年10-12月版 PDF」だけを使う（2026-10-30 本人指定）
+
+メールの添付・カレンダーの添付／説明欄・商談準備の参考資料など、
+**HAWK の概要資料（Overview／媒体資料／ピッチ資料）を出す場面はすべてこれ。**
+スキルや過去の予定に古い ID が書いてあっても、こちらを優先する。
+
+- ファイル名: `FreakOut_HAWK_Overview_2026_10-12.pptx.pdf`（表紙「HAWK OVERVIEW 2026年 10-12月」、33枚、2.5MB）
+- URL: https://drive.google.com/file/d/1oLe71twfwBdJGxktDagQKS1q0AVeukCA/view
+- 置き場所: 共有ドライブ `01_概要資料`（`1E3WvuymV8e1HuhBDYwVskVC4WdTnV5PA`）
+- 元の pptx: `FreakOut_HAWK_Overview_2026_10-12.pptx`（`1l834fpPZeamuW7n2XuBZVOTDzD2CmY_8`）。渡すのは PDF の方
+- ページ早見: DealDesk p.15・23・31-32 ／ デモ p.21 ／ 料金 p.27-28 ／ 無料トライアル p.29
+
+**共有範囲は fout.jp ドメイン内だけ**（「リンクを知っている全員」ではない）。
+- 社外宛メールは **PDF をファイルとして添付**する。リンクを貼っても先方は開けない。
+  gog なら 2.5MB でもそのまま下書きに付く（2026-10-30 実測。テスト下書きは削除済み）。
+  添付名がローカルのファイル名になるので、正式名で保存してから付ける:
+  ```bash
+  gog --account yuki.katayama@fout.jp drive download 1oLe71twfwBdJGxktDagQKS1q0AVeukCA --out "$TMP/FreakOut_HAWK_Overview_2026_10-12.pdf"
+  gog --account yuki.katayama@fout.jp --gmail-no-send gmail drafts create --to ... --subject ... --body-file ... --attach "$TMP/FreakOut_HAWK_Overview_2026_10-12.pdf"
+  ```
+- 署名にある「▼HAWK 媒体資料」のリンク（旧版 `1jNYfsyb…`、誰でも閲覧可）は使わない。
+  新版は社外から開けないので、その行は外して PDF 添付で代える。
+- 社内向けのカレンダー予定（先方がゲストにいない）は、上の URL を説明欄に書き、ファイルも添付する。
+
+以下は**旧版なので新規には使わない**（11月以降の予定に残っていたら差し替える）:
+- `HAWK Overview_202610版`（`1izKzY_NFIRr5kmJvJGlaigo1-j05jDGzkTWMNDKoIxI`）
+- `【概要資料】HAWK Overview 202610版（DealDesk反映・暫定）`（`1GuSc_ZafP0ZQtkkJEoACKYazNoavc4QR7UKJL05VuJg`）
+- `HAWK Overview Ver2.0`（`1YP05pRNdz3RYTSeFoek8X9bEwRAz2VH-2V1XILYkUN0`）
+- `【概要資料】HAWK Overview 202609版_ver2`（`12MgGu8yN-mNnNyVoHrKeWROzFVIz68ztRKOEJ8_TPX0`）
+- `【概要資料】HAWK Overview 202609版`（`1DDY0AxIOoArf23EbnDwBpP4k8zqNPMmpECIB_0oU7YQ`）
+- `HAWK Overview 202607版`（`1rvFIO3jDTaI6Dif6-mRpwMb55xI1Uy-JRVx18dJpw30`）
+- `HAWK Overview 20260518Ver1.1`（`1jNYfsybGnwpOGYQ2PyvBdpoEoUnjRkGoNNXYOtP7sIg`）
+  … `hawk-inbound-lead` スキルの templates.md（署名・商談関連資料・標準添付セット①）にまだ載っている
+- `HAWK Overview 05182026`（`1YO2Lmgs7gFwK3f6vt0dJW07INkFZNT4o7PEHim4Tw7M`）
+
+※ 送付済みメールの記録（「10/26 に 202610版PDFを添付して送付」等）は事実なので書き換えない。
+※ 先方がゲストにいる予定の添付は勝手に触らない。差し替えたい時は確認する。
+※ 社名入りの版（`【〇〇様】HAWK Overview_…`）を別の会社に流用しない。
+※ 次の版が出たら、この節の ID・ページ早見・旧版リストをまとめて更新する。
+
 ## Google Workspace 操作は gog を最優先で使う
 
 Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操作は、
