@@ -208,7 +208,8 @@ job_program() {
 # launchd ジョブを止めて plist と PrivilegedHelperTools の実体を退避
 remove_job() {
   local plist="$1" prog
-  [ -e "$plist" ] || return 0
+  # Oracle Java 等は plist を本体へのシンボリックリンクで置くので、リンク切れも拾う
+  [ -e "$plist" ] || [ -L "$plist" ] || return 0
   prog=$(job_program "$plist")
   if [ "$MODE" = apply ]; then
     case "$plist" in
