@@ -21,11 +21,22 @@ set -u
 
 LOGIN_ITEMS=("Clipy")
 # 復元させないアプリ: "バンドルID|アプリ名"
+#   アプリ名を書いたものだけ、保険（起動してしまったら 60 秒以内に終了）の対象にもなる
+#   復元を残すもの: Chrome / Finder / Slack / LINE
 NO_RELAUNCH=(
   "com.microsoft.Excel|Microsoft Excel"
   "com.microsoft.Word|Microsoft Word"
   "com.microsoft.Powerpoint|Microsoft PowerPoint"
   "us.zoom.xos|zoom.us"
+  "com.apple.systempreferences|"
+  "com.moomoo.mm|"
+  "com.openai.atlas|"
+  "com.pushplaylabs.sidekick|"
+  "com.sublimetext.4|"
+  "com.apple.notes|"
+  "com.apple.MobileSMS|"
+  "kj.gapps|"                 # アンインストール済み（mdfind で見つからない）
+  "com.magican.castle|"       # 同上
 )
 WINDOW_SEC=60
 
@@ -125,8 +136,9 @@ done
 echo "== 2. 次回ログインで復元させないアプリ（それ以外は今まで通り復元）"
 IDS=""; NAMES=()
 for e in "${NO_RELAUNCH[@]}"; do
-  IDS="$IDS ${e%%|*}"; NAMES+=("${e#*|}")
-  echo "  ${e#*|}  (${e%%|*})"
+  IDS="$IDS ${e%%|*}"
+  [ -n "${e#*|}" ] && NAMES+=("${e#*|}")
+  if [ -n "${e#*|}" ]; then echo "  ${e%%|*}  （保険あり: ${e#*|}）"; else echo "  ${e%%|*}"; fi
 done
 echo "  → $D_PLIST（root で常駐。ログアウト後も動く）"
 echo "== 3. 保険: それでも立ち上がったらログイン後 ${WINDOW_SEC} 秒以内に終了"
