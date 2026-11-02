@@ -129,7 +129,7 @@ for name in "${LOGIN_ITEMS[@]}"; do
     mkdir -p "$STATE_DIR"
     printf '%s\t%s\n' "$name" "$path" >> "$STATE"
   else
-    echo "  !! 失敗: $name（システム設定 → 一般 → ログイン項目 から手で外してください）"
+    echo "  !! 失敗: ${name}（システム設定 → 一般 → ログイン項目 から手で外してください）"
   fi
 done
 
@@ -140,7 +140,7 @@ for e in "${NO_RELAUNCH[@]}"; do
   [ -n "${e#*|}" ] && NAMES+=("${e#*|}")
   if [ -n "${e#*|}" ]; then echo "  ${e%%|*}  （保険あり: ${e#*|}）"; else echo "  ${e%%|*}"; fi
 done
-echo "  → $D_PLIST（root で常駐。ログアウト後も動く）"
+echo "  → ${D_PLIST}（root で常駐。ログアウト後も動く）"
 echo "== 3. 保険: それでも立ち上がったらログイン後 ${WINDOW_SEC} 秒以内に終了"
 echo "  → $A_PLIST"
 
