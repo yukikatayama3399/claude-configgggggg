@@ -118,6 +118,12 @@ LEFTOVERS=(
   "$L/Group Containers/group.com.moomoo.mm.StockQuoteWidgetMoo"
   # Java（本体は削除済み）
   "$L/Application Support/Java"
+  # 本体が既に無いアプリ（--inspect で「アプリ: 見つからない」を確認済み）
+  "$L/Application Support/Dia"
+  "$L/Application Support/LarkInternational"
+  "$L/Application Support/Microsoft Edge"
+  "$L/Application Support/com.openai.atlas"
+  "$L/Application Support/Adobe"
 )
 
 MODE=dry
@@ -138,7 +144,7 @@ human() { awk '{ kb=$1; $1=""; sub(/^ /,"");
 
 # ---------------------------------------------------------------- inspect
 if [ "$MODE" = inspect ]; then
-  for d in "$L/Application Support/Claude" "$L/Application Support/Google" \
+  for d in "$L/Application Support/Claude" "$L/Application Support/Claude/vm_bundles" "$L/Application Support/Google" \
            "$L/Application Support/Google/Chrome" "$L/Application Support/Google/Chrome/Default" \
            "$L/Group Containers/UBF8T346G9.OneDriveSyncClientSuite" "$L/Containers/com.microsoft.OneDrive-mac" \
            "$L/Application Support/ChatWork" "$HOME/.ollama/models" "$HOME/Dropbox"; do
@@ -170,16 +176,36 @@ purge() {
   TOTAL=$((TOTAL + kb))
   printf '%s %s\n' "$kb" "$p" | human | sed "s#$HOME#~#"
   [ "$MODE" = apply ] || return 0
-  rm -rf "$p" 2>/dev/null || FAILED="${FAILED}  - ${p}"$'\n'
+  rm -rf "$p" 2>/dev/null
+  if [ -e "$p" ]; then
+    # インストーラが root で作ったファイルは sudo で消す（Containers は sudo でも無理。フルディスクアクセスが要る）
+    case "$p" in
+      */Containers/*) ;;
+      *) sudo rm -rf "$p" 2>/dev/null ;;
+    esac
+  fi
   [ -e "$p" ] && FAILED="${FAILED}  - ${p}"$'\n'
   return 0
 }
 
+# アプリが起動中なら飛ばす（起動中にキャッシュを消すと不具合の元）
+app_running() {
+  if pgrep -xq "$1"; then
+    echo "  $1 が起動中なのでスキップ。$1 を終了（⌘Q）してからもう一度実行してください。"
+    return 0
+  fi
+  return 1
+}
+
 echo "== 1. Chrome のキャッシュ"
-if pgrep -xq "Google Chrome"; then
-  echo "  Chrome が起動中なのでスキップ。Chrome を終了（⌘Q）してからもう一度実行してください。"
-else
+if ! app_running "Google Chrome"; then
   for p in "${CHROME_CACHE[@]}"; do purge "$p"; done
+  # 各プロファイルの Service Worker キャッシュ（サイトが作り直す。ログイン状態・履歴には影響しない）
+  for prof in "$L/Application Support/Google/Chrome/"*/; do
+    purge "${prof}Service Worker/CacheStorage"
+    purge "${prof}Service Worker/ScriptCache"
+    purge "${prof}GPUCache"
+  done
 fi
 
 echo "== 2. 更新ファイルの残り・キャッシュ"
@@ -187,6 +213,23 @@ for p in "${CACHES[@]}"; do purge "$p"; done
 
 echo "== 3. 削除したアプリの残りデータ"
 for p in "${LEFTOVERS[@]}"; do purge "$p"; done
+
+echo "== 4. 使い続けるアプリのキャッシュ（作り直される）"
+if ! app_running "Claude"; then
+  purge "$L/Application Support/Claude/Cache"
+  purge "$L/Application Support/Claude/Code Cache"
+  purge "$L/Application Support/Claude/GPUCache"
+fi
+if ! app_running "Chatwork"; then
+  # Partitions 直下はアカウントごとのセッション。ログイン情報は残してキャッシュだけ消す
+  for part in "$L/Application Support/ChatWork/Partitions/"*/; do
+    purge "${part}Cache"
+    purge "${part}Code Cache"
+    purge "${part}GPUCache"
+    purge "${part}Service Worker/CacheStorage"
+    purge "${part}Service Worker/ScriptCache"
+  done
+fi
 
 echo
 echo "合計: 約 $((TOTAL / 1024)) MB"
