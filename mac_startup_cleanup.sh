@@ -1,5 +1,5 @@
 #!/bin/bash
-# mac_startup_cleanup.sh — Mac の起動時に立ち上がる不要アプリ・常駐ヘルパーを片付ける
+# mac_startup_cleanup.sh — 使っていないアプリと常駐の残骸を片付ける（MacBook-Air-3 用の一覧）
 #
 # 使い方（sudo は付けない。必要な所だけスクリプトが sudo を求める）:
 #   bash mac_startup_cleanup.sh               # ドライラン: 何を退避するか表示するだけ
@@ -9,19 +9,84 @@
 #
 # 削除はしない。全部 ~/startup_cleanup_backup/<日時>/files/<元のパス> に退避するので、
 # --restore で元の場所に戻せる。様子を見て問題なければ、そのフォルダをゴミ箱へ。
+# アプリ本体だけを動かすので、各アプリのデータ（~/Dropbox、1Password の保管庫、
+# ~/Library 配下の設定など）はそのまま残る。
 #
-# 対象（存在するものだけ処理する。無ければ何もしない）:
-#   - Clipy（ログイン項目＋アプリ）
-#   - Microsoft Excel / Word / PowerPoint
-#       Outlook / OneNote / Defender 等が残っていなければ AutoUpdate とライセンスヘルパーも
-#   - Zoom（アプリ＋常駐 Daemon＋updater）
-#   - Oracle Java の更新ヘルパー・ブラウザプラグイン・設定パネル（JDK 本体は触らない）
-#   - ClashX Pro / XQuartz / Canon MasterInstaller / HighfiveApp
-#
-# 触らないもの: Trend Micro・Avast（セキュリティ）、Google 日本語入力、Karabiner、
-#   Google / OneDrive / Teams の updater、DisplayLink、Brother、SwitchResX、Logi
+# 残すもの（2026-11-02 決定）: Excel / Word / PowerPoint / OneDrive / Zoom とその更新ツール、
+#   Google Docs/Sheets/Slides のショートカット、Bitwarden、UCSS、Apple 純正、連絡系アプリ、
+#   Trend Micro・Avast、Google 日本語入力、Karabiner、DisplayLink、Brother、SwitchResX
 
 set -u
+
+# ---- 退避するアプリ（存在するものだけ処理）
+REMOVE_APPS=(
+  # 前から不要
+  "$HOME/Applications/Clipy.app"
+  "$HOME/Applications/HighfiveApp.app"
+  "$HOME/Applications/PhoneClean.app"
+  # Microsoft（Excel / Word / PowerPoint / OneDrive は残す）
+  "/Applications/Microsoft Outlook.app"
+  "/Applications/Microsoft Teams.app"
+  # 古い・サービス終了・代替あり
+  "/Applications/Utilities/QuickTime Player 7.app"
+  "/Applications/Utilities/Adobe AIR Uninstaller.app"
+  "/Applications/Utilities/Adobe AIR Application Installer.app"
+  "/Applications/Utilities/LogiMgr Uninstaller.app"
+  "/Applications/Skype.app"
+  "/Applications/Twitter.app"
+  "/Applications/HyperSwitch.app"
+  "/Applications/Google AdWords Editor.app"
+  "/Applications/MacWinZipper.app"
+  "/Applications/The Unarchiver.app"
+  "/Applications/OmniDiskSweeper_容量整理.app"
+  "/Applications/PDFelementPro6.app"
+  "/Applications/Shadowrocket.app"
+  "/Applications/1Password 7.app"
+  # 動画編集
+  "/Applications/CapCut 2.app"
+  "/Applications/Wondershare Filmora Mac.app"
+  "/Applications/Vrew.app"
+  # メモ・読書
+  "/Applications/Goodnotes.app"
+  "/Applications/Amazon Kindle.app"
+  "/Applications/Skim.app"
+  # ストレージ
+  "/Applications/Dropbox.app"
+  # ブラウザ・VPN
+  "/Applications/Firefox.app"
+  "/Applications/Fellou.app"
+  "/Applications/Sidekick.app"
+  "/Applications/ProtonVPN.app"
+  "/Applications/Notion Web Clipper.app"
+  # マウス系
+  "/Applications/Logi Options.app"
+  "/Applications/lghub.app"
+  "/Applications/Utilities/SteerMouse.app"
+  # その他
+  "/Applications/iTerm.app"
+  "/Applications/moomoo.app"
+)
+
+# ---- 退避する常駐ジョブ（アプリ本体が無い残骸・上のアプリ付属の updater）
+#      上のアプリの中を指している LaunchAgent / LaunchDaemon は、この一覧に無くても自動で拾う
+REMOVE_JOBS=(
+  /Library/LaunchDaemons/com.microsoft.teams.TeamsUpdaterDaemon.plist
+  /Library/LaunchDaemons/com.oracle.java.Helper-Tool.plist
+  /Library/LaunchAgents/com.oracle.java.Java-Updater.plist
+  /Library/LaunchDaemons/com.west2online.ClashXPro.ProxyConfigHelper.plist
+  /Library/LaunchDaemons/org.macosforge.xquartz.privileged_startx.plist
+  /Library/LaunchAgents/org.macosforge.xquartz.startx.plist
+  /Library/LaunchDaemons/jp.co.canon.MasterInstaller.plist
+  "$HOME/Library/LaunchAgents/com.fatline.HighfiveApp.ota.plist"
+)
+
+# ---- その他の残骸（アプリ本体が既に無いもの）
+REMOVE_PATHS=(
+  "/Library/Internet Plug-Ins/JavaAppletPlugin.plugin"
+  /Library/PreferencePanes/JavaControlPanel.prefPane
+  "/Library/Application Support/Oracle/Java"
+  /opt/X11
+)
 
 MODE=dry
 RESTORE_DIR=""
@@ -30,7 +95,7 @@ case "${1:-}" in
   --apply)      MODE=apply ;;
   --list-apps)  MODE=list ;;
   --restore)    MODE=restore; RESTORE_DIR="${2:-}" ;;
-  -h|--help)    sed -n '2,25p' "$0"; exit 0 ;;
+  -h|--help)    sed -n '2,19p' "$0"; exit 0 ;;
   *) echo "不明な引数: $1（--help 参照）" >&2; exit 1 ;;
 esac
 
@@ -45,6 +110,7 @@ UID_NUM=$(id -u)
 BACKUP="$HOME/startup_cleanup_backup/$(date +%Y%m%d-%H%M%S)"
 MANIFEST="$BACKUP/manifest.tsv"
 FOUND=0
+FREED_KB=0
 FAILED=""
 
 # $HOME 配下でなければ sudo を付けて実行
@@ -119,9 +185,11 @@ fi
 
 # ファイル／フォルダを退避フォルダへ移動
 stash() {
-  local p="$1"
+  local p="$1" kb
   [ -e "$p" ] || [ -L "$p" ] || return 0
   FOUND=$((FOUND + 1))
+  kb=$(du -sk "$p" 2>/dev/null | cut -f1)
+  FREED_KB=$((FREED_KB + ${kb:-0}))
   echo "  退避: $p"
   [ "$MODE" = apply ] || return 0
   mkdir -p "$BACKUP/files$(dirname "$p")"
@@ -132,12 +200,16 @@ stash() {
   fi
 }
 
+job_program() {
+  plutil -extract Program raw -o - "$1" 2>/dev/null \
+    || plutil -extract ProgramArguments.0 raw -o - "$1" 2>/dev/null
+}
+
 # launchd ジョブを止めて plist と PrivilegedHelperTools の実体を退避
 remove_job() {
   local plist="$1" prog
   [ -e "$plist" ] || return 0
-  prog=$(plutil -extract Program raw -o - "$plist" 2>/dev/null \
-      || plutil -extract ProgramArguments.0 raw -o - "$plist" 2>/dev/null)
+  prog=$(job_program "$plist")
   if [ "$MODE" = apply ]; then
     case "$plist" in
       /Library/LaunchDaemons/*) sudo launchctl bootout system "$plist" 2>/dev/null ;;
@@ -169,69 +241,36 @@ remove_login_item() {
   fi
 }
 
-echo "== Clipy"
-quit_app Clipy
-remove_login_item Clipy
-stash /Applications/Clipy.app
-
-echo "== Microsoft Excel / Word / PowerPoint"
-for a in "Microsoft Excel" "Microsoft Word" "Microsoft PowerPoint"; do
-  quit_app "$a"
-  stash "/Applications/$a.app"
+echo "== 1. 常駐ジョブ（アプリ付属の updater・残骸）"
+for j in "${REMOVE_JOBS[@]}"; do remove_job "$j"; done
+# 退避するアプリの中を指している LaunchAgent / LaunchDaemon も止める
+for plist in /Library/LaunchAgents/*.plist /Library/LaunchDaemons/*.plist "$HOME"/Library/LaunchAgents/*.plist; do
+  [ -e "$plist" ] || continue
+  prog=$(job_program "$plist")
+  [ -n "$prog" ] || continue
+  for app in "${REMOVE_APPS[@]}"; do
+    case "$prog" in "$app"/*) remove_job "$plist"; break ;; esac
+  done
 done
-KEEP_MS=""
-for a in "Microsoft Outlook" "Microsoft OneNote" "Microsoft Defender" "Microsoft Remote Desktop" "Windows App"; do
-  [ -d "/Applications/$a.app" ] && KEEP_MS="$KEEP_MS $a,"
+
+echo "== 2. アプリ"
+for app in "${REMOVE_APPS[@]}"; do
+  [ -e "$app" ] || continue
+  name=$(basename "$app" .app)
+  quit_app "$name"
+  remove_login_item "$name"
+  stash "$app"
 done
-if [ -z "$KEEP_MS" ]; then
-  remove_job /Library/LaunchAgents/com.microsoft.update.agent.plist
-  remove_job /Library/LaunchDaemons/com.microsoft.autoupdate.helper.plist
-  stash "/Library/Application Support/Microsoft/MAU2.0"
-  remove_job /Library/LaunchDaemons/com.microsoft.office.licensingV2.helper.plist
-else
-  echo "  （${KEEP_MS%,} が残っているので AutoUpdate とライセンスヘルパーは残す）"
-fi
 
-echo "== Zoom"
-quit_app zoom.us
-stash /Applications/zoom.us.app
-remove_job /Library/LaunchDaemons/us.zoom.ZoomDaemon.plist
-remove_job /Library/LaunchAgents/us.zoom.updater.plist
-remove_job /Library/LaunchAgents/us.zoom.updater.login.check.plist
-stash "/Library/Internet Plug-Ins/ZoomUsPlugIn.plugin"
-
-echo "== Oracle Java（更新ヘルパー・プラグイン。JDK 本体は残す）"
-remove_job /Library/LaunchDaemons/com.oracle.java.Helper-Tool.plist
-remove_job /Library/LaunchAgents/com.oracle.java.Java-Updater.plist
-stash "/Library/Internet Plug-Ins/JavaAppletPlugin.plugin"
-stash /Library/PreferencePanes/JavaControlPanel.prefPane
-stash "/Library/Application Support/Oracle/Java"
-
-echo "== ClashX Pro"
-quit_app "ClashX Pro"
-remove_job /Library/LaunchDaemons/com.west2online.ClashXPro.ProxyConfigHelper.plist
-stash "/Applications/ClashX Pro.app"
-
-echo "== XQuartz"
-remove_job /Library/LaunchDaemons/org.macosforge.xquartz.privileged_startx.plist
-remove_job /Library/LaunchAgents/org.macosforge.xquartz.startx.plist
-stash /Applications/Utilities/XQuartz.app
-stash /opt/X11
-
-echo "== Canon MasterInstaller"
-remove_job /Library/LaunchDaemons/jp.co.canon.MasterInstaller.plist
-
-echo "== HighfiveApp"
-quit_app HighfiveApp
-remove_job "$HOME/Library/LaunchAgents/com.fatline.HighfiveApp.ota.plist"
-stash "$HOME/Applications/HighfiveApp.app"
+echo "== 3. その他の残骸"
+for p in "${REMOVE_PATHS[@]}"; do stash "$p"; done
 
 echo
-echo "対象: ${FOUND} 件"
+echo "対象: ${FOUND} 件 / 空く容量: 約 $((FREED_KB / 1024 / 1024)) GB（退避フォルダを空にした後）"
 
 # ClashX がシステムのプロキシを 127.0.0.1 に向けたまま残っていると通信できなくなる
 if scutil --proxy 2>/dev/null | grep -qE 'Proxy : 127\.0\.0\.1'; then
-  echo "⚠ システムのプロキシが 127.0.0.1 に向いています（ClashX の残り設定の可能性）。"
+  echo "⚠ システムのプロキシが 127.0.0.1 に向いています（ClashX / Shadowrocket の残り設定の可能性）。"
   echo "  システム設定 → ネットワーク → 使用中の回線 → 詳細 → プロキシ を全部オフにしてください。"
 fi
 
@@ -240,11 +279,12 @@ if [ "$MODE" = apply ]; then
     echo
     echo "退避できなかったもの:"
     printf '%s' "$FAILED"
-    echo "  アプリが 'Operation not permitted' の場合は、Finder でゴミ箱へドラッグするか、"
-    echo "  システム設定 → プライバシーとセキュリティ → アプリの管理 でターミナルを許可して再実行。"
+    echo "  'Operation not permitted' の場合は、システム設定 → プライバシーとセキュリティ →"
+    echo "  アプリの管理（とフルディスクアクセス）でターミナルを許可して、もう一度 --apply。"
+    echo "  または Finder でそのアプリをゴミ箱へドラッグ。"
   fi
   echo
   echo "退避先: $BACKUP"
   echo "元に戻す: bash $0 --restore $BACKUP"
-  echo "再起動して問題なければ、退避フォルダはゴミ箱へ入れてOK。"
+  echo "数日使って問題なければ、退避フォルダをゴミ箱へ入れて空にすると容量が空きます。"
 fi
