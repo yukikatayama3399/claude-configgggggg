@@ -222,9 +222,19 @@ remove_job() {
   esac
 }
 
+# 起動中のときだけ、バンドル ID 指定で終了させる。
+# 名前で tell すると、ファイル名とアプリ名が違う場合に「〜はどこですか？」ダイアログで止まる。
 quit_app() {
+  local app="$1" bid
   [ "$MODE" = apply ] || return 0
-  osascript -e "tell application \"$1\" to quit" >/dev/null 2>&1 || true
+  pgrep -qf "$app/Contents/MacOS/" || return 0
+  bid=$(defaults read "$app/Contents/Info" CFBundleIdentifier 2>/dev/null)
+  if [ -n "$bid" ]; then
+    osascript -e "with timeout of 15 seconds" -e "tell application id \"$bid\" to quit" -e "end timeout" >/dev/null 2>&1
+  fi
+  sleep 1
+  pgrep -qf "$app/Contents/MacOS/" && pkill -TERM -f "$app/Contents/MacOS/"
+  return 0
 }
 
 remove_login_item() {
@@ -257,7 +267,7 @@ echo "== 2. アプリ"
 for app in "${REMOVE_APPS[@]}"; do
   [ -e "$app" ] || continue
   name=$(basename "$app" .app)
-  quit_app "$name"
+  quit_app "$app"
   remove_login_item "$name"
   stash "$app"
 done
