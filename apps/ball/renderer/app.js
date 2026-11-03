@@ -95,6 +95,21 @@
     if (i.calStart) { const t = Date.parse(i.calStart); return t ? `<span class="chip c-time cal">📅 ${esc(fmtWhen(t))}</span>` : ""; }
     return i.at ? `<span class="chip c-time" title="受け取った時刻">🕘 ${esc(fmtWhen(i.at, i.atApprox))}</span>` : "";
   }
+  // ---------- 完了の印（この Mac に覚えておく） ----------
+  // 読み直しても、立ち上げ直しても、完了にしたボールは出さない。ただし新しいメッセージが来たら（印が合わなくなるので）また出す
+  const DONE_KEY = "ball.done.v1";
+  let doneStore = null;
+  const dones = () => { if (!doneStore) { try { doneStore = JSON.parse(localStorage.getItem(DONE_KEY) || "{}") || {}; } catch (e) { doneStore = {}; } } return doneStore; };
+  const doneKey = (x) => x.src === "msgr" ? `${x.id}|${x.sub}` : x.src === "cal" ? x.id : `${x.id}|${x.at || ""}`;
+  function markDone(x) {
+    x.done = true;
+    if (!x.live) return;
+    const st = dones(); st[doneKey(x)] = Date.now();
+    const ks = Object.keys(st); if (ks.length > 3000) ks.sort((a, b) => st[a] - st[b]).slice(0, ks.length - 3000).forEach((k) => delete st[k]);
+    try { localStorage.setItem(DONE_KEY, JSON.stringify(st)); } catch (e) { /* 覚えられなくても、この起動中は閉じたまま */ }
+  }
+  const applyDone = () => { const st = dones(); items.forEach((x) => { if (x.live && !x.done && st[doneKey(x)]) x.done = true; }); };
+
   // ---------- 並び順 ----------
   // メール・Slack・Messenger は受け取った時刻の新しい順（新着が上）。カレンダーの作業は、これから来る時刻の早い順
   function dateTime(str) { const d = new Date(String(str || "").replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T")); return isNaN(d) ? 0 : d.getTime(); }
@@ -110,6 +125,7 @@
   const byNewest = (a, b) => (b.at || 0) - (a.at || 0);
   const byStart = (a, b) => (a.calStart < b.calStart ? -1 : a.calStart > b.calStart ? 1 : 0);
   function left() {
+    applyDone();
     const vis = items.filter((i) => !i.done && !i.hidden && (S.proj === "all" || i.proj === S.proj));
     const by = (s) => vis.filter((i) => i.sec === s);
     $("meCount").textContent = `自分ボール ${items.filter((i) => i.sec === "me" && !i.done && !i.hidden).length}`;
@@ -771,7 +787,7 @@
           $("sendGo").disabled = true; $("sendGo").textContent = "送信中…";
           $("sendGo").textContent = (t.files || []).length ? "ファイルを送っています…" : "送信中…";
           const r = await window.ball.slackSend({ channel: t.channel, threadTs: t.threadTs, text: toSlackText(t, ta.value), files: (t.files || []).map((f) => ({ name: f.name, type: f.type, data: f.data })) });
-          if (r.ok) { box.hidden = true; t.draft = ""; ta.value = ""; (t.files || []).forEach((f) => f.preview && URL.revokeObjectURL(f.preview)); t.files = []; t.aiDraft = false; toast("送信しました"); i.done = true; D.closed.unshift(`Slack: ${i.title.slice(0, 30)} · 返信済み`); left(); }
+          if (r.ok) { box.hidden = true; t.draft = ""; ta.value = ""; (t.files || []).forEach((f) => f.preview && URL.revokeObjectURL(f.preview)); t.files = []; t.aiDraft = false; toast("送信しました"); markDone(i); D.closed.unshift(`Slack: ${i.title.slice(0, 30)} · 返信済み`); left(); }
           else { $("sendGo").disabled = false; $("sendGo").textContent = "この内容で送信"; toast("送信できませんでした：" + r.error); }
         };
       };
@@ -794,7 +810,7 @@
         $("sendGo").onclick = () => {
           box.hidden = true;
           const text = ta.value;
-          insertIntoMessenger(i, text, { send: true, done: () => { t.draft = ""; i.done = true; D.closed.unshift(`Messenger: ${t.name} · 送信済み`); left(); } });
+          insertIntoMessenger(i, text, { send: true, done: () => { t.draft = ""; markDone(i); D.closed.unshift(`Messenger: ${t.name} · 送信済み`); left(); } });
         };
       };
       return;
@@ -828,7 +844,7 @@
           box.hidden = true; t.draftId = null; t.draft = ""; ta.value = "";
           $("draftState").textContent = "送信しました";
           toast("送信しました");
-          i.done = true; D.closed.unshift(`Gmail: ${i.title.slice(0, 30)} · 送信済み`); left();
+          markDone(i); D.closed.unshift(`Gmail: ${i.title.slice(0, 30)} · 送信済み`); left();
         } else {
           $("sendGo").disabled = false; $("sendGo").textContent = "この内容で送信";
           toast("送信できませんでした：" + r.error);
@@ -878,7 +894,12 @@
   // ---------- イベント ----------
   $("ct-chat").onclick = () => { S.ctab = "chat"; center(); };
   $("ct-memo").onclick = () => { S.ctab = "memo"; center(); };
-  $("ct-done").onclick = () => { const i = curItem(); i.done = true; toast("完了にしました。本番ではカレンダーの予定に ✅ を付けます"); const next = items.find((x) => !x.done && x.sec === "me"); if (next) select(next.id); else left(); };
+  $("ct-done").onclick = () => {
+    const i = curItem(); if (!i || i.id === "home") return;
+    markDone(i);
+    toast("完了にしました（このあと相手から新しいメッセージが来たら、また出します）");
+    const next = items.find((x) => !x.done && !x.hidden && x.sec === "me" && x.id !== "home"); if (next) select(next.id); else left();
+  };
   $("m-browser").onclick = () => { S.rmode = "browser"; right(); };
   $("m-thread").onclick = () => { S.rmode = "thread"; right(); };
   $("newtab").onclick = () => openTab("https://www.google.com/", "新しいタブ");
