@@ -138,4 +138,31 @@ async function sendDraft(d) {
   return { sent: true, draftId };
 }
 
-module.exports = { status, inbox, thread, openAttachment, saveDraft, sendDraft, ACCOUNT };
+// ---------- カレンダー（読み取りのみ） ----------
+// 今日から days 日ぶんの予定。[Private] と終日の場所メモ（オフィス・自宅など）は出さない
+async function calendar(days = 2) {
+  const fmt = (d) => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 10); // JST の日付
+  const now = new Date();
+  const from = fmt(now), to = fmt(new Date(now.getTime() + days * 86400e3));
+  const d = await runJson(["calendar", "events", "--from", from, "--to", to, "--max", "200", "--all-pages"]);
+  const evs = (d.events || d || []).filter((e) => e.status !== "cancelled");
+  return evs
+    .filter((e) => !/^\[Private/.test(e.summary || ""))
+    .filter((e) => !(e.start && e.start.date && /^(オフィス|自宅|在宅|\[作業\] 在宅勤務)$/.test((e.summary || "").trim())))
+    .map((e) => {
+      const self = (e.attendees || []).find((a) => a.self) || null;
+      const meet = e.hangoutLink || ((e.conferenceData && e.conferenceData.entryPoints || []).find((x) => x.entryPointType === "video") || {}).uri || "";
+      return {
+        id: e.id, summary: e.summary || "（タイトルなし）", allDay: !!(e.start && e.start.date),
+        start: (e.start && (e.start.dateTime || e.start.date)) || "", end: (e.end && (e.end.dateTime || e.end.date)) || "",
+        location: e.location || "", description: e.description || "", meet, htmlLink: e.htmlLink || "",
+        organizer: (e.organizer && (e.organizer.displayName || e.organizer.email)) || "", organizerSelf: !!(e.organizer && e.organizer.self),
+        myStatus: self ? self.responseStatus : (e.organizer && e.organizer.self ? "organizer" : ""),
+        attendees: (e.attendees || []).filter((a) => !a.resource).map((a) => ({ name: a.displayName || a.email, email: a.email, status: a.responseStatus, self: !!a.self })),
+        isWork: /^\[作業/.test(e.summary || ""),
+      };
+    })
+    .sort((a, b) => (a.start < b.start ? -1 : 1));
+}
+
+module.exports = { status, inbox, thread, openAttachment, saveDraft, sendDraft, calendar, ACCOUNT };

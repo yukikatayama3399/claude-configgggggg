@@ -73,7 +73,16 @@
     html += sec("自分ボール", by("me").filter((i) => !i.pinned));
     html += sec("AI 作業中", by("ai"));
     html += sec("返事待ち（相手ボール）", by("them"));
-    html += `<div class="sec"><div class="sech"><span>今日の予定</span><span class="n">${D.todayCal.length}</span></div>${D.todayCal.map((e) => `<button type="button" class="ev" ${e[2] ? `data-id="${e[2]}"` : "data-none='1'"} aria-current="${S.cur === e[2]}"><time>${e[0]}</time><span>${esc(e[1])}</span></button>`).join("")}</div>`;
+    const liveCal = items.filter((x) => x.live && x.src === "cal" && x.sec === "cal" && !x.hidden && (S.proj === "all" || x.proj === S.proj));
+    if (calLoaded) {
+      const byDay = {};
+      liveCal.forEach((x) => { (byDay[x.calDay] = byDay[x.calDay] || []).push(x); });
+      Object.keys(byDay).sort().forEach((day) => {
+        html += `<div class="sec"><div class="sech"><span>${day === todayStr() ? "今日の予定" : dayLabel(day) + "の予定"}</span><span class="n">${byDay[day].length}</span></div>${byDay[day].map((x) => `<button type="button" class="ev" data-id="${x.id}" aria-current="${S.cur === x.id}"><time>${esc(x.calTime)}</time><span>${esc(x.title)}</span></button>`).join("")}</div>`;
+      });
+    } else {
+      html += `<div class="sec"><div class="sech"><span>今日の予定</span><span class="n">${D.todayCal.length}</span></div>${D.todayCal.map((e) => `<button type="button" class="ev" ${e[2] ? `data-id="${e[2]}"` : "data-none='1'"} aria-current="${S.cur === e[2]}"><time>${e[0]}</time><span>${esc(e[1])}</span></button>`).join("")}</div>`;
+    }
     const closed = D.closed.concat(items.filter((i) => i.done).map((i) => i.title + " · 完了"));
     html += `<div class="sec"><div class="sech"><span>自動で閉じた</span><span class="n">${closed.length}</span></div><div class="closed">${closed.map((c) => `<s>${esc(c)}</s>`).join("")}</div></div>`;
     $("sections").innerHTML = html;
@@ -203,6 +212,7 @@
   function renderThread(i) {
     const t = i.thread;
     if (t.kind === "msgr") { renderMsgrThread(i); return; }
+    if (t.kind === "cal") { renderCalThread(i); return; }
     if (t.kind === "slack") {
       $("thr").innerHTML = `<div class="thr"><h4>${t.ws === "DM" ? "DM: " : ""}${esc(t.ch)}${t.ws === "DM" ? "" : " のスレッド"}<span>${esc(t.ws)}</span></h4>
         ${t.msgs.map((m) => `<div class="sm"><span class="av" style="background:${m[0]}">${esc(m[1][0])}</span><div><div class="n">${esc(m[1])}<time>${esc(m[2])}</time></div><div class="x">${esc(m[3])}</div>${m[4] ? `<span class="react">${esc(m[4])}</span>` : ""}</div></div>`).join("")}
@@ -596,6 +606,64 @@
     el.classList.remove("mock", "ng"); if (cls) el.classList.add(cls);
     el.querySelector("span").textContent = text;
   }
+  // ---------- カレンダーの取り込み（アプリ版のみ・Mac の gog 経由・読み取りのみ） ----------
+  // [作業] の予定 → 自分ボール。それ以外 → 「今日の予定」「明日の予定」。予定は押すと右に詳細が出る
+  let calLoaded = false, calAt = 0, calErr = null;
+  const todayStr = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const dayLabel = (d) => { const t = todayStr(); const tm = new Date(Date.parse(t) + 86400e3).toISOString().slice(0, 10); return d === tm ? "明日" : d.slice(5).replace("-", "/"); };
+  const hhmm = (iso) => (iso && iso.length > 10 ? iso.slice(11, 16) : "終日");
+  const STATUS_JA = { accepted: "出席", declined: "欠席", tentative: "未定", needsAction: "未回答", organizer: "主催" };
+  async function loadCalendar() {
+    const r = await window.ball.calendarEvents(2);
+    if (!r.ok) { calErr = r.error; setFt("ft-cal", "カレンダー: 読み込みエラー（押して再読込）", "ng"); return; }
+    calErr = null; calLoaded = true; calAt = Date.now();
+    items.filter((x) => x.src === "cal" && !x.live).forEach((x) => (x.hidden = true));
+    const ids = new Set();
+    r.data.forEach((e) => {
+      const id = "c-" + e.id + "-" + e.start.slice(0, 10); ids.add(id);
+      const isBall = e.isWork && !/今日の5件/.test(e.summary);
+      const day = e.start.slice(0, 10);
+      const fields = {
+        sec: isBall ? "me" : "cal", proj: "none", src: "cal", live: true, hidden: false,
+        title: isBall ? e.summary.replace(/^\[作業[^\]]*\]\s*/, "") : e.summary,
+        sub: isBall ? `カレンダーの作業 · ${dayLabel(day) === "明日" ? "明日" : day === todayStr() ? "今日" : dayLabel(day)} ${hhmm(e.start)}` : `${hhmm(e.start)}〜${hhmm(e.end)}`,
+        ago: "", calDay: day, calTime: e.allDay ? "終日" : hhmm(e.start),
+        chips: isBall ? [[day === todayStr() ? "今日" : dayLabel(day), "me"]] : [],
+      };
+      let it = items.find((x) => x.id === id);
+      if (!it) {
+        it = Object.assign({ id, memo: "", activeTab: 0, done: false,
+          feed: [["prog", "カレンダーから自動で取り込み"], ["ai", isBall ? `カレンダーに入れていた作業です（${hhmm(e.start)}〜）。右に予定の中身を出しています。` : `${hhmm(e.start)} の予定です。右に参加者や説明を出しています。\n商談なら、予習のブリーフはここで作れるようになります（Claude をつないだあと）。`]],
+          thread: { kind: "cal", live: true, ev: e },
+          tabs: e.htmlLink ? [{ title: "Google カレンダー", url: e.htmlLink, sim: "calev", key: id + "-0" }] : [] }, fields);
+        items.push(it);
+      } else { Object.assign(it, fields); it.thread.ev = e; }
+    });
+    // 予定が消えた・過去になったものは隠す
+    items.filter((x) => x.live && x.src === "cal" && !ids.has(x.id)).forEach((x) => (x.hidden = true));
+    setFt("ft-cal", `カレンダー ${agoText(calAt)} · ${r.data.length}件`, "");
+    left();
+  }
+  function renderCalThread(i) {
+    const e = i.thread.ev;
+    if (!e) { $("thr").innerHTML = `<div class="thr"><div class="empty">見本の予定です</div></div>`; return; }
+    const when = e.allDay ? `${e.start.slice(5).replace("-", "/")} 終日` : `${e.start.slice(5, 10).replace("-", "/")} ${hhmm(e.start)}〜${hhmm(e.end)}`;
+    $("thr").innerHTML = `<div class="thr">
+      <div class="thd"><h4>${esc(e.summary)}</h4><span>${e.meet ? `<button type="button" class="btn send" id="calMeet">Meet に入る</button> ` : ""}${e.htmlLink ? `<button type="button" class="btn" id="calOpen">カレンダーで開く ↗</button>` : ""}</span></div>
+      <div class="calv"><dl class="kv">
+        <dt>日時</dt><dd>${esc(when)}</dd>
+        ${e.location ? `<dt>場所</dt><dd>${esc(e.location)}</dd>` : ""}
+        ${e.organizer ? `<dt>主催</dt><dd>${esc(e.organizerSelf ? "自分" : e.organizer)}</dd>` : ""}
+        ${e.myStatus ? `<dt>自分</dt><dd>${esc(STATUS_JA[e.myStatus] || e.myStatus)}</dd>` : ""}
+        ${e.attendees.length ? `<dt>参加者</dt><dd>${e.attendees.map((a) => `${esc(a.self ? "自分" : a.name)}<span class="hint">（${esc(STATUS_JA[a.status] || a.status || "")}）</span>`).join("、")}</dd>` : ""}
+      </dl></div>
+      ${e.description ? `<div class="mcard"><div class="mb">${esc(e.description)}</div></div>` : ""}
+    </div>`;
+    if ($("calMeet")) $("calMeet").onclick = () => (IS_APP ? window.ball.openExternal(e.meet) : window.open(e.meet, "_blank"));
+    if ($("calOpen")) $("calOpen").onclick = () => openTab(e.htmlLink, "Google カレンダー");
+  }
+  $("ft-cal").onclick = () => { if (!IS_APP) return toast("カレンダーの取り込みはデスクトップアプリ版で動きます"); toast(calErr ? "読み込み直しています…（前回のエラー：" + calErr.slice(0, 80) + "）" : "カレンダーを読み込み直しています…"); loadCalendar(); };
+
   let gmailErr = null, gmailAt = 0, gmailCount = 0;
   async function loadGmail() {
     const st = await window.ball.gmailStatus();
@@ -639,6 +707,11 @@
     if (gmailErr.reason === "nogog") toast("この Mac に gog が入っていないか、場所が分かりません。ターミナルで gog --version を試してください");
     else toast("Gmail を読めませんでした：" + (gmailErr.message || "").slice(0, 300));
   };
+  if (IS_APP && window.ball.calendarEvents) {
+    window.ball.gmailStatus().then((st) => { if (st.ok) loadCalendar(); else setFt("ft-cal", "カレンダー: gog の準備が必要", "ng"); });
+    setInterval(() => { loadCalendar(); }, 5 * 60 * 1000);
+    setInterval(() => { if (calAt && !calErr) setFt("ft-cal", `カレンダー ${agoText(calAt)}`, ""); }, 60000);
+  }
   if (IS_APP && window.ball.gmailStatus) {
     loadGmail();
     setInterval(loadGmail, 3 * 60 * 1000);

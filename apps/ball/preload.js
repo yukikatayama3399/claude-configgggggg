@@ -19,4 +19,5 @@ contextBridge.exposeInMainWorld("ball", {
   gmailDraft: (d) => ipcRenderer.invoke("gmail-draft", d),
   gmailSend: (d) => ipcRenderer.invoke("gmail-send", d),
   gmailAttachment: (a) => ipcRenderer.invoke("gmail-attachment", a),
+  calendarEvents: (days) => ipcRenderer.invoke("calendar-events", days),
 });

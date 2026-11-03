@@ -153,6 +153,7 @@ const wrap = (fn) => async (_e, arg) => { try { return { ok: true, data: await f
 ipcMain.handle("gmail-status", () => gmail.status());
 ipcMain.handle("gmail-inbox", wrap(() => gmail.inbox()));
 ipcMain.handle("gmail-thread", wrap((id) => gmail.thread(id)));
+ipcMain.handle("calendar-events", wrap((days) => gmail.calendar(days || 2)));
 ipcMain.handle("gmail-draft", wrap((d) => gmail.saveDraft(d)));
 // 送信: BALL 本体の画面（片山さんが押す確認ボタン）からだけ受け付ける。
 // 右のブラウザのページや、将来つなぐ AI からは呼べない。AI に送信の手段は渡さない。
