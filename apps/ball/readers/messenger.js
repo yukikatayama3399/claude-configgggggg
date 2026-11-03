@@ -1,0 +1,64 @@
+// Messenger 読み取り係（見えない裏ウィンドウの preload）。
+// 右側のブラウザと同じログイン状態（partition "persist:ball"）で facebook.com/messages を開き、
+// 会話一覧を1分ごとに読んで、アプリ本体に送る。書き込み・送信は一切しない。
+const { ipcRenderer } = require("electron");
+
+const TIME_RE = /(\d+\s*(秒|分|時間|日|週|か月|年|m|h|d|w|y))$|^(月|火|水|木|金|土|日)(曜日?)?$|^\d{1,2}\/\d{1,2}$|^\d{1,2}:\d{2}$/;
+
+function isLoginPage() {
+  return /login|checkpoint/.test(location.pathname) ||
+    !!document.querySelector('input[name="email"], input[name="pass"], form[action*="login"]');
+}
+
+function readRow(a) {
+  const href = a.getAttribute("href") || "";
+  const m = href.match(/\/t\/([^/?#]+)/);
+  if (!m) return null;
+  let lines = (a.innerText || "").split("\n").map((s) => s.trim()).filter((s) => s && s !== "·");
+  if (lines.length < 2) {
+    // 1行に詰まっている作りのときは、文字の入った末端の要素を順に拾う
+    lines = [...a.querySelectorAll("*")].filter((el) => el.childElementCount === 0)
+      .map((el) => el.textContent.trim()).filter((s) => s && s !== "·");
+  }
+  if (lines.length < 2) return null;
+  const name = lines[0];
+  let rest = lines.slice(1);
+  let time = "";
+  if (rest.length && TIME_RE.test(rest[rest.length - 1])) time = rest.pop();
+  let snippet = rest.join(" ").replace(/\s*·\s*$/, "");
+  const mt = snippet.match(/\s·\s([^·]+)$/);
+  if (!time && mt && TIME_RE.test(mt[1].trim())) { time = mt[1].trim(); snippet = snippet.slice(0, mt.index); }
+  const mine = /^(あなた|You)\s*[:：]/.test(snippet);
+
+  // 未読の判定: aria-label に「未読」、または名前が太字
+  const row = a.closest('[role="row"], [role="listitem"], [role="gridcell"]');
+  const label = (a.getAttribute("aria-label") || "") + " " + ((row && row.getAttribute("aria-label")) || "");
+  let unread = /未読|unread/i.test(label) || !!a.querySelector('[aria-label*="未読"], [aria-label*="nread"]');
+  if (!unread) {
+    const nameSpan = [...a.querySelectorAll("span")].find((s) => s.childElementCount === 0 && s.textContent.trim() === name);
+    if (nameSpan && parseInt(getComputedStyle(nameSpan).fontWeight, 10) >= 600) unread = true;
+  }
+  let abs;
+  try { abs = new URL(href, location.href.startsWith("http") ? location.origin : "https://www.facebook.com").href; }
+  catch (e) { abs = "https://www.facebook.com" + href; }
+  return { id: m[1], name, snippet, time, unread, mine, href: abs };
+}
+
+function scrape() {
+  const at = Date.now();
+  if (isLoginPage()) return ipcRenderer.send("msgr-result", { at, status: "login", url: location.href, convos: [] });
+  const seen = new Set(), convos = [];
+  for (const a of document.querySelectorAll('a[href*="/t/"]')) {
+    const r = readRow(a);
+    if (!r || seen.has(r.id)) continue;
+    seen.add(r.id); convos.push(r);
+    if (convos.length >= 30) break;
+  }
+  ipcRenderer.send("msgr-result", { at, status: convos.length ? "ok" : "nolist", url: location.href, convos });
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  setTimeout(scrape, 8000);
+  setInterval(scrape, 60 * 1000);
+});
+ipcRenderer.on("scrape-now", scrape);

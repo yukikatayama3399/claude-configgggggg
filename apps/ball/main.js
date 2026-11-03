@@ -25,12 +25,40 @@ function createWindow() {
     },
   });
   win.loadFile(path.join(__dirname, "renderer", "index.html"));
+  // Mac 以外は本体を閉じたら終了（裏ウィンドウが残って終わらない、を防ぐ）
+  win.on("closed", () => { if (process.platform !== "darwin") { app.isQuitting = true; app.quit(); } });
 }
+
+// ---------- Messenger の読み取り（見えない裏ウィンドウ） ----------
+const MSGR_URL = process.env.BALL_MSGR_URL || "https://www.facebook.com/messages/";
+let msgrWin = null, lastMsgr = null;
+function startMessenger() {
+  msgrWin = new BrowserWindow({
+    show: false, width: 1200, height: 900, title: "BALL - Messenger 読み取り",
+    webPreferences: {
+      partition: "persist:ball",
+      preload: path.join(__dirname, "readers", "messenger.js"),
+      contextIsolation: true, nodeIntegration: false, backgroundThrottling: false,
+    },
+  });
+  msgrWin.loadURL(MSGR_URL);
+  // 裏ウィンドウを閉じても読み取りは止めない（隠すだけ）
+  msgrWin.on("close", (e) => { if (!app.isQuitting) { e.preventDefault(); msgrWin.hide(); } });
+  // 15分ごとに読み込み直して、一覧を新しくする
+  setInterval(() => { if (msgrWin && !msgrWin.isDestroyed()) msgrWin.reload(); }, 15 * 60 * 1000);
+}
+ipcMain.on("msgr-result", (_e, data) => { lastMsgr = data; if (win && !win.isDestroyed()) win.webContents.send("msgr-update", data); });
+ipcMain.handle("msgr-last", () => lastMsgr);
+ipcMain.on("msgr-show", () => { if (msgrWin) { msgrWin.show(); msgrWin.focus(); } });
+ipcMain.on("msgr-refresh", () => { if (msgrWin) msgrWin.reload(); });
+app.on("before-quit", () => { app.isQuitting = true; });
 
 app.whenReady().then(() => {
   session.fromPartition("persist:ball").setUserAgent(CHROME_UA);
   createWindow();
-  app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  if (process.env.BALL_NO_MSGR !== "1") startMessenger();
+  // 裏の Messenger ウィンドウは数えずに、本体ウィンドウが無ければ作り直す
+  app.on("activate", () => { if (!win || win.isDestroyed()) createWindow(); });
 });
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
 
@@ -50,6 +78,15 @@ app.on("web-contents-created", (_e, contents) => {
     });
   }
 });
+
+// ---------- Gmail（Mac の gog 経由） ----------
+const gmail = require("./gmail-bridge");
+const wrap = (fn) => async (_e, arg) => { try { return { ok: true, data: await fn(arg) }; } catch (err) { return { ok: false, error: String(err.message || err) }; } };
+ipcMain.handle("gmail-status", () => gmail.status());
+ipcMain.handle("gmail-inbox", wrap(() => gmail.inbox()));
+ipcMain.handle("gmail-thread", wrap((id) => gmail.thread(id)));
+ipcMain.handle("gmail-draft", wrap((d) => gmail.saveDraft(d)));
+ipcMain.handle("gmail-attachment", wrap(async (a) => { const p = await gmail.openAttachment(a); await shell.openPath(p); return p; }));
 
 ipcMain.on("open-external", (_e, url) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url);

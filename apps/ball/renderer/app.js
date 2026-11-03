@@ -62,9 +62,9 @@
       ${i.chips.length ? `<span class="m">${i.chips.map((c) => `<span class="chip c-${c[1]}">${esc(c[0])}</span>`).join("")}</span>` : ""}</span></button>`;
   }
   function left() {
-    const vis = items.filter((i) => !i.done && (S.proj === "all" || i.proj === S.proj));
+    const vis = items.filter((i) => !i.done && !i.hidden && (S.proj === "all" || i.proj === S.proj));
     const by = (s) => vis.filter((i) => i.sec === s);
-    $("meCount").textContent = `自分ボール ${items.filter((i) => i.sec === "me" && !i.done).length}`;
+    $("meCount").textContent = `自分ボール ${items.filter((i) => i.sec === "me" && !i.done && !i.hidden).length}`;
     $("jobs").innerHTML = D.jobs.map((j) => `<div class="job"><b class="${j[0]}">${esc(j[1])}</b><span>${esc(j[2])}</span></div>`).join("");
     const sec = (t, list) => `<div class="sec"><div class="sech"><span>${t}</span><span class="n">${list.length}</span></div>${list.map(card).join("")}</div>`;
     let html = "";
@@ -84,7 +84,8 @@
   function select(id) {
     S.cur = id;
     const i = curItem();
-    S.rmode = i.thread && i.thread.draft ? S.rmode : "browser";
+    // スレッドがあるボールは、まずスレッド（件名・本文・添付・下書き）を出す
+    S.rmode = i.thread ? "thread" : "browser";
     left(); center(); right();
   }
 
@@ -120,7 +121,7 @@
     $("thr").hidden = showB;
     $("webviews").hidden = !(showB && IS_APP);
     $("sim").hidden = !(showB && !IS_APP);
-    if (showB) { renderTabs(); showTab(); } else { $("thr").innerHTML = thread(i.thread); bindSend($("thr")); }
+    if (showB) { renderTabs(); showTab(); } else renderThread(i);
   }
   function renderTabs() {
     const i = curItem();
@@ -177,21 +178,99 @@
   }
   function curWebview() { const t = activeTab(); return t && webviews[t.key]; }
 
-  function thread(t) {
+  // ---------- スレッド表示 ----------
+  const gmailUrl = (threadId) => "https://mail.google.com/mail/u/0/#all/" + threadId;
+  const nameOf = (addr) => (String(addr || "").match(/^\s*"?([^"<]+?)"?\s*</) || [, addr || ""])[1].trim();
+  const emailOf = (addr) => (String(addr || "").match(/<([^>]+)>/) || [, addr || ""])[1].trim();
+  // 返信に付いてくる引用（「〜 wrote:」「>」以降）を切って、そのメールで新しく書かれた部分だけにする
+  function trimQuote(body) {
+    const lines = String(body || "").split(/\r?\n/);
+    const cut = lines.findIndex((l) => /^\s*>/.test(l) || /^On .+wrote:\s*$/.test(l) || /^\d{4}年\d{1,2}月\d{1,2}日.+(<.+@.+>)?:?\s*$/.test(l.trim()) && /[:：]\s*$/.test(l.trim()) || /^-{5,}\s*(Original Message|Forwarded message)/i.test(l));
+    const kept = (cut > 0 ? lines.slice(0, cut) : lines).join("\n").trim();
+    return { text: kept || String(body || "").trim(), trimmed: cut > 0 };
+  }
+  function msgCard(m, open) {
+    const q = trimQuote(m.body);
+    const att = (m.attachments || []).map((a, k) => `<button type="button" class="att" data-msg="${esc(m.id)}" data-att="${k}" title="開く">📎 ${esc(a.filename)}<span>${esc(a.size)}</span></button>`).join("");
+    return `<div class="mcard${open ? " open" : ""}">
+      <div class="mhd"><b>${esc(nameOf(m.from))}</b><span>${esc(emailOf(m.from))}</span><time>${esc(m.date)}</time></div>
+      <div class="mto">宛先 ${esc(m.to)}${m.cc ? `　CC ${esc(m.cc)}` : ""}</div>
+      ${att ? `<div class="atts">${att}</div>` : ""}
+      <div class="mb">${esc(q.text)}</div>
+      ${q.trimmed ? `<div class="hint">（引用部分は省略。全文は「Gmail で開く」）</div>` : ""}
+    </div>`;
+  }
+  function renderThread(i) {
+    const t = i.thread;
     if (t.kind === "slack") {
-      return `<div class="thr"><h4>${t.ws === "DM" ? "DM: " : ""}${esc(t.ch)}${t.ws === "DM" ? "" : " のスレッド"}<span>${esc(t.ws)}</span></h4>
+      $("thr").innerHTML = `<div class="thr"><h4>${t.ws === "DM" ? "DM: " : ""}${esc(t.ch)}${t.ws === "DM" ? "" : " のスレッド"}<span>${esc(t.ws)}</span></h4>
         ${t.msgs.map((m) => `<div class="sm"><span class="av" style="background:${m[0]}">${esc(m[1][0])}</span><div><div class="n">${esc(m[1])}<time>${esc(m[2])}</time></div><div class="x">${esc(m[3])}</div>${m[4] ? `<span class="react">${esc(m[4])}</span>` : ""}</div></div>`).join("")}
-        ${t.draft ? draftBox(t.draft, "slack") : ""}</div>`;
+        ${t.draft ? draftBox(i, "slack") : ""}</div>`;
+      bindDraft(i);
+      return;
     }
-    return `<div class="thr"><div class="mail"><div class="mh"><span class="s">${esc(t.subject)}</span><span>${esc(t.from)} → ${esc(t.to)} · ${esc(t.date)}</span></div><div class="mb">${esc(t.body)}</div></div>${draftBox(t.draft, "gmail")}</div>`;
+    // Gmail
+    if (t.live && !t.data) {
+      $("thr").innerHTML = `<div class="thr"><div class="empty">スレッドを読み込み中…</div></div>`;
+      if (!t.loading) {
+        t.loading = true;
+        window.ball.gmailThread(t.threadId).then((r) => {
+          t.loading = false;
+          if (r.ok) t.data = r.data; else t.error = r.error;
+          if (curItem() === i && S.rmode === "thread") renderThread(i);
+        });
+      }
+      if (!t.error) return;
+    }
+    if (t.error) { $("thr").innerHTML = `<div class="thr"><div class="empty">スレッドを読めませんでした：${esc(t.error)}</div></div>`; return; }
+    const msgs = t.live ? t.data.messages : t.messages;
+    const last = msgs[msgs.length - 1];
+    const older = msgs.slice(0, -1).reverse();
+    const subject = (last && last.subject) || t.subject || i.title;
+    $("thr").innerHTML = `<div class="thr">
+      <div class="thd"><h4>${esc(subject)}</h4><button type="button" class="btn" id="openInGmail">Gmail で開く ↗</button></div>
+      ${last ? msgCard(last, true) : ""}
+      ${older.length ? `<details class="older"><summary>過去のやり取り（${older.length}件）</summary>${older.map((m) => msgCard(m, false)).join("")}</details>` : ""}
+      ${draftBox(i, "gmail")}
+    </div>`;
+    $("openInGmail").onclick = () => { const url = gmailUrl(t.threadId || ""); if (!t.threadId) return toast("見本のスレッドです"); const tab = i.tabs.find((x) => x.url === url); if (tab) { i.activeTab = i.tabs.indexOf(tab); S.rmode = "browser"; right(); } else openTab(url, "Gmail - このスレッド"); };
+    $("thr").querySelectorAll(".att").forEach((b) => (b.onclick = () => {
+      const m = msgs.find((x) => x.id === b.dataset.msg), a = m && m.attachments[+b.dataset.att];
+      if (!a) return;
+      if (!IS_APP || !t.live) return toast("見本の添付ファイルです");
+      toast("添付ファイルを開いています…");
+      window.ball.gmailAttachment(a).then((r) => toast(r.ok ? "開きました" : "開けませんでした：" + r.error));
+    }));
+    bindDraft(i);
   }
-  function draftBox(d, kind) {
-    return `<div class="draft"><div class="dh"><span>AI 下書き（送るまで送信されません）</span><span>破棄</span></div>
-      <div class="tool"><span>B</span><span>I</span><span>S</span><span>link</span><span>•</span><span>1.</span></div>
-      <textarea aria-label="下書き">${esc(d)}</textarea>
-      <div class="df">${kind === "gmail" ? `<button type="button" class="btn" data-send>Gmail の下書きに保存</button>` : `<span>＋ ☺ @</span>`}<span class="sp"></span><span>下書きを保存しています</span><button type="button" class="btn send" data-send>送信</button></div></div>`;
+  function draftBox(i, kind) {
+    const t = i.thread;
+    const saved = t.draftId ? `Gmail の下書きに保存済み` : "まだ保存していません";
+    return `<div class="draft"><div class="dh"><span>下書き（送るまで送信されません）</span><span id="draftState">${saved}</span></div>
+      <textarea id="draftText" aria-label="下書き" placeholder="真ん中で「下書き書いて」と言うとここに入ります。直接書いても OK。">${esc(t.draft || "")}</textarea>
+      <div class="df">${kind === "gmail"
+        ? `<span class="hint">送るときは「Gmail で開く」から。下書きがそのスレッドに入っています</span><span class="sp"></span><button type="button" class="btn send" id="saveDraft">Gmail の下書きに保存</button>`
+        : `<span class="sp"></span><button type="button" class="btn send" id="saveDraft">送信</button>`}</div></div>`;
   }
-  function bindSend(root) { root.querySelectorAll("[data-send]").forEach((b) => (b.onclick = () => toast("見本なので送信しません。裏側をつなぐと、ここで初めて送られます"))); }
+  function bindDraft(i) {
+    const t = i.thread, ta = $("draftText"), btn = $("saveDraft");
+    if (!ta || !btn) return;
+    ta.oninput = () => { t.draft = ta.value; $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
+    btn.onclick = async () => {
+      if (t.kind !== "gmail" || !t.live || !IS_APP) return toast("見本なので保存・送信はしません");
+      const msgs = t.data.messages, last = msgs[msgs.length - 1];
+      // 返信先: 最後に相手から来たメール。宛先はその差出人、CC は元の宛先と CC（自分を除く）
+      const lastOther = [...msgs].reverse().find((m) => !/yuki\.katayama@fout\.jp/i.test(m.from)) || last;
+      const me = /yuki\.katayama@fout\.jp/i;
+      const cc = [lastOther.to, lastOther.cc].join(",").split(",").map((s) => s.trim()).filter((s) => s && !me.test(s) && emailOf(s) !== emailOf(lastOther.from)).join(", ");
+      const subject = /^re[:：]/i.test(last.subject) ? last.subject : "Re: " + last.subject;
+      btn.disabled = true; $("draftState").textContent = "保存中…";
+      const r = await window.ball.gmailDraft({ draftId: t.draftId, replyToMessageId: lastOther.id, to: lastOther.from, cc, subject, body: ta.value });
+      btn.disabled = false;
+      if (r.ok) { t.draftId = r.data.draftId || t.draftId; $("draftState").textContent = "Gmail の下書きに保存済み"; toast("Gmail の下書きに保存しました（送信はしていません）"); }
+      else { $("draftState").textContent = "保存できませんでした"; toast("保存できませんでした：" + r.error); }
+    };
+  }
 
   // 見本ページ（プレビュー用。アプリでは本物のサイトが開く）
   function pageOf(t) {
@@ -294,6 +373,118 @@
   });
   // webview からのポップアップは新しいタブで開く
   if (IS_APP) window.ball.onOpenTab((url) => openTab(url));
+
+  // ---------- Messenger の取り込み（アプリ版のみ） ----------
+  // 未読 → 自分ボール。既読でも相手の発言で止まっている上位の会話 → 自分ボール（既読・未返信）。
+  // 自分が最後に返した会話はボールにしない。前回ボールだったものが返信済みになったら自動で閉じる。
+  function agoText(ms) { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? "たった今" : m + "分前"; }
+  function msgrStatus(data) {
+    const el = $("ft-msgr");
+    el.classList.remove("mock", "ng");
+    let text;
+    if (!data) { text = "Messenger 読み取り準備中"; el.classList.add("mock"); }
+    else if (data.status === "login") { text = "Messenger: ログインが必要（押して開く）"; el.classList.add("ng"); }
+    else if (data.status === "nolist") { text = "Messenger: 会話一覧が読めません（押して確認）"; el.classList.add("ng"); }
+    else text = `Messenger ${agoText(data.at)} · 会話${data.convos.length}件・未読${data.convos.filter((c) => c.unread).length}`;
+    el.querySelector("span").textContent = text;
+  }
+  let lastMsgrData = null;
+  function applyMessenger(data) {
+    lastMsgrData = data;
+    msgrStatus(data);
+    if (!data || data.status !== "ok") return;
+    // 見本の Messenger ボールは本物が来たら外す
+    const mock = items.find((x) => x.id === "msgr"); if (mock) mock.hidden = true;
+    const want = new Map();
+    data.convos.forEach((c, idx) => {
+      if (c.unread || (!c.mine && idx < 8)) want.set("m-" + c.id, c);
+    });
+    // 返信済みになったものは閉じる
+    items.filter((x) => x.msgr && !x.done && !want.has(x.id)).forEach((x) => {
+      x.done = true; D.closed.unshift(`Messenger: ${x.msgrName} · 返信済み`);
+    });
+    want.forEach((c, id) => {
+      let it = items.find((x) => x.id === id);
+      const chips = [[c.unread ? "未読" : "既読・未返信", c.unread ? "warn" : "me"]];
+      if (c.time) chips.push([c.time, "them"]);
+      const fields = {
+        sec: "me", proj: "none", src: "msgr", ago: c.time || "", msgr: true, msgrName: c.name, done: false, hidden: false,
+        title: `Messenger：${c.name}`, sub: c.snippet ? c.snippet.slice(0, 40) : "Facebook メッセンジャー", chips,
+      };
+      if (!it) {
+        it = Object.assign({ id, memo: "", thread: null, activeTab: 0,
+          feed: [["prog", "Messenger から自動で取り込み"], ["ai", `${c.name}さんとの会話です。${c.unread ? "未読があります。" : "相手の発言で止まっています。"}\n最後のメッセージ：${c.snippet || "（読み取れず）"}\n\n右のブラウザで会話を開いています。中身の判断と返信の下書きは、Claude をつないだあとにここで出るようになります。`]],
+          tabs: [{ title: `${c.name} - Messenger`, url: c.href, sim: "messenger", key: id + "-0" }] }, fields);
+        items.unshift(it);
+      } else Object.assign(it, fields);
+    });
+    left();
+  }
+  // ---------- Gmail の取り込み（アプリ版のみ・Mac の gog 経由） ----------
+  // 受信トレイで「最後のメールが自分以外の人から」のスレッドを自分ボールにする。返信すると次の取り込みで閉じる。
+  function setFt(id, text, cls) {
+    const el = $(id); if (!el) return;
+    el.classList.remove("mock", "ng"); if (cls) el.classList.add(cls);
+    el.querySelector("span").textContent = text;
+  }
+  let gmailErr = null, gmailAt = 0, gmailCount = 0;
+  async function loadGmail() {
+    const st = await window.ball.gmailStatus();
+    if (!st.ok) {
+      gmailErr = st;
+      setFt("ft-gmail", st.reason === "nogog" ? "Gmail: gog が見つかりません（押して確認）" : "Gmail: gog の認証エラー（押して確認）", "ng");
+      return;
+    }
+    const r = await window.ball.gmailInbox();
+    if (!r.ok) { gmailErr = { reason: "error", message: r.error }; setFt("ft-gmail", "Gmail: 読み込みエラー（押して確認）", "ng"); return; }
+    gmailErr = null;
+    // 本物が読めたら見本の Gmail ボールは隠す
+    items.filter((x) => x.src === "gmail" && !x.live).forEach((x) => (x.hidden = true));
+    const ids = new Set();
+    [...r.data].reverse().forEach((t) => {
+      const id = "g-" + t.id; ids.add(id);
+      const fields = {
+        sec: "me", proj: "none", src: "gmail", live: true, hidden: false, done: false,
+        title: t.subject || "（件名なし）", sub: nameOf(t.from), ago: (t.date || "").slice(5, 16),
+        chips: [[t.unread ? "未読" : "未返信", t.unread ? "warn" : "me"]].concat(t.count > 1 ? [[t.count + "通", "them"]] : []),
+      };
+      let it = items.find((x) => x.id === id);
+      if (!it) {
+        it = Object.assign({ id, memo: "", activeTab: 0,
+          feed: [["prog", "Gmail から自動で取り込み"], ["ai", `${nameOf(t.from)}さんからのメールです。右にスレッドを出しています。\n\n返信の段取りはここで相談できるようになります（Claude をつないだあと）。今は右の下書き欄に直接書いて、Gmail の下書きに保存できます。`]],
+          thread: { kind: "gmail", live: true, threadId: t.id, draft: "" },
+          tabs: [{ title: "Gmail - このスレッド", url: gmailUrl(t.id), sim: "gmail", key: id + "-0" }] }, fields);
+        items.unshift(it);
+      } else Object.assign(it, fields);
+    });
+    // 一覧から消えた（＝返信した・アーカイブした）ものは閉じる
+    items.filter((x) => x.live && x.src === "gmail" && !x.done && !ids.has(x.id)).forEach((x) => { x.done = true; D.closed.unshift(`Gmail: ${x.title.slice(0, 30)} · 返信済み`); });
+    gmailAt = Date.now(); gmailCount = r.data.length;
+    setFt("ft-gmail", `Gmail ${agoText(gmailAt)} · ${gmailCount}件`, "");
+    left();
+    if (!curItem() || curItem().hidden) { const first = items.find((x) => !x.hidden && !x.done && x.sec === "me"); if (first) select(first.id); }
+  }
+  $("ft-gmail").onclick = () => {
+    if (!IS_APP) return toast("Gmail の取り込みはデスクトップアプリ版で動きます");
+    if (!gmailErr) { toast("Gmail を読み込み直しています…"); return loadGmail(); }
+    if (gmailErr.reason === "nogog") toast("この Mac に gog が入っていないか、場所が分かりません。ターミナルで gog --version を試してください");
+    else toast("Gmail を読めませんでした：" + (gmailErr.message || "").slice(0, 120));
+  };
+  if (IS_APP && window.ball.gmailStatus) {
+    loadGmail();
+    setInterval(loadGmail, 3 * 60 * 1000);
+    setInterval(() => { if (gmailAt && !gmailErr) setFt("ft-gmail", `Gmail ${agoText(gmailAt)} · ${gmailCount}件`, ""); }, 30000);
+  }
+
+  $("ft-msgr").onclick = () => {
+    if (!IS_APP) { toast("Messenger の読み取りはデスクトップアプリ版で動きます"); return; }
+    window.ball.messengerShow();
+  };
+  if (IS_APP && window.ball.onMessenger) {
+    window.ball.onMessenger(applyMessenger);
+    window.ball.messengerLast().then((d) => { if (d) applyMessenger(d); else msgrStatus(null); });
+    setInterval(() => { if (lastMsgrData) msgrStatus(lastMsgrData); }, 30000);
+  }
 
   ptabs(); select("iwata");
   if (!store.get("ball.seenOverview")) overview(true);

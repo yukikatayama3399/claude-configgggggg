@@ -13,6 +13,7 @@ window.BALL_DATA = (function () {
     alpaka: { name: "alpaka", color: "var(--p-alpaka)" },
     in: { name: "社内", color: "var(--p-in)" },
     me: { name: "個人", color: "var(--p-me)" },
+    none: { name: "未分類", color: "var(--muted)" },
   };
 
   const items = [
@@ -78,9 +79,11 @@ window.BALL_DATA = (function () {
         ["ai", "11/2 の打合せメモから、次の2点を拾いました。\n・2027年1月の共催オンライン選定会に、HAWK として登壇する方向\n・登壇者と概要を11月中に連絡する\n\nお礼メールを下書きしました。概要の叩き台はメモに入れています。"],
       ],
       memo: "登壇概要（叩き台）\n・テーマ：SNS広告の運用を AI エージェントに任せる\n・事例：共催ウェビナーで出した3社\n・時間：20分想定",
-      thread: { kind: "gmail", subject: "Re: 【お伺い】広告サービス・営業×AIエージェント選定会へのご登壇について",
-        from: "佐藤 亜弥 <aya.sato@clabel.co.jp>", to: "片山 優希", date: "10/28 11:35",
-        body: "片山様\n\nお世話になっております。シーラベルの佐藤です。\n2027年1月に予定している選定会について、ご登壇をご検討いただけますと幸いです。\n詳細は打合せの場でご説明いたします。",
+      thread: { kind: "gmail", subject: "【お伺い】広告サービス・営業×AIエージェント選定会へのご登壇について（HAWKにつきまして）",
+        messages: [{ id: "mock-c1", from: "佐藤 亜弥 <aya.sato@clabel.co.jp>", to: "yuki.katayama@fout.jp", cc: "松山 為長 <matsuyama@clabel.co.jp>", date: "Wed, 28 Oct 2026 10:29 +0900",
+          subject: "【お伺い】広告サービス・営業×AIエージェント選定会へのご登壇について（HAWKにつきまして）",
+          body: "株式会社フリークアウト 片山 優希 様\n\nお世話になっております。株式会社シーラベルの佐藤です。\n来年2027年1月に「共催型オンライン選定会」の開催を予定しており、貴社にも是非ご参画いただきたくご連絡いたしました。\n\n企画書を添付いたします。一度オンラインでお話しさせていただけますと幸いです。",
+          attachments: [{ filename: "広告サービス選定会_企画書.pdf", size: "2.1 MB" }] }],
         draft: "佐藤様、松山様\n\n本日はお時間をいただきありがとうございました。フリークアウトの片山です。\n1月の選定会、ぜひ登壇させていただければと思います。\n登壇者と概要は、11月中にあらためてご連絡いたします。\n\n引き続きよろしくお願いいたします。" },
       tabs: [t("Gmail", GMAIL, "gmail"), t("Gemini によるメモ", "https://drive.google.com/drive/recent", "gemini2")],
     },
