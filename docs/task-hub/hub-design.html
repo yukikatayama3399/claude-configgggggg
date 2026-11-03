@@ -1,0 +1,396 @@
+<title>ボール管理ハブ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: 1カラムの読み物 → 中盤に3ペインの操作できるモック → 計画と質問。数字は等幅で右揃え */
+:root{
+  --bg:#F2F4F7; --surface:#FFFFFF; --ink:#16202B; --muted:#5B6878; --line:#D9DEE5;
+  --me:#C86A00; --me-bg:#FFF1DE; --them:#3E5C8A; --them-bg:#E6EDF8; --ai:#0F7A6C; --ai-bg:#DDF3EF;
+  --warn:#B3261E; --warn-bg:#FCE8E6; --accent:#C86A00;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F141A; --surface:#171E26; --ink:#E7ECF2; --muted:#98A5B4; --line:#2A3440;
+  --me:#F0A04B; --me-bg:#3A2A14; --them:#8FB0E0; --them-bg:#1C2A3D; --ai:#4FC7B5; --ai-bg:#12302C;
+  --warn:#F2867D; --warn-bg:#3A1C1A; --accent:#F0A04B; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F141A; --surface:#171E26; --ink:#E7ECF2; --muted:#98A5B4; --line:#2A3440;
+  --me:#F0A04B; --me-bg:#3A2A14; --them:#8FB0E0; --them-bg:#1C2A3D; --ai:#4FC7B5; --ai-bg:#12302C;
+  --warn:#F2867D; --warn-bg:#3A1C1A; --accent:#F0A04B; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.75;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:56px}
+.prose{max-width:68ch}
+h1,h2,h3{text-wrap:balance;line-height:1.35;margin:0}
+h1{font-size:clamp(28px,4.6vw,42px);font-weight:900;letter-spacing:.01em}
+h2{font-size:22px;font-weight:900;display:flex;gap:10px;align-items:baseline}
+h2 .tag{font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.08em}
+h3{font-size:16px;font-weight:700}
+p{margin:0}
+.stack{display:grid;gap:14px}
+.lede{font-size:17px;color:var(--ink)}
+.small{font-size:13px;color:var(--muted)}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+a{color:var(--them)}
+.ball{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:1px 9px 1px 7px;border-radius:999px;white-space:nowrap}
+.ball::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.b-me{color:var(--me);background:var(--me-bg)} .b-them{color:var(--them);background:var(--them-bg)} .b-ai{color:var(--ai);background:var(--ai-bg)}
+.b-warn{color:var(--warn);background:var(--warn-bg)}
+
+/* 実態テーブル */
+.facts{display:grid;gap:0;border-top:2px solid var(--ink)}
+.fact{display:grid;grid-template-columns:7.5rem 1fr;gap:4px 20px;padding:14px 0;border-bottom:1px solid var(--line)}
+.fact .num{font-family:var(--f-mono);font-weight:600;font-size:26px;line-height:1.2;font-variant-numeric:tabular-nums;text-align:right}
+.fact .num small{font-size:12px;color:var(--muted);font-weight:400;display:block}
+.fact .src{font-family:var(--f-mono);font-size:11px;color:var(--muted);letter-spacing:.06em}
+.fact .body{min-width:0;display:grid;gap:2px}
+.fact.hot .num{color:var(--warn)}
+@media (max-width:560px){.fact{grid-template-columns:1fr}.fact .num{text-align:left}}
+
+.principles{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.pr{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:6px;align-content:start}
+.pr b{font-size:15px}
+
+/* モック */
+.mock{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:grid;grid-template-rows:auto 1fr}
+.mbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap}
+.tabs button{font:inherit;font-size:13px;font-weight:700;border:1px solid var(--line);background:transparent;color:var(--muted);padding:4px 12px;border-radius:999px;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tabs button:focus-visible,.item:focus-visible,.act:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.counts{display:flex;gap:6px;flex-wrap:wrap}
+.panes{display:grid;grid-template-columns:300px minmax(0,1fr) minmax(0,.9fr);min-height:520px}
+.pane{min-width:0;padding:14px;display:grid;gap:10px;align-content:start}
+.pane+.pane{border-left:1px solid var(--line)}
+.ptitle{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;display:flex;justify-content:space-between;gap:8px}
+.list{display:grid;gap:6px}
+.item{all:unset;cursor:pointer;display:grid;gap:3px;padding:9px 10px;border-radius:8px;border:1px solid transparent}
+.item:hover{background:var(--bg)}
+.item[aria-current="true"]{background:var(--bg);border-color:var(--line)}
+.item .t{font-size:14px;font-weight:700;line-height:1.45}
+.item .m{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.item.done .t{text-decoration:line-through;color:var(--muted)}
+.src-ic{font-family:var(--f-mono);font-size:10px;font-weight:600;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--muted)}
+.chat{display:grid;gap:10px}
+.msg{padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.7;white-space:pre-wrap}
+.msg.ai{background:var(--ai-bg)}
+.msg.draft{background:var(--bg);border:1px dashed var(--line);font-size:13px}
+.msg .who{display:block;font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-bottom:2px;white-space:normal}
+.acts{display:flex;flex-wrap:wrap;gap:6px}
+.act{font:inherit;font-size:13px;font-weight:700;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.act.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.ctx{display:grid;gap:8px}
+.ctxcard{border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.65;display:grid;gap:4px}
+.ctxcard .h{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.toast{font-size:12px;color:var(--ai);min-height:1.4em}
+.morning{display:grid;gap:12px}
+.note{background:var(--bg);border-radius:10px;padding:18px 20px;font-size:16px;line-height:2.1;background-image:repeating-linear-gradient(to bottom,transparent 0 33px,var(--line) 33px 34px);font-weight:500}
+@media (max-width:900px){.panes{grid-template-columns:1fr}.pane+.pane{border-left:0;border-top:1px solid var(--line)}}
+
+/* フロー */
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.step{padding:12px 14px;display:grid;gap:4px;align-content:start;border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0}
+.step .when{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.step .what{font-size:14px;font-weight:700;line-height:1.45}
+.step .who{justify-self:start}
+.recipes{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.rc{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:6px;align-content:start}
+.rc .ev{font-size:12px;color:var(--muted)}
+
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px}
+ul.tight{margin:0;padding-left:1.2em;display:grid;gap:6px}
+.phase{display:grid;grid-template-columns:7rem 1fr;gap:6px 20px;padding:16px 0;border-bottom:1px solid var(--line)}
+.phase:first-child{border-top:2px solid var(--ink)}
+.phase .ph{font-family:var(--f-mono);font-weight:600;font-size:13px}
+.phase .ph span{display:block;color:var(--muted);font-weight:400}
+.phase .body{min-width:0;display:grid;gap:8px}
+.gate{font-size:13px;background:var(--me-bg);border-radius:8px;padding:8px 12px}
+.gate b{color:var(--me)}
+@media (max-width:560px){.phase{grid-template-columns:1fr}}
+.qs{display:grid;gap:10px;counter-reset:q}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:4px}
+.q b{font-size:15px}
+.critic{border-left:3px solid var(--them);padding:4px 0 4px 16px;display:grid;gap:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+
+<header class="stack">
+  <div class="eyebrow">片山さん専用 · 統合タスクハブ 設計案 v0.1 · 2026-11-03</div>
+  <h1>いま、ボールを持っているのは誰か。</h1>
+  <p class="lede prose">Slack・Gmail・カレンダー・Drive の実データ（直近4〜7週）を読んで、片山さんの毎日の動きに合わせたハブを設計しました。中心にあるのは「やることリスト」ではなく、<b>すべての依頼とやり取りを「自分 / 相手 / AI」のどこにボールがあるかで管理する</b>という考え方です。目の前には自分ボールだけが出ます。</p>
+  <p class="prose">並べる単位は会社ではなく<b>人とスレッド</b>です。「誰と」「最後に話したのはどっちか」「何日経ったか」の3つで並べます。Slack の依頼の6割以上は社内からで、会社に紐づかないためです。会社名はタグとして付けます。</p>
+  <div class="counts"><span class="ball b-me">自分ボール</span><span class="ball b-them">相手ボール（待ち）</span><span class="ball b-ai">AIボール（作業中）</span></div>
+</header>
+
+<section class="stack">
+  <h2>いまの使い方を数字で見る <span class="tag">ACTUAL DATA</span></h2>
+  <div class="facts">
+    <div class="fact"><div class="num">135<small>件 / 7週</small></div><div class="body"><span class="src">CALENDAR</span><b>カレンダーが事実上のタスク管理になっている</b><span class="small">「[作業]」ブロックが1日3件ペース。同じ時刻に3つ重ねる日（10/21 9:00）や「(無題)」もある。ただしカレンダーには「完了」が無いので、終わったかどうかが残らない。</span></div></div>
+    <div class="fact hot"><div class="num">12<small>週連続</small></div><div class="body"><span class="src">CALENDAR</span><b>終わらない繰り返し</b><span class="small">「Shirofune解約 ※8/19まで」が8月から毎週土曜に出続けている。済んだのか、まだなのかがカレンダーからは分からない。</span></div></div>
+    <div class="fact"><div class="num">831<small>/ 1,009 未読</small></div><div class="body"><span class="src">GMAIL · 30日</span><b>受信箱は「見ない場所」になっている</b><span class="small">プロモーションが364件。人からのメールは一握り。</span></div></div>
+    <div class="fact hot"><div class="num">207<small>件 自動返信</small></div><div class="body"><span class="src">GMAIL · 30日</span><b>フォーム営業の返信が自動返信に埋もれる</b><span class="small">「お問い合わせありがとうございます」が207件。その中に薬院オーガニック原様のような<b>本物の返信</b>が混ざっている。</span></div></div>
+    <div class="fact"><div class="num">140<small>件 下書き</small></div><div class="body"><span class="src">GMAIL</span><b>送るか捨てるか決まっていない下書きが溜まっている</b><span class="small">7月からの分。52件はテンプレ営業文。毎週月曜に「Gmailの下書き確認」を予定に入れて対処している。</span></div></div>
+    <div class="fact"><div class="num">≈5<small>件 / 営業日</small></div><div class="body"><span class="src">SLACK · 6週</span><b>自分宛メンションの半分は cc 型</b><span class="small">4割が中西さんから。確認・レビュー依頼35%、作業依頼30%。取りこぼしやすいのは、スレッド奥の cc 型メンションと、DM で相手の発言で止まっているもの（UUUM 春さん、2週間超）。</span></div></div>
+    <div class="fact hot"><div class="num">5<small>回通知 → 未返信</small></div><div class="body"><span class="src">SLACK · 自分宛DM</span><b>既存の自動ダイジェストが効いていない</b><span class="small">「未対応ダイジェスト」「抜け漏れウォッチ」がすでに動いている。それでも岩田さんの提案ステータス記入依頼は、2.5時間おきに5回通知されて未返信のまま。裏では Mac 側の gog 認証が<b>106日</b>失効したままで、誰も気づいていない。</span></div></div>
+    <div class="fact"><div class="num">6<small>工程 / 商談</small></div><div class="body"><span class="src">CALENDAR + GMAIL + DRIVE</span><b>商談のたびに同じ段取りを手で予定に入れている</b><span class="small">仮押さえ → 前日リマインド → 予習メモ → 商談（Geminiメモ自動生成）→ お礼メール＋資料 → 検討状況の確認。社外MTGは週2〜5件。</span></div></div>
+  </div>
+</section>
+
+<section class="stack">
+  <h2>「通知を増やす」は一度失敗している <span class="tag">DESIGN RULES</span></h2>
+  <p class="prose">いまのダイジェストが読まれないのは、片山さんの怠慢ではなく作りの問題です。同じ依頼を何度も知らせるだけで、その場で片付ける手段がなく、終わっても自動で消えない。だから次の5つを守ります。</p>
+  <div class="principles" id="principles">
+    <div class="pr"><b>1件は1回だけ出す</b><span class="small">同じ依頼は1つのボールにまとめる。再通知はしない。期限が近づいたら並び順が上がるだけ。</span></div>
+    <div class="pr"><b>その場で片付く</b><span class="small">返信の下書き、予定の仮押さえ、シートへの記入まで、ボールを開いた画面で終わらせる。別アプリへ飛ばさない。</span></div>
+    <div class="pr"><b>勝手に閉じる</b><span class="small">自分が返信した、他の人が答えた、✅が付いた、予定が終わった。こうした事実を見て自動で消す。</span></div>
+    <div class="pr"><b>カレンダーは今のまま</b><span class="small">「[作業]」の書き方を変えなくていい。ハブが読み取り、完了したら予定のタイトルに ✅ を書き戻す。</span></div>
+    <div class="pr"><b>送るのは自分</b><span class="small">AIが作るのは下書きまで。メールも Slack も、送信は必ず片山さんの1クリック。</span></div>
+    <div class="pr"><b>止まったら目に見える</b><span class="small">「最終取得 ○分前」を常に表示する。連携が切れたらカレンダーに赤い予定を入れて知らせる。106日気づかない状態を二度と作らない。</span></div>
+    <div class="pr"><b>声でそのまま入る</b><span class="small">入力欄は普通のテキスト欄を1つだけ置く。Aqua Voice で話した内容がそのまま入り、履歴からコピーして貼り付ける手間をなくす。書式も専用の記法も要らない。</span></div>
+    <div class="pr"><b>足す前に止める</b><span class="small">今ある自動ダイジェスト3本は止めて、この1本に置き換える。見る場所を増やさない。</span></div>
+  </div>
+</section>
+
+<section class="stack">
+  <h2>入口 <span class="tag">SOURCES &amp; INPUT</span></h2>
+  <div class="facts">
+    <div class="fact"><div class="num" style="font-size:15px">今すぐ</div><div class="body"><b>Slack・Gmail・カレンダー・Drive/Sheets</b><span class="small">公式の連携がすでに動いている（gog / gws / Slack コネクタ）。追加の認証は不要。</span></div></div>
+    <div class="fact"><div class="num" style="font-size:15px">Phase 1</div><div class="body"><b>FB メッセンジャー（仕事）・LINE（個人）</b><span class="small">どちらも個人アカウント向けの公式 API がない。現実的なのは Beeper（複数のメッセンジャーを1つにまとめる Mac アプリ）を経由して読む方法。Beeper のデスクトップ版が手元の Mac から AI に読ませる口を持っている。LINE に対応しているかは最初に試して確かめる。読み取り専用で使い、返信は下書きまで。LINE は「個人」の枠に分けて、仕事のボールと混ぜない。第三者アプリを経由するので、どこまで渡すかは片山さんが決める。</span></div></div>
+    <div class="fact"><div class="num" style="font-size:15px">常に</div><div class="body"><b>Aqua Voice（声）と貼り付け</b><span class="small">「岩田さんに提案ステータス明日までに返すって入れといて」「朝日コネクト、木曜に確認メール」と話すだけでボールになる。誰宛て・いつまで・どのスレッドかは AI が読み取る。入力欄は特別な部品を使わず、どのアプリでも Aqua Voice が入る普通のテキスト欄にする。</span></div></div>
+    <div class="fact"><div class="num" style="font-size:15px">夕方</div><div class="body"><b>手書きノートの写真</b><span class="small">ノートを1枚撮って送ると、✅ が付いた項目を読み取ってカレンダーに書き戻す。残った項目は明日の候補に回す。夕方に10件をボタンで片付ける作業がなくなる。</span></div></div>
+  </div>
+</section>
+
+<section class="stack">
+  <h2>動くモック <span class="tag">CLICKABLE · 例は実データから</span></h2>
+  <p class="prose small">左のボールを押すと、真ん中に AI の提案と下書き、右に元のスレッドや予定が出ます。「完了」「相手ボールにする」も実際に動きます（このページ内だけの動きで、どこにも送信しません）。内容は今回読んだ実データを要約した例です。</p>
+  <div class="mock" id="mock">
+    <div class="mbar">
+      <div class="tabs" role="group" aria-label="表示">
+        <button type="button" id="tab-me" data-view="me" aria-pressed="true">自分ボール</button>
+        <button type="button" id="tab-them" data-view="them" aria-pressed="false">相手ボール</button>
+        <button type="button" id="tab-ai" data-view="ai" aria-pressed="false">AIボール</button>
+        <button type="button" id="tab-morning" data-view="morning" aria-pressed="false">朝の5つ</button>
+      </div>
+      <div class="counts" id="counts"></div>
+    </div>
+    <div class="panes" id="panes">
+      <div class="pane">
+        <form id="quick" class="stack" style="gap:6px">
+          <label for="quickText" class="ptitle"><span>話すか貼り付ける</span><span>⌥Space</span></label>
+          <textarea id="quickText" rows="2" style="font:inherit;font-size:14px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);resize:vertical">春さんに媒体の件、金曜までに返すって入れといて</textarea>
+          <button type="submit" class="act primary" style="justify-self:start">ボールにする</button>
+        </form>
+        <div class="ptitle"><span id="listTitle">自分ボール</span><span id="listCount"></span></div><div class="list" id="list"></div></div>
+      <div class="pane"><div class="ptitle"><span>このボールの AI</span><span id="aiState"></span></div><div class="chat" id="chat"></div><div class="acts" id="acts"></div><div class="toast" id="toast" role="status"></div></div>
+      <div class="pane"><div class="ptitle"><span>元ネタ</span></div><div class="ctx" id="ctx"></div></div>
+    </div>
+    <div class="pane morning" id="morningView" hidden>
+      <div class="ptitle"><span>朝の5つ · 手書きノートに写す用</span><span>11/4（火）在宅</span></div>
+      <div class="note" id="note"></div>
+      <p class="small">ハブはノートの代わりではありません。朝、ここから5つ選んでノートに書く。書かなかったものは、ハブがボールとして持ち続けます。夕方には、終わらなかった「[作業]」ブロックを「明日へ送る / 捨てる / 相手ボールにする」の3択で片付けます。</p>
+    </div>
+  </div>
+</section>
+
+<section class="stack">
+  <h2>商談は1件ごとに自動で回す <span class="tag">AUTOMATION</span></h2>
+  <p class="prose">いま手で予定に入れている6工程を、商談が確定した時点でハブが組み立てます。片山さんがやるのはオレンジの部分だけです。既存のスキル（hawk-shodan-prep など）はここから呼び出します。</p>
+  <div class="flow">
+    <div class="step"><span class="when">確定時</span><span class="what">予定・顧客フォルダ・アタックリスト行を作る</span><span class="ball b-ai who">AI</span></div>
+    <div class="step"><span class="when">前日 17:00</span><span class="what">リマインドの下書き</span><span class="ball b-me who">送るだけ</span></div>
+    <div class="step"><span class="when">当日 朝</span><span class="what">予習ブリーフ（過去メール・Slack・議事録・ニュース）</span><span class="ball b-ai who">AI</span></div>
+    <div class="step"><span class="when">商談後 30分</span><span class="what">Geminiメモからお礼メール＋資料＋ネクストアクション</span><span class="ball b-me who">確認して送る</span></div>
+    <div class="step"><span class="when">送信後</span><span class="what">相手ボールに移し、返信を待つ</span><span class="ball b-them who">相手</span></div>
+    <div class="step"><span class="when">N日返信なし</span><span class="what">検討状況の確認メール下書き</span><span class="ball b-me who">送るだけ</span></div>
+  </div>
+  <div class="recipes">
+    <div class="rc"><h3>フォーム営業の本物返信だけ拾う</h3><p class="small">自動返信207件は既読・アーカイブ。人が書いた返信だけを自分ボールに上げ、アタックリストの行に紐づける。</p><span class="ev">根拠: 「問い合わせ完了」ラベル207件 / 30日</span></div>
+    <div class="rc"><h3>下書きの棚卸し</h3><p class="small">古い下書きを「送る / 捨てる / テンプレに昇格」の3択で一気に片付ける。月曜の「Gmailの下書き確認」予定はなくす。</p><span class="ev">根拠: 下書き140件、うちテンプレ52件</span></div>
+    <div class="rc"><h3>イベント後の一括フォロー</h3><p class="small">参加者リストを受け取ったら、宛名入りのお礼メール下書きと TimeRex のリンクをまとめて作る。返信が来た人から自分ボールに上がる。</p><span class="ev">根拠: 11/2 にお礼メールを20件個別送信</span></div>
+    <div class="rc"><h3>Slack の取りこぼし拾い</h3><p class="small">依頼語や「？」を含むメンション、相手の発言で24時間止まっている DM、bot の「担当: 片山」をボール化。他の人が答えたら自動で閉じる。</p><span class="ev">根拠: メンション約5件/日、春さん DM 2週間超</span></div>
+    <div class="rc"><h3>繰り返しの見直し</h3><p class="small">同じ「[作業]」が4週以上続いたら「まだ必要？」と1回だけ聞く。</p><span class="ev">根拠: Shirofune解約 12週連続</span></div>
+    <div class="rc"><h3>紹介の後追い</h3><p class="small">紹介した・つないだ案件（alpaka、UUUM、PAC、REGAL CORE）を相手ボールとして持ち、2週間動きがなければ様子伺いの下書きを出す。</p><span class="ev">根拠: 10月だけで紹介・つなぎ込みの商談5件</span></div>
+  </div>
+</section>
+
+<section class="stack" id="critique">
+  <h2>Fable によるレビュー <span class="tag">SECOND OPINION</span></h2>
+  <p class="prose small">最初の案を Fable にレビューさせました。結論は「このままだと、すでに無視されているダイジェストの豪華版になる」。指摘を受けて、軸・段階・ノートの扱いを変えています。</p>
+  <div class="critic">
+    <p><b>使われなくなる筋書き</b></p>
+    <ul class="tight small">
+      <li><b>見ない場所が1つ増えるだけ。</b>自分宛ての自動投稿を見ない習慣がすでにできている。</li>
+      <li><b>静かに止まる。</b>常時稼働の母艦が止まっても気づかず、古いデータを出し続けて信用をなくす。</li>
+      <li><b>繰り越しが雪だるまになる。</b>毎夕10件の判断を求めると全部繰り越され、翌朝50件になって見なくなる。</li>
+      <li><b>分類ミスで元のアプリに戻る。</b>cc 型のメンションや複数社のチャンネルを一度でも取り違えると、Slack を直接見る生活に戻る。</li>
+      <li><b>会話の画面が重い。</b>ボールごとに AI と会話するのは、ノートと Slack を直接見るより遅い。</li>
+    </ul>
+    <p><b>反映したこと</b></p>
+    <ul class="tight small">
+      <li>並べる単位を会社から「人 × 最後に話したのは誰 × 経過日数」に変えた。会社はタグ。</li>
+      <li>商談だけは段取りが決まっているので、ステージで管理する（仮押さえ → 前日 → 予習 → 商談 → お礼 → フォロー）。</li>
+      <li>完了は行動から自動で判定する。片山さんに完了ボタンを押させない。</li>
+      <li>フォーム営業の本物の返信を拾う機能は、小さくて価値が一番高いので最初に作る。</li>
+      <li>手書きノートを正とする。ハブが追うのは、ノートに載らないもの（相手ボール、cc 型メンション、埋もれた返信）。</li>
+      <li>画面を作るのは、1本の通知が実際に読まれて行動に結びつくと数字で確かめてから。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="stack">
+  <h2>作る順番と、次に進む条件 <span class="tag">PLAN</span></h2>
+  <div id="phases">
+  </div>
+</section>
+
+<section class="stack">
+  <h2>作らないもの <span class="tag">OUT OF SCOPE</span></h2>
+  <div class="cols">
+    <ul class="tight">
+      <li><b>アプリ内ブラウザで Gmail や Slack を開くこと。</b>どちらも埋め込みを禁止しているので、中身を読み込んで表示し、必要な時だけ元のアプリで開くリンクにします。</li>
+      <li><b>カレンダーの代わりの予定画面。</b>予定は Google カレンダーのまま。</li>
+      <li><b>メモアプリ。</b>メモは顧客フォルダの Doc に書き、ハブはそれを表示するだけ。</li>
+    </ul>
+    <ul class="tight">
+      <li><b>自動送信。</b>どの段階でも入れません。</li>
+      <li><b>プライベートの予定のタスク化。</b>「[Private]」は読まない。</li>
+      <li><b>「AI副社長」による全自動の振り分け。</b>まずボール1件ごとの AI が当たり前に使えてから。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="stack">
+  <h2>決めてほしいこと <span class="tag">QUESTIONS</span></h2>
+  <div class="qs" id="qs"></div>
+</section>
+
+<p class="small">データ: Google カレンダー 2026-09-29〜11-14（364件）、Gmail 直近30日（受信1,009スレッド・送信73・下書き140）、Slack 2026-09-22〜11-03、Drive 9/20以降の更新ファイル。すべて読み取りのみで集計。</p>
+</div>
+
+<script>
+(function(){
+const items=[
+ {id:1,ball:"me",src:"SLACK",title:"提案ステータス記入＋過去案件のコンディション確認",who:"岩田さん · #hawk-sales-private",due:"11/5 定例前",tags:["5回通知済み"],
+  ai:"既存ダイジェストで5回通知されて未返信です。HAWKアタックリストの「過去_提案ステータス」タブから、10月に動いた案件12社の現状を下書きしました。直近の Gemini メモと送信メールから推定しています。差分だけ確認してください。",
+  draft:"岩田さん\n遅くなりすみません、提案ステータス更新しました。\n・ビジョン様：トライアル延長→11/2 OK\n・朝日コネクト様：検討中（11/5に確認メール予定）\n・リック様：コンペ結果待ち\n残りもシートに反映済みです。",
+  acts:["シートに反映してSlackに返信","下書きを直す"],
+  ctx:[["SLACK","11/2 岩田","定例前に提案ステータスへの記入と、過去全案件のコンディション確認をお願いします。"],["SHEET","過去_提案ステータス","最終更新 10/15 · 12行が10月以降未更新"]]},
+ {id:2,ball:"me",src:"SLACK",title:"ウェビナー後リード65件の振り分け",who:"中西さん · #hawk-marketing",due:"休み明け",tags:["依頼"],
+  ai:"インターファクトリー共催ウェビナーのリスト65件を、HAWK企業マスタの業態×規模で3グループに分けました。A（今週アポ打診）9件、B（お礼＋資料）31件、C（ナーチャリング）25件。Aの9件には個別のお礼メール下書きを用意しています。",
+  draft:"中西さん\n振り分けました。A 9件（自分で打診）/ B 31件（お礼＋資料送付済み）/ C 25件（ナーチャリング行き）。シートの「担当」列を更新しています。",
+  acts:["振り分け案を確定","Aの下書き9件を見る"],
+  ctx:[["SLACK","10/28 中西","ウェビナー後のリード65件、振り分けて休み明けに対応お願いします"],["SHEET","共催ウェビナー_参加者","65行 · FO指名4社は送付済み"]]},
+ {id:3,ball:"me",src:"GMAIL",title:"薬院オーガニック 原様から返信（フォーム営業経由）",who:"自動返信207件の中から検出",due:"",tags:["本物の返信"],
+  ai:"フォーム営業の自動返信の山の中に、人が書いた返信がありました。10/19・10/21 に商談済みの相手です。alpaka の獲得トライアルについての質問なので、酒井さんを cc に入れた返信を下書きしました。",
+  draft:"原様\nご返信ありがとうございます。フリークアウトの片山です。\nトライアルの開始時期につきまして、alpaka 酒井より詳細をご案内いたします。…",
+  acts:["下書きをGmailに作る","アタックリストに記録"],
+  ctx:[["GMAIL","10/15 原銀大様","Re: 片山 優希様よりサイトからお問い合わせがありました。"],["CAL","10/21 16:30","薬院オーガニック様 × alpaka 酒井ご紹介・獲得トライアルのご案内"]]},
+ {id:4,ball:"me",src:"CAL",title:"LIVEDGE様 商談の予習（11/11 13:00）",who:"Tomoさん同席 · 西田さん経由",due:"11/10 夕方",tags:["商談"],
+  ai:"11/11 の商談に向けて、過去のメール・Slack・紹介の経緯からブリーフを作ります（hawk-shodan-prep）。前日 17:00 にリマインド下書きも用意します。",
+  draft:"【予習ブリーフ】LIVEDGE様\n経緯：西田さん紹介 → Tomoさん設定\n当日のゴール：トライアル合意\n想定Q：Meta以外の媒体対応、料金体系",
+  acts:["ブリーフを作る","リマインド下書きを予約"],
+  ctx:[["CAL","11/11 13:00","Fix) HAWK - Livedgeさま（3名）"],["GMAIL","11/2 Tomoさん","招待: 社外_西田さん×tomoさん LIVEDGE様 ご商談"]]},
+ {id:5,ball:"me",src:"CAL",title:"Shirofune解約、まだ必要？",who:"毎週土曜の定例 · 12週連続",due:"",tags:["繰り返し"],
+  ai:"8月から毎週出ている予定です。メールに解約完了の通知は見当たりません。「完了した」なら定例ごと消します。「まだ」なら1回だけの作業として今週に置き直します。",
+  draft:"",acts:["完了済み → 定例を消す","まだ → 今週1回に"],
+  ctx:[["CAL","毎週土 13:00","[作業/定例] Shirofune解約 ※8/19まで6/19から2か月"]]},
+ {id:10,ball:"me",src:"MSGR",title:"（例）メッセンジャーで止まっている仕事の連絡",who:"FB メッセンジャー · Beeper 経由 · 相手発言から2日",due:"",tags:["Phase 1"],
+  ai:"メッセンジャーの会話で、相手の発言で止まっているものを拾った例です。実データは未取得です。Beeper をつないだあとに、この形で出ます。",
+  draft:"",acts:["返信の下書きを作る"],
+  ctx:[["MSGR","例","来週どこかでお茶しませんか？紹介したい会社があります"]]},
+ {id:6,ball:"them",src:"GMAIL",title:"朝日コネクト様 検討状況",who:"秦様 · 10/30 商談",due:"11/5 に確認",tags:["待ち 4日"],
+  ai:"10/30 にお礼を送って返信待ちです。11/5 17:30 に確認メールの下書きを自分ボールに戻します。",
+  draft:"",acts:["今すぐ自分ボールに戻す"],
+  ctx:[["CAL","10/30 14:00","【オンライン・社外MTG】朝日コネクト・HAWK"]]},
+ {id:7,ball:"them",src:"SLACK",title:"UUUM 春さん：rawデータ活用と媒体の縛り",who:"DM · 相手の発言で止まっている",due:"",tags:["要確認"],
+  ai:"10/16 の春さんの質問に返していないようです。相手ボールではなく自分ボールでは？ 自分ボールに移しますか。",
+  draft:"",acts:["自分ボールに移す","もう対応済み"],
+  ctx:[["SLACK","10/16 春大介さん","rawデータ活用と、媒体の縛りについて質問"]]},
+ {id:8,ball:"ai",src:"GMAIL",title:"下書き140件の棚卸し",who:"テンプレ営業文52件を含む",due:"",tags:["作業中"],
+  ai:"下書きを「送る / 捨てる / テンプレに昇格」で仕分け中です。30日以上前のテンプレ営業文52件は「捨てる」を提案予定。終わったら自分ボールに戻します。",
+  draft:"",acts:["途中経過を見る"],
+  ctx:[["GMAIL","下書き","最古 7/6 · テンプレ「入稿・運用・レポートの工数を大幅削減」29件"]]},
+ {id:9,ball:"ai",src:"SLACK",title:"静鉄アド・パートナーズ 紹介申込の初動",who:"#hawk_紹介受付 · 担当: 片山",due:"",tags:["作業中"],
+  ai:"hawk-inbound-lead の手順で、会社概要Doc・カレンダー仮押さえ・初回メール下書きを作っています。",
+  draft:"",acts:["途中経過を見る"],
+  ctx:[["SLACK","11/3 bot","HAWK紹介申込：静鉄アド・パートナーズ（担当: 片山）"]]}
+];
+const note=["岩田さん：提案ステータス記入（定例前）","リード65件の振り分け → 中西さんに返す","原様に返信（酒井さん cc）","LIVEDGE 予習 → 前日リマインド","Shirofune：完了か判断して消す"];
+const qs=[
+ ["今のダイジェストを読まなかった理由はどれか","(a) 中身が信用できない (b) 届く時間が悪い (c) Slack の自分宛DMという場所が悪い (d) 読んでも動く気にならない。答えによって Phase 0 の形が変わります。"],
+ ["朝の5つはどこに出すか","候補は3つです。(a) 朝8:45のカレンダー予定の本文、(b) Mac のメニューバーに件数とリンク、(c) Slack の自分宛DMに1通だけ。ノートを書く直前に必ず目に入る場所がよいと考えています。"],
+ ["常時動かす Mac を誰が見るか","自宅の Mac mini（セットアップ中と予定にありました）を母艦にする案です。止まったら知らせる仕組みは入れますが、それも面倒なら「朝1回だけ動く」形でも Phase 0 は成立します。社用データを自宅で動かしてよいかも確認したいです。"],
+ ["メッセンジャーと LINE はどこまで読むか","Beeper 経由で読む前提です。仕事のメッセンジャーは全部読むのか、特定の人だけにするのか。LINE は個人の枠として出すのか、出さないのか。"]
+];
+const phases=[
+ ["Phase 0","1〜2週間","<b>引き算から始める。</b>初日に gog の失効を直し、既存のダイジェスト3本を止める。代わりに1日1回、朝ノートを書く直前に「自分ボール上位5件」を出す（人の名前、経過日数、元スレッドへのリンク）。フォーム営業の本物の返信を拾う機能だけはここで入れる。画面は作らない。リンクのクリックを数えて効果を測る。","リンクを開いたのが週3日以上。出した5件のうち4割以上に24時間以内に手を付けた。未達なら画面は作らず、出す時間と場所を変えてもう2週間試す。"],
+ ["Phase 1","2〜3週間","<b>画面と自動完了。</b>声を入れる入力欄1つと、自分 / 相手 / AI ボールの一覧。返信した・送った・予定が終わった、を見て自動で閉じる。下書き140件の棚卸し。夕方にノートの写真から ✅ を書き戻す。Beeper 経由でメッセンジャー（と、可能なら LINE）を読み取りでつなぐ。","相手の発言で止まったまま5営業日を超えたスレッドが、2週間で半分になる。月曜の「Gmailの下書き確認」の予定が要らなくなる。"],
+ ["Phase 2","以降","<b>商談を段取りごと任せる。</b>商談ステージの自動化（前日リマインド、予習、お礼メールとネクストアクション、N日後のフォロー）。イベント後の一括フォロー。紹介の後追い。ボールごとの AI 会話。スマホからの閲覧。","商談1件あたりで手で入れる「[作業]」ブロックが半分以下になる。"]
+];
+let view="me",cur=null;
+const $=s=>document.getElementById(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const ballLabel={me:"自分",them:"相手",ai:"AI"};
+function counts(){
+  const c={me:0,them:0,ai:0};items.forEach(i=>{if(!i.done)c[i.ball]++});
+  $("counts").innerHTML=`<span class="ball b-me">${c.me}</span><span class="ball b-them">${c.them}</span><span class="ball b-ai">${c.ai}</span>`;
+}
+function renderList(){
+  const vis=items.filter(i=>i.ball===view);
+  $("listTitle").textContent=ballLabel[view]+"ボール";
+  $("listCount").textContent=vis.filter(i=>!i.done).length+"件";
+  $("list").innerHTML=vis.map(i=>`<button type="button" class="item${i.done?" done":""}" data-id="${i.id}" aria-current="${cur&&cur.id===i.id}">
+    <span class="t">${esc(i.title)}</span>
+    <span class="m"><span class="src-ic">${i.src}</span>${esc(i.who)}${i.due?` · <b>${esc(i.due)}</b>`:""}${i.tags.map(t=>`<span class="ball ${t.includes("通知")||t.includes("繰り返し")?"b-warn":"b-"+i.ball}">${esc(t)}</span>`).join("")}</span></button>`).join("")||`<p class="small">このボールはありません。</p>`;
+  $("list").querySelectorAll(".item").forEach(b=>b.addEventListener("click",()=>select(+b.dataset.id)));
+}
+function select(id){
+  cur=items.find(i=>i.id===id);
+  $("aiState").innerHTML=`<span class="ball b-${cur.ball}">${ballLabel[cur.ball]}ボール</span>`;
+  $("chat").innerHTML=`<div class="msg ai"><span class="who">AI</span>${esc(cur.ai)}</div>`+(cur.draft?`<div class="msg draft"><span class="who">下書き（未送信）</span>${esc(cur.draft)}</div>`:"");
+  const extra=cur.ball==="me"?["相手ボールにする","明日へ"]:[];
+  $("acts").innerHTML=cur.acts.map((a,k)=>`<button type="button" class="act${k===0?" primary":""}" data-a="${esc(a)}">${esc(a)}</button>`).join("")+extra.map(a=>`<button type="button" class="act" data-a="${a}">${a}</button>`).join("")+`<button type="button" class="act" data-a="完了">完了</button>`;
+  $("acts").querySelectorAll(".act").forEach(b=>b.addEventListener("click",()=>act(b.dataset.a)));
+  $("ctx").innerHTML=cur.ctx.map(c=>`<div class="ctxcard"><span class="h"><span class="src-ic">${c[0]}</span>${esc(c[1])}</span><span>${esc(c[2])}</span></div>`).join("");
+  $("toast").textContent="";
+  renderList();
+}
+function act(a){
+  if(!cur)return;
+  if(a==="完了"||a.startsWith("完了済み")||a==="もう対応済み"){cur.done=true;$("toast").textContent="完了にしました。カレンダーの予定には ✅ を付けます（モックなので実際には書き込みません）。";}
+  else if(a==="相手ボールにする"){cur.ball="them";cur.tags=["待ち 0日"];$("toast").textContent="相手ボールに移しました。3営業日返信がなければ自分ボールに戻します。";}
+  else if(a==="自分ボールに移す"||a==="今すぐ自分ボールに戻す"){cur.ball="me";$("toast").textContent="自分ボールに移しました。";}
+  else if(a==="明日へ"){cur.due="明日";$("toast").textContent="明日の朝の5つ候補に入れました。";}
+  else{$("toast").textContent="「"+a+"」は本番では下書きや記入まで行い、送信前に確認を求めます。";}
+  counts();renderList();
+  if(cur.ball!==view){$("aiState").innerHTML=`<span class="ball b-${cur.ball}">${ballLabel[cur.ball]}ボール</span>`;}
+}
+function setView(v){
+  view=v;document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.view===v));
+  const m=v==="morning";$("panes").hidden=m;$("morningView").hidden=!m;
+  if(!m){const first=items.find(i=>i.ball===v&&!i.done);if(first)select(first.id);else{cur=null;renderList();$("chat").innerHTML="";$("acts").innerHTML="";$("ctx").innerHTML="";}}
+}
+document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>setView(b.dataset.view)));
+let nextId=100;
+$("quick").addEventListener("submit",e=>{
+  e.preventDefault();const t=$("quickText").value.trim();if(!t)return;
+  const who=(t.match(/^(.+?さん)/)||[,"相手未特定"])[1];
+  const due=(t.match(/(今日|明日|月曜|火曜|水曜|木曜|金曜|\d+\/\d+)/)||[,""])[1];
+  const it={id:nextId++,ball:"me",src:"VOICE",title:t.replace(/って?入れといて|入れといて/,"").slice(0,40),who:who+" · 声で追加",due:due?due+"まで":"",tags:["新規"],
+    ai:`「${who}」とのスレッドを探して紐づけます。${due?"期限は「"+due+"」として読み取りました。":"期限は読み取れませんでした。"}（モックなので実際の検索はしません）`,
+    draft:"",acts:["返信の下書きを作る"],ctx:[["VOICE","いま","「"+t+"」"]]};
+  items.unshift(it);$("quickText").value="";setView("me");select(it.id);counts();
+});
+$("note").innerHTML=note.map((n,i)=>`□ ${esc(n)}`).join("<br>");
+$("qs").innerHTML=qs.map(q=>`<div class="q"><b>${esc(q[0])}</b><span class="small">${esc(q[1])}</span></div>`).join("");
+$("phases").innerHTML=phases.map(p=>`<div class="phase"><div class="ph">${p[0]}<span>${p[1]}</span></div><div class="body"><p>${p[2]}</p><div class="gate"><b>次に進む条件</b>　${esc(p[3])}</div></div></div>`).join("");
+counts();select(1);
+})();
+</script>
