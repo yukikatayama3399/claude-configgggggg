@@ -433,3 +433,20 @@ details.sctx[open] summary::before{content:"▾ "}
 .chip.c-time{background:transparent;border:1px solid var(--line);color:var(--ink);font-family:var(--f-mono);font-weight:600}
 .chip.c-time.cal{border-color:var(--them);color:var(--them)}
 .subh{font-size:11px;font-weight:700;color:var(--muted);padding:6px 2px 2px;letter-spacing:.02em}
+/* Slack の見出し・メンバーとファイルの小窓 */
+.sch{display:inline-block;min-width:16px;color:var(--muted);font-weight:700;margin-right:2px}
+.stopic{font-size:12px;color:var(--muted);margin-top:-6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spop{position:fixed;z-index:50;width:320px;max-height:420px;display:flex;flex-direction:column;background:var(--win);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);padding:8px}
+.sph{font-size:12px;font-weight:800;padding:4px 6px 8px}
+.spl{overflow:auto;display:flex;flex-direction:column;gap:2px}
+.spm{display:flex;align-items:center;gap:10px;padding:5px 6px;border-radius:6px;font-size:13px}
+.spm:hover{background:var(--soft)}
+.spm img{width:28px;height:28px;border-radius:6px;object-fit:cover}
+.spf{all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;padding:6px;border-radius:6px}
+.spf:hover{background:var(--soft)}
+.spf .fn{display:flex;flex-direction:column;min-width:0}.spf .fn b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.spf .fn span{font-size:11px;color:var(--muted)}
+.ssend{display:inline-flex}
+.ssend #saveDraft{border-top-right-radius:0;border-bottom-right-radius:0}
+.ssend .sdrop{border-top-left-radius:0;border-bottom-left-radius:0;border-left:1px solid rgba(255,255,255,.35);padding-left:8px;padding-right:8px}
+.schcustom{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line);margin-top:6px;padding:8px 6px 2px;font-size:13px}
+.schcustom input{font:inherit;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:5px 8px;color-scheme:light dark}

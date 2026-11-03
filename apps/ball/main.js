@@ -195,6 +195,14 @@ ipcMain.handle("slack-people", (_e, a) => askSlack("slack-people", { channel: a.
 ipcMain.handle("slack-send", async (e, a) => {
   if (!win || e.sender !== win.webContents) return { ok: false, error: "BALL 本体の画面からの送信だけ受け付けます" };
   const files = (a && Array.isArray(a.files) ? a.files : []).slice(0, 10);
+  const postAt = Number(a && a.postAt) || 0;
+  if (postAt) {
+    // 予約送信（片山さんが BALL 本体で日時を選んで「この内容で予約」を押したときだけ）
+    if (files.length) return { ok: false, error: "予約送信にはファイルを付けられません" };
+    if (postAt * 1000 < Date.now() + 30e3 || postAt * 1000 > Date.now() + 120 * 86400e3) return { ok: false, error: "予約の日時がおかしいです（今から 120 日以内）" };
+    if (!String(a.text || "").trim()) return { ok: false, error: "本文が空です" };
+    return askSlack("slack-send", { channel: a.channel, threadTs: a.threadTs || "", text: a.text, postAt }, "slack-send-result", 30000);
+  }
   if (!a || !a.channel || (!String(a.text || "").trim() && !files.length)) return { ok: false, error: "送り先か本文が空です" };
   // 添付: Slack に上げる先を聞いて、BALL の中の Slack のログイン（persist:ball）でここから上げる
   const fileIds = [];

@@ -772,22 +772,30 @@
       const cp = $("copyDraft");
       if (cp) cp.onclick = () => navigator.clipboard.writeText(ta.value).then(() => toast("コピーしました"), () => { ta.select(); toast("選択しました。⌘C でコピーしてください"); });
       // 送信は2段階: 「送信…」→ 送り先と本文を確認 →「この内容で送信」を本人が押したときだけ。送り先はチャンネルとスレッドで決まるので取り違えない
-      btn.onclick = () => {
+      const sched = $("sSched");
+      if (sched) sched.onclick = () => {
+        if ((t.files || []).length) return toast("Slack の予約送信はファイルを付けられません。添付を外すか、今すぐ送信してください");
+        if (!ta.value.trim()) return toast("下書きが空です");
+        schedMenu(sched, (d) => { t.schedAt = d.getTime(); btn.onclick(); });
+      };
+      btn.onclick = (ev) => {
+        if (ev && ev.isTrusted) t.schedAt = 0; // 「送信 ▶」を押したときは今すぐ送る
         if (!IS_APP) return toast("見本なので送信しません");
         if (!ta.value.trim() && !(t.files || []).length) return toast("下書きが空です");
         const where = t.threadTs ? `${t.where} のスレッド` : t.where;
         const box = $("sendConfirm");
         const ments = slackPeople(t).filter((p) => ta.value.includes("@" + p.name)).map((p) => p.name);
         const nf = (t.files || []).length;
-        box.innerHTML = `<b>${esc(where)}に、この内容で送信しますか？</b>${ments.length ? `<div class="hint">メンション（通知が届きます）: ${esc(ments.join("、"))}</div>` : ""}${nf ? `<div class="hint">添付 ${nf} 件: ${esc(t.files.map((f) => f.name).join("、"))}</div>` : ""}<div class="mb sx" style="max-height:160px;overflow:auto">${slackHtml(ta.value, { emoji: (t.data && t.data.emoji) || {}, people: slackPeople(t), selfName: (t.data && t.data.selfName) || "" })}</div>
-          <div class="crow"><span class="sp"></span><button type="button" class="btn" id="sendCancel">やめる</button><button type="button" class="btn send" id="sendGo">この内容で送信</button></div>`;
+        box.innerHTML = `<b>${esc(where)}に、この内容を${t.schedAt ? ` <u>${esc(fmtWhen(t.schedAt))}</u> に予約送信` : "送信"}しますか？</b>${ments.length ? `<div class="hint">メンション（通知が届きます）: ${esc(ments.join("、"))}</div>` : ""}${nf ? `<div class="hint">添付 ${nf} 件: ${esc(t.files.map((f) => f.name).join("、"))}</div>` : ""}<div class="mb sx" style="max-height:160px;overflow:auto">${slackHtml(ta.value, { emoji: (t.data && t.data.emoji) || {}, people: slackPeople(t), selfName: (t.data && t.data.selfName) || "" })}</div>
+          <div class="crow"><span class="sp"></span><button type="button" class="btn" id="sendCancel">やめる</button><button type="button" class="btn send" id="sendGo">${t.schedAt ? "この内容で予約" : "この内容で送信"}</button></div>`;
         box.hidden = false;
-        $("sendCancel").onclick = () => { box.hidden = true; };
+        $("sendCancel").onclick = () => { box.hidden = true; t.schedAt = 0; };
         $("sendGo").onclick = async () => {
           $("sendGo").disabled = true; $("sendGo").textContent = "送信中…";
-          $("sendGo").textContent = (t.files || []).length ? "ファイルを送っています…" : "送信中…";
-          const r = await window.ball.slackSend({ channel: t.channel, threadTs: t.threadTs, text: toSlackText(t, ta.value), files: (t.files || []).map((f) => ({ name: f.name, type: f.type, data: f.data })) });
-          if (r.ok) { box.hidden = true; t.draft = ""; ta.value = ""; (t.files || []).forEach((f) => f.preview && URL.revokeObjectURL(f.preview)); t.files = []; t.aiDraft = false; toast("送信しました"); markDone(i); D.closed.unshift(`Slack: ${i.title.slice(0, 30)} · 返信済み`); left(); }
+          $("sendGo").textContent = t.schedAt ? "予約しています…" : (t.files || []).length ? "ファイルを送っています…" : "送信中…";
+          const sAt = t.schedAt;
+          const r = await window.ball.slackSend({ channel: t.channel, threadTs: t.threadTs, text: toSlackText(t, ta.value), postAt: sAt ? Math.floor(sAt / 1000) : 0, files: sAt ? [] : (t.files || []).map((f) => ({ name: f.name, type: f.type, data: f.data })) });
+          if (r.ok) { box.hidden = true; t.draft = ""; ta.value = ""; (t.files || []).forEach((f) => f.preview && URL.revokeObjectURL(f.preview)); t.files = []; t.aiDraft = false; t.schedAt = 0; toast(sAt ? `予約しました（${fmtWhen(sAt)} に送られます。取り消しは Slack の「予約済み」から）` : "送信しました"); markDone(i); D.closed.unshift(`Slack: ${i.title.slice(0, 30)} · 返信済み`); left(); }
           else { $("sendGo").disabled = false; $("sendGo").textContent = "この内容で送信"; toast("送信できませんでした：" + r.error); }
         };
       };
@@ -1568,9 +1576,27 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
         <button type="button" class="sbt" id="sEmo" title="絵文字">😀</button>
         <button type="button" class="sbt" id="sAt" title="メンション">@</button>
         <span class="hint">送るのは「送信…」で確認したときだけ</span><span class="sp"></span>
-        <button type="button" class="btn" id="copyDraft">コピー</button><button type="button" class="btn send" id="saveDraft">送信…</button>
+        <button type="button" class="btn" id="copyDraft">コピー</button><span class="ssend"><button type="button" class="btn send" id="saveDraft">送信 ▶</button><button type="button" class="btn send sdrop" id="sSched" title="送信日時を設定する" aria-label="送信日時を設定する">▾</button></span>
       </div>
       <div class="confirm" id="sendConfirm" hidden></div></div>`;
+  }
+  // ---------- 予約送信（Slack と同じ: 今日 / 明日 / 月曜日の 09:00・カスタム時間） ----------
+  function schedChoices() {
+    const at9 = (d) => { const x = new Date(d); x.setHours(9, 0, 0, 0); return x; };
+    const now = new Date(), out = [];
+    const today = at9(now); if (today > now) out.push(["今日の 09:00", today]);
+    const tm = at9(new Date(now.getTime() + 86400e3)); out.push(["明日の 09:00", tm]);
+    const mon = new Date(now); mon.setDate(now.getDate() + ((8 - now.getDay()) % 7 || 7)); const m9 = at9(mon);
+    if (m9.getTime() !== tm.getTime()) out.push(["月曜日の 09:00", m9]);
+    return out;
+  }
+  function schedMenu(anchor, onPick) {
+    const local = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const box = popover(anchor, `<div class="sph">送信日時を設定する</div><div class="spl">${schedChoices().map(([l, d], k) => `<button type="button" class="spf" data-k="${k}"><span>🕘</span><span class="fn"><b>${l}</b><span>${esc(fmtWhen(d.getTime()))}</span></span></button>`).join("")}
+      <div class="schcustom"><b>カスタム時間</b><input type="datetime-local" id="schAt" value="${local(new Date(Date.now() + 3600e3))}" min="${local(new Date())}"><button type="button" class="btn" id="schGo">この時間で予約</button></div></div>`);
+    const ch = schedChoices();
+    box.querySelectorAll(".spf").forEach((b) => (b.onclick = () => { box.remove(); onPick(ch[+b.dataset.k][1]); }));
+    box.querySelector("#schGo").onclick = () => { const d = new Date(box.querySelector("#schAt").value); if (isNaN(d) || d.getTime() < Date.now() + 60e3) return toast("1分より先の時間を選んでください"); box.remove(); onPick(d); };
   }
   // 選んだところを書式で囲む / 行の頭に付ける
   function fmtWrap(ta, a, b, ph) {
@@ -1667,6 +1693,41 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     });
   }
 
+  // ---------- Slack の見出し: 🔒 / #・メンバー・ファイルとリンク ----------
+  function slackTitle(t) {
+    const info = t.data && t.data.info;
+    const name = info && info.name && !info.isIm ? info.name : String(t.where || "").replace(/^#/, "");
+    const icon = info ? (info.isIm || info.isMpim ? "💬" : info.isPrivate ? "🔒" : "#") : (/^#/.test(t.where || "") ? "#" : "💬");
+    return `<span class="sch">${icon}</span>${esc(name)}${t.threadTs ? `<span>のスレッド</span>` : ""}`;
+  }
+  function popover(anchor, html) {
+    document.querySelectorAll(".spop").forEach((x) => x.remove());
+    const box = document.createElement("div"); box.className = "spop"; box.innerHTML = html; document.body.appendChild(box);
+    const r = anchor.getBoundingClientRect();
+    box.style.top = r.bottom + 6 + "px"; box.style.left = Math.max(8, Math.min(window.innerWidth - 340, r.right - 320)) + "px";
+    const off = (e) => { if (!box.contains(e.target) && e.target !== anchor) { box.remove(); document.removeEventListener("mousedown", off, true); } };
+    setTimeout(() => document.addEventListener("mousedown", off, true), 0);
+    return box;
+  }
+  async function slackMembersPop(i, anchor) {
+    const t = i.thread;
+    const draw = (list, loading) => popover(anchor, `<div class="sph">メンバー${list ? `（${list.length}人）` : ""}</div>${loading ? `<div class="hint">読み込み中…</div>` : ""}<div class="spl">${(list || []).map((p) => `<div class="spm">${p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : `<span class="sav ini" style="width:28px;height:28px;background:#4A154B">${esc((p.name || "?")[0])}</span>`}<span>${esc(p.name)}</span></div>`).join("")}</div>`);
+    if (t.people && t.people.length) return draw(t.people);
+    draw(null, true);
+    if (!IS_APP || !window.ball.slackPeople) return;
+    const r = await window.ball.slackPeople({ channel: t.channel });
+    t.people = r.ok ? r.people : [];
+    if (document.querySelector(".spop")) draw(t.people);
+  }
+  function slackFilesPop(i, anchor) {
+    const docs = collectDocs(i);
+    const box = popover(anchor, `<div class="sph">ファイルとリンク（${docs.length}件・新しい順）</div><div class="spl">${docs.length ? docs.slice().reverse().map((d, k) => {
+      const name = d.name || (d.gid && driveCache[d.gid] && driveCache[d.gid].name) || linkLabel(d.url).replace(/^\S+\s/, "");
+      return `<button type="button" class="spf" data-k="${docs.length - 1 - k}"><span>${docIcon(name, d.mime || "", d.url || "")}</span><span class="fn"><b>${esc(name)}</b><span>${esc(d.date ? shortDate(d.date) : "")} ${esc(d.url ? hostOf(d.url) : "")}</span></span></button>`;
+    }).join("") : `<div class="hint">このやり取りにはファイルもリンクもありません</div>`}</div>`);
+    box.querySelectorAll(".spf").forEach((b) => (b.onclick = (e) => { const d = docs[+b.dataset.k]; box.remove(); openLink(d.url, d.name || linkLabel(d.url), e); }));
+  }
+
   // 上へスクロールしたら、さらに前のやり取りを読み込む（チャンネルの最初まで遡れる）
   async function slackOlder(i) {
     const t = i.thread;
@@ -1703,11 +1764,14 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       return;
     }
     $("thr").innerHTML = `<div class="thr">
-      <div class="thd"><h4>${esc(t.where)}${t.threadTs ? " のスレッド" : ""}</h4><span><button type="button" class="btn" id="slackReload">読み直す</button>${t.permalink ? ` <button type="button" class="btn" id="slackOpen">Slack で開く ↗</button>` : ""}</span></div>
+      <div class="thd"><h4>${slackTitle(t)}</h4><span>${t.data && t.data.info && !t.data.info.isIm ? `<button type="button" class="btn" id="slackMembers" title="メンバーを見る">👤 ${t.data.info.members || "…"}</button> ` : ""}<button type="button" class="btn" id="slackFiles" title="このやり取りのファイルとリンク">📎 ファイルとリンク</button> <button type="button" class="btn" id="slackReload">読み直す</button>${t.permalink || (t.data && t.data.teamId) ? ` <button type="button" class="btn" id="slackOpen">Slack で開く ↗</button>` : ""}</span></div>
+      ${t.data && t.data.info && (t.data.info.topic || t.data.info.purpose) ? `<div class="stopic">${esc(t.data.info.topic || t.data.info.purpose)}</div>` : ""}
       ${t.error ? `<div class="empty">読めませんでした：${esc(t.error)}</div>` : `<div class="smsgs">${slackMsgsHtml(t)}</div>`}
       ${draftBox(i, "slacklive")}
     </div>`;
     $("slackReload").onclick = () => { t.data = null; t.error = null; t.scrolled = false; renderSlackThread(i); };
+    if ($("slackMembers")) $("slackMembers").onclick = () => slackMembersPop(i, $("slackMembers"));
+    if ($("slackFiles")) $("slackFiles").onclick = () => slackFilesPop(i, $("slackFiles"));
     mountDocsBar(i, ".thd");
     // Slack で開く: Slack のアプリで開く。アプリで開けなければ右のブラウザで
     if ($("slackOpen")) $("slackOpen").onclick = async () => {

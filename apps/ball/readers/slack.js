@@ -273,7 +273,7 @@ async function toMsgs(cfg, list, ids) {
 }
 async function extras(cfg, messages, ids) {
   const people = [];
-  for (const id of ids) people.push({ id, name: await userName(cfg, id) });
+  for (const id of ids) people.push({ id, name: await userName(cfg, id), avatar: avatars.get(id) || "" });
   const all = await customEmoji(cfg), emoji = {};
   for (const m of messages) {
     for (const x of String(m.text).matchAll(/:([a-z0-9_+'-]+):/gi)) { const u = emojiOf(all, x[1]); if (u) emoji[x[1]] = u; }
@@ -312,7 +312,13 @@ ipcRenderer.on("slack-thread", async (_e, { channel, threadTs, reqId }) => {
     const ids = new Set();
     const messages = await toMsgs(cfg, list, ids);
     const { people, emoji } = await extras(cfg, messages, ids);
-    ipcRenderer.send("slack-thread-result", { reqId, ok: true, messages, hasMore, people, emoji, selfName: users.get(cfg.userId) || "", teamUrl: cfg.url, teamId: cfg.teamId, enterpriseId: cfg.enterprise || "" });
+    // チャンネルの情報（名前・鍵付きか・メンバー数）。見出しに出す
+    let info = null;
+    try {
+      const c = (await api(cfg, "conversations.info", { channel, include_num_members: true })).channel || {};
+      info = { name: c.name || "", isPrivate: !!(c.is_private || c.is_group), isIm: !!c.is_im, isMpim: !!c.is_mpim, members: c.num_members || 0, topic: (c.topic && c.topic.value) || "", purpose: (c.purpose && c.purpose.value) || "" };
+    } catch (e) { /* 読めなくても出す */ }
+    ipcRenderer.send("slack-thread-result", { reqId, ok: true, messages, hasMore, info, people, emoji, selfName: users.get(cfg.userId) || "", teamUrl: cfg.url, teamId: cfg.teamId, enterpriseId: cfg.enterprise || "" });
   } catch (err) { ipcRenderer.send("slack-thread-result", { reqId, ok: false, error: String(err.message || err) }); }
 });
 // さらに前のやり取り（上へスクロールしたとき）
@@ -359,7 +365,7 @@ ipcRenderer.on("slack-people", async (_e, { channel, reqId }) => {
       const people = [];
       const todo = ids.filter((id) => id !== cfg.userId);
       for (let k = 0; k < todo.length; k += 5) {
-        const part = await Promise.all(todo.slice(k, k + 5).map(async (id) => ({ id, name: await userName(cfg, id) })));
+        const part = await Promise.all(todo.slice(k, k + 5).map(async (id) => { const name = await userName(cfg, id); return { id, name, avatar: avatars.get(id) || "" }; }));
         people.push(...part.filter((x) => x.name && x.name !== x.id));
       }
       peopleCache.set(channel, people);
@@ -370,10 +376,14 @@ ipcRenderer.on("slack-people", async (_e, { channel, reqId }) => {
 
 // 送信（返信）。BALL 本体が「この内容で送信」を押されたときにだけ送ってくる
 // ファイル付きのときは、BALL 本体が先にファイルを上げて（slack-upload-url → 本体がアップロード）、ここで本文と一緒に投稿する
-ipcRenderer.on("slack-send", async (_e, { channel, threadTs, text, fileIds, reqId }) => {
+ipcRenderer.on("slack-send", async (_e, { channel, threadTs, text, fileIds, postAt, reqId }) => {
   const cfg = config();
   if (!cfg) return ipcRenderer.send("slack-send-result", { reqId, ok: false, error: "Slack にログインしていません" });
   try {
+    if (postAt) {
+      const r = await api(cfg, "chat.scheduleMessage", { channel, text, post_at: postAt, thread_ts: threadTs || undefined });
+      return ipcRenderer.send("slack-send-result", { reqId, ok: true, scheduled: r.scheduled_message_id || true });
+    }
     if (fileIds && fileIds.length) {
       await api(cfg, "files.completeUploadExternal", { files: JSON.stringify(fileIds), channel_id: channel, thread_ts: threadTs || undefined, initial_comment: text || undefined });
       return ipcRenderer.send("slack-send-result", { reqId, ok: true });
