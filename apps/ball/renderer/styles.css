@@ -84,7 +84,10 @@ body.electron .dots{display:none}
 .card[aria-current="true"]{border-color:var(--ink);background:var(--win)}
 .card:focus-visible{outline:2px solid var(--me)}
 .ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-family:var(--f-mono);font-size:10.5px;font-weight:600;color:#fff}
-.ic.s-slack{background:#4A154B}.ic.s-gmail{background:#C5221F}.ic.s-msgr{background:#0866FF}.ic.s-cal{background:#1A73E8}.ic.s-form{background:#5B6B7F}.ic.s-doc{background:#1F7A4D}.ic.s-web{background:#E8340C}
+.ic.logo{background:#FFFFFF;border:1px solid var(--line)}
+.ic.logo svg{width:18px;height:18px;display:block}
+.fav.logo{background:transparent;display:grid;place-items:center;width:14px;height:14px}
+.fav.logo svg{width:14px;height:14px;display:block}
 .ct{min-width:0;display:grid;gap:2px}
 .ct .t{font-weight:700;font-size:13px;line-height:1.45}
 .ct .m{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:11px;color:var(--muted)}

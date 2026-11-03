@@ -3,8 +3,33 @@
 (function () {
   const D = window.BALL_DATA;
   const IS_APP = !!(window.ball && window.ball.isElectron);
-  const IC = { slack: "SL", gmail: "GM", msgr: "MS", cal: "CA", form: "FM", doc: "DC", web: "WB" };
-  const FAV = { slack: "#4A154B", gmail: "#C5221F", messenger: "#0866FF", sheet: "#1E8E3E", leads: "#1E8E3E", cal: "#1A73E8", calev: "#1A73E8", gemini: "#1F7A4D", gemini2: "#1F7A4D", doc: "#1F7A4D", doc2: "#1F7A4D", plain: "#8A94A3" };
+  const LOGO = window.BALL_LOGOS || {};
+  // ボールの出どころ → ロゴ（無いものは文字のアイコン）
+  const SRC_LOGO = { slack: "slack", gmail: "gmail", msgr: "msgr", cal: "cal", form: "slack", doc: "doc" };
+  const SRC_TEXT = { web: ["メ", "#E8340C"] };
+  // ブラウザのタブ → ロゴ
+  const SIM_LOGO = { slack: "slack", gmail: "gmail", messenger: "msgr", sheet: "sheet", leads: "sheet", cal: "cal", calev: "cal", gemini: "doc", gemini2: "doc", doc: "doc", doc2: "doc" };
+  function srcIcon(src) {
+    if (SRC_LOGO[src] && LOGO[SRC_LOGO[src]]) return `<span class="ic logo">${LOGO[SRC_LOGO[src]]}</span>`;
+    const t = SRC_TEXT[src] || ["・", "#8A94A3"];
+    return `<span class="ic" style="background:${t[1]}">${t[0]}</span>`;
+  }
+  function tabIcon(t) {
+    let k = SIM_LOGO[t.sim];
+    if (!k) {
+      const h = hostOf(t.url);
+      if (/mail\.google/.test(h)) k = "gmail";
+      else if (/slack\.com/.test(h)) k = "slack";
+      else if (/messenger\.com/.test(h)) k = "msgr";
+      else if (/calendar\.google/.test(h)) k = "cal";
+      else if (/docs\.google/.test(h)) k = /spreadsheets/.test(t.url) ? "sheet" : "doc";
+      else if (/drive\.google/.test(h)) k = "drive";
+      else if (/google\./.test(h)) k = "google";
+    }
+    if (k && LOGO[k]) return `<i class="fav logo">${LOGO[k]}</i>`;
+    if (/mercari/.test(t.url)) return `<i class="fav" style="background:#E8340C"></i>`;
+    return `<i class="fav"></i>`;
+  }
   const items = D.items;
   items.forEach((it) => { it.activeTab = 0; it.tabs.forEach((t, k) => (t.key = it.id + "-" + k)); });
   let tabSeq = 100;
@@ -31,7 +56,7 @@
   function card(i) {
     const pj = D.projects[i.proj];
     return `<button type="button" class="card${i.sec === "me" ? " me" : ""}" data-id="${i.id}" aria-current="${S.cur === i.id}">
-      <span class="ic s-${i.src}">${IC[i.src] || "··"}</span>
+      ${srcIcon(i.src)}
       <span class="ct"><span class="t">${esc(i.title)}</span>
       <span class="m"><span class="proj"><span class="pd" style="background:${pj.color}"></span>${esc(pj.name)}</span>${esc(i.sub)}${i.ago ? ` · ${esc(i.ago)}` : ""}</span>
       ${i.chips.length ? `<span class="m">${i.chips.map((c) => `<span class="chip c-${c[1]}">${esc(c[0])}</span>`).join("")}</span>` : ""}</span></button>`;
@@ -99,7 +124,7 @@
   }
   function renderTabs() {
     const i = curItem();
-    $("btabs").innerHTML = i.tabs.map((t, k) => `<button type="button" class="btab" data-k="${k}" aria-pressed="${k === i.activeTab}"><i class="fav" style="background:${FAV[t.sim] || FAV.plain}"></i><span>${esc(t.title)}</span><span class="x" data-close="${k}" aria-label="タブを閉じる">×</span></button>`).join("");
+    $("btabs").innerHTML = i.tabs.map((t, k) => `<button type="button" class="btab" data-k="${k}" aria-pressed="${k === i.activeTab}">${tabIcon(t)}<span>${esc(t.title)}</span><span class="x" data-close="${k}" aria-label="タブを閉じる">×</span></button>`).join("");
     $("btabs").querySelectorAll(".btab").forEach((b) => (b.onclick = (e) => {
       const c = e.target.closest("[data-close]");
       if (c) { closeTab(+c.dataset.close); return; }

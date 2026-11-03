@@ -9,6 +9,7 @@ const out = `<title>BALL 使用感プレビュー</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="styles.css">
 ${body}
+<script src="logos.js"></script>
 <script src="data.js"></script>
 <script src="app.js"></script>
 `;
