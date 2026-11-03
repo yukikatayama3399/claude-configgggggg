@@ -96,13 +96,13 @@ ipcMain.on("msgr-result", (_e, data) => {
 // 1つの会話の直近メッセージを、裏ウィンドウで読んで返す
 let threadReq = 0;
 ipcMain.handle("msgr-thread", (_e, arg) => new Promise((resolve) => {
-  const { href, name } = typeof arg === "string" ? { href: arg, name: "" } : arg;
+  const { href, name, steps } = typeof arg === "string" ? { href: arg, name: "", steps: 4 } : arg;
   if (!msgrWin || msgrWin.isDestroyed()) return resolve({ ok: false, error: "Messenger の読み取り画面がありません" });
   const reqId = ++threadReq;
-  const timer = setTimeout(() => { ipcMain.removeListener("thread-result", onRes); resolve({ ok: false, error: "時間内に読めませんでした" }); }, 20000);
+  const timer = setTimeout(() => { ipcMain.removeListener("thread-result", onRes); resolve({ ok: false, error: "時間内に読めませんでした" }); }, 30000 + (steps || 4) * 1500);
   function onRes(_ev, data) { if (data.reqId !== reqId) return; clearTimeout(timer); ipcMain.removeListener("thread-result", onRes); resolve(data); }
   ipcMain.on("thread-result", onRes);
-  msgrWin.webContents.send("read-thread", { href, name, reqId });
+  msgrWin.webContents.send("read-thread", { href, name, steps, reqId });
 }));
 // 右のブラウザで開いている Messenger のページを、読み取りに使う
 ipcMain.on("msgr-use-url", (_e, url) => {

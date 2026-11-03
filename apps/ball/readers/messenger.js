@@ -149,67 +149,93 @@ function scrape() {
 // ---------- 1つの会話の直近メッセージを読む ----------
 // 会話のページ（/t/<id>）で、メッセージ欄（role=main）の行を上から読む。
 // 右寄せの吹き出し＝自分、左寄せ＝相手、として判定する。
-function readConversation() {
+// 会話欄の範囲: 入力欄（メッセージを書く欄）の左右を基準にする。右端の「チャット情報」欄や左の一覧は入れない
+function convColumn() {
   const w = window.innerWidth || 1200, h = window.innerHeight || 900;
-  // 会話欄の範囲: 入力欄（メッセージを書く欄）の左右を基準にする。右端の「チャット情報」欄や左の一覧は入れない
   const box = document.querySelector('[role="textbox"][contenteditable="true"]');
   const br = box && box.getBoundingClientRect();
   let colL, colR;
-  if (br && br.width > 100) {
-    // 入力欄の左右にはアイコン（＋、写真、スタンプなど）が並ぶので、少し広めに取る
-    colL = Math.max(0, br.left - 160); colR = Math.min(w, br.right + 110);
-  } else {
+  if (br && br.width > 100) { colL = Math.max(0, br.left - 160); colR = Math.min(w, br.right + 110); }
+  else {
     const main = document.querySelector('[role="main"]');
     const mr = main ? main.getBoundingClientRect() : { left: w * 0.35, right: w };
     colL = mr.left; colR = mr.right;
   }
-  const center = (colL + colR) / 2;
-  const bottom = br ? br.top - 4 : h - 60;
+  return { colL, colR, center: (colL + colR) / 2, bottom: br ? br.top - 4 : h - 60 };
+}
+const SKIP_SEL = '[contenteditable="true"], [role="textbox"], [role="navigation"], [role="banner"], [role="complementary"], [role="toolbar"], [role="dialog"]';
+const bgUrl = (el) => { const m = (el.style.backgroundImage || "").match(/url\(["']?([^"')]+)/); return m ? m[1] : ""; };
+// 今画面に見えている会話欄のメッセージ（文字・写真・ファイル）を上から順に集める
+function collectItems(col) {
+  const { colL, colR, center, bottom } = col;
   const inCol = (r) => r.width > 0 && r.height > 0 && r.left >= colL - 2 && r.right <= colR + 2 && r.top > 120 && r.bottom < bottom;
-  const skip = (el) => !!el.closest('[contenteditable="true"], [role="textbox"], [role="navigation"], [role="banner"], [role="complementary"], [role="toolbar"], [role="dialog"]');
   const items = [];
-  // 文字: いちばん内側の dir=auto のかたまり
   for (const el of document.querySelectorAll('div[dir="auto"], span[dir="auto"]')) {
-    if (skip(el) || el.querySelector('div[dir="auto"], span[dir="auto"]')) continue;
+    if (el.closest(SKIP_SEL) || el.querySelector('div[dir="auto"], span[dir="auto"]')) continue;
     const r = el.getBoundingClientRect();
-    if (!inCol(r)) continue;
+    if (!inCol(r) || r.width > (colR - colL) * 0.9) continue;
     const text = el.innerText.trim();
     if (!text || /^(\d{1,2}:\d{2}|\d+月\d+日.*|今日|昨日|既読|送信済み|Seen|Sent|入力中…?)$/.test(text)) continue;
-    // 会話欄の上下の端にある見出し（相手の名前など）は入れない
-    if (r.width > (colR - colL) * 0.9) continue;
-    items.push({ top: r.top, mine: r.left + r.width / 2 > center, text });
+    items.push({ el, top: r.top, mine: r.left + r.width / 2 > center, text });
   }
-  // 写真: 会話欄の中の大きめの画像（アイコンは小さいので入れない）。押すと開けるように元の URL も渡す
-  for (const im of document.querySelectorAll("img")) {
-    if (skip(im)) continue;
+  // 写真: img と、背景に貼られた画像。アイコンは小さいので入れない
+  const pics = [...document.querySelectorAll("img"), ...document.querySelectorAll('[style*="background-image"]')];
+  for (const im of pics) {
+    if (im.closest(SKIP_SEL)) continue;
     const r = im.getBoundingClientRect();
-    if (!inCol(r) || r.width < 80 || r.height < 60) continue;
-    items.push({ top: r.top, mine: r.left + r.width / 2 > center, image: im.currentSrc || im.src, text: "📷 写真" });
+    if (!inCol(r) || r.width < 60 || r.height < 60) continue;
+    const src = im.tagName === "IMG" ? (im.currentSrc || im.src) : bgUrl(im);
+    if (!src) continue;
+    items.push({ el: im, top: r.top, mine: r.left + r.width / 2 > center, image: src, text: "📷 写真" });
   }
-  // ファイル: 会話欄の中の、ファイル名らしいリンク
   for (const a of document.querySelectorAll("a[href]")) {
-    if (skip(a)) continue;
+    if (a.closest(SKIP_SEL)) continue;
     const r = a.getBoundingClientRect();
     if (!inCol(r)) continue;
     const t = (a.innerText || "").trim().split("\n")[0];
-    if (!/\.(pdf|docx?|xlsx?|pptx?|csv|zip|txt|key|numbers|pages|mov|mp4|png|jpe?g)\b/i.test(t) && !a.hasAttribute("download")) continue;
-    items.push({ top: r.top, mine: r.left + r.width / 2 > center, file: a.href, text: "📎 " + t });
+    if (!/\.(pdf|docx?|xlsx?|pptx?|csv|zip|txt|key|numbers|pages|mov|mp4)\b/i.test(t) && !a.hasAttribute("download")) continue;
+    items.push({ el: a, top: r.top, mine: r.left + r.width / 2 > center, file: a.href, text: "📎 " + t });
   }
-  items.sort((x, y) => x.top - y.top);
+  return items.sort((x, y) => x.top - y.top);
+}
+// メッセージ欄のスクロールする箱（上にスクロールすると過去のメッセージが読み込まれる）
+function scrollBox(col) {
+  const probe = collectItems(col)[0];
+  for (let el = probe && probe.el; el && el !== document.body; el = el.parentElement) {
+    const cs = getComputedStyle(el);
+    if (/(auto|scroll)/.test(cs.overflowY) && el.scrollHeight > el.clientHeight + 40) return el;
+  }
+  return null;
+}
+// 直近から過去へ、上にスクロールしながら集める。steps 回まで（足りなければ「もっと過去を読む」で増やす）
+async function readConversation(steps = 4) {
+  const col = convColumn();
+  const seen = new Set();
+  let all = [];
+  const box = scrollBox(col);
+  let reachedTop = false;
+  for (let i = 0; i <= steps; i++) {
+    const batch = collectItems(col).filter((it) => !seen.has(it.el));
+    batch.forEach((it) => seen.add(it.el));
+    all = batch.concat(all); // 上にスクロールして出てきたものほど古いので、前に足す
+    if (!box) break;
+    if (box.scrollTop <= 0) { reachedTop = true; break; }
+    box.scrollTop = Math.max(0, box.scrollTop - box.clientHeight * 0.85);
+    await sleep(1000);
+  }
   const out = [];
-  for (const it of items) {
+  for (const it of all) {
     const prev = out[out.length - 1];
-    if (prev && prev.text === it.text && !it.image) continue;
-    // 写真と同じ位置にある説明文の重複は省く
+    if (prev && prev.text === it.text && prev.mine === it.mine && !it.image) continue;
     if (prev && it.image && prev.image === it.image) continue;
     out.push({ mine: it.mine, text: it.text, image: it.image || "", file: it.file || "" });
   }
   const name = (document.querySelector('[role="main"] h1, [role="main"] h2, h1, h2') || {}).innerText || "";
-  return { name: name.trim(), messages: out.slice(-15), rows: items.length };
+  return { name: name.trim(), messages: out.slice(-400), rows: all.length, reachedTop: reachedTop || !box, url: location.href };
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let readingThread = false;
-ipcRenderer.on("read-thread", async (_e, { href, name, reqId }) => {
+ipcRenderer.on("read-thread", async (_e, { href, name, steps, reqId }) => {
   readingThread = true;
   const back = location.href;
   try {
@@ -223,8 +249,9 @@ ipcRenderer.on("read-thread", async (_e, { href, name, reqId }) => {
     if (target) target.click();
     else if (/\/t\//.test(path)) { history.pushState({}, "", path); window.dispatchEvent(new PopStateEvent("popstate")); }
     else throw new Error("一覧に " + (name ? "その名前の" : "") + "会話が見つかりませんでした");
-    let res = { messages: [] };
-    for (let i = 0; i < 12; i++) { await sleep(700); res = readConversation(); if (res.messages.length) break; }
+    // 会話が開いて最初のメッセージが出るまで待ってから、過去へ遡って読む
+    for (let i = 0; i < 12; i++) { await sleep(700); if (collectItems(convColumn()).length) break; }
+    const res = await readConversation(steps || 4);
     ipcRenderer.send("thread-result", { reqId, ok: true, ...res });
   } catch (err) {
     ipcRenderer.send("thread-result", { reqId, ok: false, error: String(err && err.message || err) });

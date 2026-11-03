@@ -248,21 +248,26 @@
   function renderMsgrThread(i) {
     const t = i.thread;
     if (t.live && !t.data && !t.error) {
-      $("thr").innerHTML = `<div class="thr"><div class="empty">${esc(t.name)}さんとのやり取りを読み込み中…</div></div>`;
+      $("thr").innerHTML = `<div class="thr"><div class="empty">${esc(t.name)}さんとのやり取りを読み込み中…（過去へ遡って読んでいます）</div></div>`;
       if (!t.loading && IS_APP) {
         t.loading = true;
-        window.ball.messengerThread({ href: t.href, name: t.name }).then((r) => {
+        window.ball.messengerThread({ href: t.href, name: t.name, steps: t.steps || 4 }).then((r) => {
           t.loading = false;
-          if (r.ok && r.messages && r.messages.length) t.data = r;
-          else t.error = r.ok ? `メッセージを読み取れませんでした（行 ${r.rows || 0} 個）。「Messenger で開く」で見てください` : r.error;
+          if (r.ok && r.messages && r.messages.length) {
+            t.data = r;
+            // 会話を開いたあとの URL（/t/<番号>）を覚える。送信先の取り違えを防ぐのに使う
+            if (/\/t\/[^/?#]+/.test(r.url || "")) { t.href = r.url; i.tabs.forEach((x) => { if (x.sim === "messenger") x.url = r.url; }); }
+          } else t.error = r.ok ? `メッセージを読み取れませんでした（${r.rows || 0} 個）。「Messenger で開く」で見てください` : r.error;
           if (curItem() === i && S.rmode === "thread") renderMsgrThread(i);
         });
       }
       return;
     }
     const msgs = t.live ? (t.data ? t.data.messages : []) : t.messages;
+    const more = t.live && t.data && !t.data.reachedTop;
     $("thr").innerHTML = `<div class="thr">
       <div class="thd"><h4>Messenger：${esc(t.name)}</h4><span><button type="button" class="btn" id="msgrReload">読み直す</button> <button type="button" class="btn" id="openInMsgr">Messenger で開く ↗</button></span></div>
+      ${t.live && t.data ? `<div class="hint">${t.data.reachedTop ? "最初のメッセージまで読みました" : "直近から遡って読んでいます"}（${msgs.length}件）${more ? ` <button type="button" class="btn" id="msgrMore">もっと過去を読む</button>` : ""}</div>` : ""}
       ${t.error ? `<div class="empty">${esc(t.error)}</div>` : `<div class="bubs">${msgs.map((m, k) => `<div class="bubrow${m.mine ? " mine" : ""}">${
         m.image ? `<button type="button" class="bbimg" data-img="${k}" title="大きく開く"><img src="${esc(m.image)}" alt="写真" loading="lazy" referrerpolicy="no-referrer"></button>`
         : m.file ? `<button type="button" class="bb bbfile" data-file="${k}">${esc(m.text)}</button>`
@@ -270,34 +275,54 @@
       ${draftBox(i, "msgr")}
     </div>`;
     $("msgrReload").onclick = () => { if (!t.live) return toast("見本の会話です"); t.data = null; t.error = null; renderMsgrThread(i); };
+    if ($("msgrMore")) $("msgrMore").onclick = () => { t.steps = (t.steps || 4) + 10; t.data = null; t.error = null; renderMsgrThread(i); };
     $("openInMsgr").onclick = () => openConversationTab(i);
-    // 写真・ファイルは押すと右のブラウザで開く
+    // 写真は開けなかったら「📷 写真」の文字に差し替える。押すと右のブラウザで開く
+    $("thr").querySelectorAll(".bbimg img").forEach((im) => (im.onerror = () => { const btn = im.parentElement; btn.className = "bb bbfile"; btn.textContent = "📷 写真（押すと開く）"; }));
     $("thr").querySelectorAll("[data-img]").forEach((b) => (b.onclick = () => openTab(msgs[+b.dataset.img].image, "写真")));
     $("thr").querySelectorAll("[data-file]").forEach((b) => (b.onclick = () => openTab(msgs[+b.dataset.file].file, msgs[+b.dataset.file].text.replace(/^📎\s*/, ""))));
+    if (t.live && t.data) { const bx = $("thr").querySelector(".bubs"); if (bx && bx.lastElementChild) bx.lastElementChild.scrollIntoView({ block: "nearest" }); }
     bindDraft(i);
   }
   function openConversationTab(i) {
     const url = i.thread.href || (i.tabs[0] && i.tabs[0].url);
     let tab = i.tabs.find((x) => x.url === url);
-    if (!tab) { tab = { title: `${i.thread.name} - Messenger`, url, sim: "messenger", key: i.id + "-c" }; i.tabs.unshift(tab); }
+    if (!tab) { tab = { title: `${i.thread.name} - Messenger`, url, sim: "messenger", key: i.id + "-c" + tabSeq++ }; i.tabs.unshift(tab); }
     i.activeTab = i.tabs.indexOf(tab); S.rmode = "browser"; right();
     return tab;
   }
-  // 会話を右のブラウザで開き、入力欄に下書きを入れる（送信は本人が Enter）
-  function insertIntoMessenger(i, text) {
+  const normName = (x) => String(x || "").replace(/[\s　・、,]/g, "").toLowerCase();
+  // 会話を右のブラウザで開き、入力欄に下書きを入れる。send=true のときだけ Enter まで押す（本人が確認ボタンを押した場合のみ）
+  function insertIntoMessenger(i, text, { send = false, done } = {}) {
     if (!IS_APP || !i.thread.live) return toast("見本なので入れません。アプリ版では会話の入力欄に入ります");
+    const t = i.thread;
+    if (send && !/\/t\/[^/?#]+/.test(t.href || "")) return toast("この会話の場所（URL）が分からないので送信できません。「入力欄に入れる」を使って、Messenger で送ってください");
     const tab = openConversationTab(i);
     const w = webviews[tab.key];
-    const js = `(function(t){var b=document.querySelector('[role="textbox"][contenteditable="true"]');if(!b)return false;b.focus();document.execCommand('insertText',false,t);return true;})(${JSON.stringify(text)})`;
+    // 入力欄に入れる前に、開いている会話の名前が相手と一致するかを確かめる
+    const js = `(function(t){var h=(document.querySelector('[role="main"] h1, [role="main"] h2')||{}).innerText||document.title||"";var b=document.querySelector('[role="textbox"][contenteditable="true"]');if(!b)return {ok:false,h:h};b.focus();document.execCommand('insertText',false,t);return {ok:true,h:h};})(${JSON.stringify(text)})`;
+    const check = `(function(){var h=(document.querySelector('[role="main"] h1, [role="main"] h2')||{}).innerText||document.title||"";return h;})()`;
     let tries = 0;
-    const attempt = () => {
-      w.executeJavaScript(js).then((ok) => {
-        if (ok) toast("入力欄に入れました。内容を確認して Enter で送ってください");
-        else if (++tries < 8) setTimeout(attempt, 1000);
-        else toast("入力欄が見つかりませんでした。下書きをコピーして貼ってください");
-      }).catch(() => { if (++tries < 8) setTimeout(attempt, 1000); });
+    const attempt = async () => {
+      try {
+        const header = await w.executeJavaScript(check);
+        const match = header && normName(header).includes(normName(t.name).slice(0, 6));
+        if (!match) {
+          if (++tries < 10) return setTimeout(attempt, 1000);
+          return toast(send ? "開いている会話の相手が一致しなかったので、送信を止めました" : "会話が開けませんでした。下書きをコピーして貼ってください");
+        }
+        const r = await w.executeJavaScript(js);
+        if (!r.ok) { if (++tries < 10) return setTimeout(attempt, 1000); return toast("入力欄が見つかりませんでした。下書きをコピーして貼ってください"); }
+        if (!send) return toast("入力欄に入れました。内容を確認して Enter で送ってください");
+        w.focus();
+        w.sendInputEvent({ type: "keyDown", keyCode: "Enter" });
+        w.sendInputEvent({ type: "char", keyCode: "\r" });
+        w.sendInputEvent({ type: "keyUp", keyCode: "Enter" });
+        toast(`${t.name}さんに送信しました`);
+        if (done) done();
+      } catch (e) { if (++tries < 10) setTimeout(attempt, 1000); }
     };
-    setTimeout(attempt, 1200);
+    setTimeout(attempt, 1500);
   }
   function draftBox(i, kind) {
     const t = i.thread;
@@ -305,7 +330,7 @@
     const actions = kind === "gmail"
       ? `<span class="hint">AI は下書きまで。送るのは「送信」を押して確認したときだけ</span><span class="sp"></span><button type="button" class="btn" id="saveDraft">下書きに保存</button><button type="button" class="btn send" id="sendMail">送信…</button>`
       : kind === "msgr"
-        ? `<button type="button" class="btn" id="copyDraft">コピー</button><span class="sp"></span><button type="button" class="btn send" id="saveDraft">Messenger の入力欄に入れる</button>`
+        ? `<button type="button" class="btn" id="copyDraft">コピー</button><span class="sp"></span><button type="button" class="btn" id="saveDraft">入力欄に入れる</button><button type="button" class="btn send" id="sendMsgr">送信…</button>`
         : `<span class="hint">見本です（Slack は下書きまで。投稿は自分のボタンで）</span><span class="sp"></span><button type="button" class="btn send" id="saveDraft">送信</button>`;
     return `<div class="draft"><div class="dh"><span>下書き（送るまで送信されません）</span><span id="draftState">${saved}</span></div>
       <textarea id="draftText" aria-label="下書き" placeholder="真ん中で「下書き書いて」と言うとここに入ります。直接書いても OK。">${esc(t.draft || "")}</textarea>
@@ -329,6 +354,22 @@
       const cp = $("copyDraft");
       if (cp) cp.onclick = () => navigator.clipboard.writeText(ta.value).then(() => toast("コピーしました"), () => { ta.select(); toast("選択しました。⌘C でコピーしてください"); });
       btn.onclick = () => { if (!ta.value.trim()) return toast("下書きが空です"); insertIntoMessenger(i, ta.value); };
+      // 送信も2段階: 「送信…」→ 相手と本文を確認 →「この内容で送信」を本人が押したときだけ
+      const sb = $("sendMsgr");
+      if (sb) sb.onclick = () => {
+        if (!t.live || !IS_APP) return toast("見本なので送信しません");
+        if (!ta.value.trim()) return toast("下書きが空です");
+        const box = $("sendConfirm");
+        box.innerHTML = `<b>${esc(t.name)}さんに、この内容で送信しますか？</b><div class="mb" style="max-height:120px;overflow:auto">${esc(ta.value)}</div>
+          <div class="crow"><span class="hint">送る前に、開いた会話の相手が ${esc(t.name)}さんか確かめます</span><span class="sp"></span><button type="button" class="btn" id="sendCancel">やめる</button><button type="button" class="btn send" id="sendGo">この内容で送信</button></div>`;
+        box.hidden = false;
+        $("sendCancel").onclick = () => { box.hidden = true; };
+        $("sendGo").onclick = () => {
+          box.hidden = true;
+          const text = ta.value;
+          insertIntoMessenger(i, text, { send: true, done: () => { t.draft = ""; i.done = true; D.closed.unshift(`Messenger: ${t.name} · 送信済み`); left(); } });
+        };
+      };
       return;
     }
     const live = t.kind === "gmail" && t.live && IS_APP;
