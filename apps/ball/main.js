@@ -269,6 +269,52 @@ ipcMain.handle("gmail-send", async (e, d) => {
   if (!win || e.sender !== win.webContents) return { ok: false, error: "BALL 本体の画面からの送信だけ受け付けます" };
   return wrap((x) => gmail.sendDraft(x))(e, d);
 });
+// ---------- Gmail の予約送信 ----------
+// Gmail の API には予約送信が無いので、BALL が時刻になったら下書きを送る。片山さんが BALL 本体で予約を押したものだけ。
+// BALL を閉じていて時刻を 15 分以上過ぎていたら、遅れて勝手に送らず、下書きのまま残して画面に知らせる
+const schedFile = () => path.join(app.getPath("userData"), "gmail-schedules.json");
+let gmailScheds = [];
+try { gmailScheds = JSON.parse(fs.readFileSync(schedFile(), "utf8")) || []; } catch (e) { gmailScheds = []; }
+const saveScheds = () => { try { fs.writeFileSync(schedFile(), JSON.stringify(gmailScheds)); } catch (e) { /* 残せなくても動く */ } };
+async function runScheds() {
+  const now = Date.now();
+  for (const sc of gmailScheds.filter((x) => x.at <= now && !x.busy)) {
+    sc.busy = true;
+    if (now - sc.at > 15 * 60e3) {
+      gmailScheds = gmailScheds.filter((x) => x !== sc); saveScheds();
+      if (win && !win.isDestroyed()) win.webContents.send("gmail-sched-event", { type: "missed", ...sc });
+      continue;
+    }
+    try {
+      await gmail.sendDraftById(sc.draftId);
+      gmailScheds = gmailScheds.filter((x) => x !== sc); saveScheds();
+      if (win && !win.isDestroyed()) win.webContents.send("gmail-sched-event", { type: "sent", ...sc });
+    } catch (err) {
+      sc.busy = false; sc.err = String(err.message || err);
+      if (win && !win.isDestroyed()) win.webContents.send("gmail-sched-event", { type: "error", ...sc });
+      sc.at = now + 5 * 60e3; saveScheds(); // 5 分後にもう一度
+    }
+  }
+}
+setInterval(runScheds, 30000);
+ipcMain.handle("gmail-schedule", async (e, a) => {
+  if (!win || e.sender !== win.webContents) return { ok: false, error: "BALL 本体の画面からだけ受け付けます" };
+  const at = Number(a && a.at) || 0;
+  if (at < Date.now() + 60e3 || at > Date.now() + 120 * 86400e3) return { ok: false, error: "予約の日時がおかしいです（1分後〜120日以内）" };
+  try {
+    const r = await gmail.saveDraft(a.d);
+    if (!r.draftId) return { ok: false, error: "下書きを保存できませんでした" };
+    gmailScheds = gmailScheds.filter((x) => x.draftId !== r.draftId).concat([{ draftId: r.draftId, at, subject: a.d.subject, to: a.d.to, ballId: a.ballId || "" }]);
+    saveScheds();
+    return { ok: true, data: { draftId: r.draftId, at } };
+  } catch (err) { return { ok: false, error: String(err.message || err) }; }
+});
+ipcMain.handle("gmail-unschedule", (e, draftId) => {
+  if (!win || e.sender !== win.webContents) return { ok: false };
+  gmailScheds = gmailScheds.filter((x) => x.draftId !== draftId); saveScheds();
+  return { ok: true };
+});
+ipcMain.handle("gmail-schedules", () => gmailScheds.map(({ busy, ...x }) => x));
 ipcMain.handle("gmail-attachment", wrap(async (a) => { const p = await gmail.openAttachment(a); await shell.openPath(p); return p; }));
 
 // ---------- リンクの確認ウィンドウ ----------

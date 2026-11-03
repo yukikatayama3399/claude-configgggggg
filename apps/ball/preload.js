@@ -22,6 +22,10 @@ contextBridge.exposeInMainWorld("ball", {
   gmailDraft: (d) => ipcRenderer.invoke("gmail-draft", d),
   gmailSend: (d) => ipcRenderer.invoke("gmail-send", d),
   gmailAttachment: (a) => ipcRenderer.invoke("gmail-attachment", a),
+  gmailSchedule: (a) => ipcRenderer.invoke("gmail-schedule", a),
+  gmailUnschedule: (id) => ipcRenderer.invoke("gmail-unschedule", id),
+  gmailSchedules: () => ipcRenderer.invoke("gmail-schedules"),
+  onGmailSched: (cb) => ipcRenderer.on("gmail-sched-event", (_e, ev) => cb(ev)),
   calendarEvents: (days) => ipcRenderer.invoke("calendar-events", days),
   driveMeta: (ids) => ipcRenderer.invoke("drive-meta", ids),
   // Slack（BALL の中でログインした Slack から読む）

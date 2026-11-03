@@ -156,9 +156,10 @@ function writeAttachments(files) {
     return p;
   });
 }
-async function saveDraft({ draftId, replyToMessageId, to, cc, subject, body, files }) {
+async function saveDraft({ draftId, replyToMessageId, to, cc, subject, body, bodyHtml, files }) {
   const args = ["--to", to, "--subject", subject, "--body-file", "-"];
   if (cc) args.push("--cc", cc);
+  if (bodyHtml) args.push("--body-html", String(bodyHtml)); // 書式付き（太字・リストなど）。プレーンの本文と一緒に入る
   for (const p of writeAttachments(files)) args.push("--attach", p);
   if (draftId) {
     const r = await runJson(["gmail", "drafts", "update", draftId, ...args], { input: body });
@@ -246,4 +247,12 @@ const ai = {
 // 真ん中の Claude が Bash で gog を使うとき用: 本物の gog の場所と、BALL 用の環境変数（個人 Mac の専用 gog など）
 async function gogForClaude() { await ensureGog(); return { bin: GOG, env: gogEnv() }; }
 
-module.exports = { status, inbox, thread, openAttachment, saveDraft, sendDraft, calendar, driveMeta, ai, gogForClaude, ACCOUNT };
+// 予約送信: 予約の時刻になったら、保存してある下書きを送る（片山さんが予約を押したものだけ。main.js が呼ぶ）
+async function sendDraftById(draftId) {
+  if (!/^[\w-]+$/.test(String(draftId || ""))) throw new Error("下書きの id がおかしいです");
+  await ensureGog();
+  await run(["gmail", "drafts", "send", String(draftId)], { allowSend: true });
+  return { sent: true, draftId };
+}
+
+module.exports = { status, inbox, thread, openAttachment, saveDraft, sendDraft, sendDraftById, calendar, driveMeta, ai, gogForClaude, ACCOUNT };

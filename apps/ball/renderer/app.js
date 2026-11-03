@@ -100,7 +100,9 @@
   const DONE_KEY = "ball.done.v1";
   let doneStore = null;
   const dones = () => { if (!doneStore) { try { doneStore = JSON.parse(localStorage.getItem(DONE_KEY) || "{}") || {}; } catch (e) { doneStore = {}; } } return doneStore; };
-  const doneKey = (x) => x.src === "msgr" ? `${x.id}|${x.sub}` : x.src === "cal" ? x.id : `${x.id}|${x.at || ""}`;
+  // Messenger は最後のメッセージの文（空白・記号・時刻表示を除いた形）、Gmail・Slack は最後の受信時刻、カレンダーはその予定
+  const normText = (t) => String(t || "").replace(/[\s\u3000・…。、,.!！?？:：「」"'()（）]/g, "").replace(/\d+(分|時間|日|週間)$/, "").slice(0, 24);
+  const doneKey = (x) => x.src === "msgr" ? `msgr|${x.msgrName || x.id}|${normText(x.sub)}` : x.src === "cal" ? x.id : `${x.id}|${x.at || ""}`;
   function markDone(x) {
     x.done = true;
     if (!x.live) return;
@@ -651,9 +653,9 @@
   function draftBox(i, kind) {
     const t = i.thread;
     if (kind === "slacklive") return slackComposerHtml(t);
-    const saved = t.aiDraft ? `AI が入れた下書きです（未保存・未送信） <button type="button" class="lnkbtn" id="discardDraft">破棄</button>` : t.draftId ? `Gmail の下書きに保存済み` : kind === "msgr" ? "送るのは Messenger で Enter" : "まだ保存していません";
+    const saved = t.scheduled && t.scheduled > Date.now() ? `🕘 予約済み: ${esc(fmtWhen(t.scheduled))} に送ります <button type="button" class="lnkbtn" id="unschedDraft">予約を取り消す</button>` : t.aiDraft ? `AI が入れた下書きです（未保存・未送信） <button type="button" class="lnkbtn" id="discardDraft">破棄</button>` : t.draftId ? `Gmail の下書きに保存済み` : kind === "msgr" ? "送るのは Messenger で Enter" : "まだ保存していません";
     const actions = kind === "gmail"
-      ? `<button type="button" class="sbt" id="gAdd" title="ファイルを添付（ドラッグ＆ドロップ・⌘V の貼り付けも可）">📎</button><input type="file" id="gFile" multiple hidden><span class="hint">送るのは「送信…」で確認したときだけ</span><span class="sp"></span><button type="button" class="btn" id="saveDraft">下書きに保存</button><button type="button" class="btn send" id="sendMail">送信…</button>`
+      ? `<span class="ssend"><button type="button" class="btn send" id="sendMail">送信 ▶</button><button type="button" class="btn send sdrop" id="gSched" title="送信日時を設定する" aria-label="送信日時を設定する">▾</button></span><button type="button" class="sbt" id="gAa" title="送ったときの見え方" aria-pressed="false">Aa</button><button type="button" class="sbt" id="gAdd" title="ファイルを添付（ドラッグ＆ドロップ・⌘V の貼り付けも可）">📎</button><input type="file" id="gFile" multiple hidden><button type="button" class="sbt" id="gLink" title="リンク（⌘⇧U）">🔗</button><button type="button" class="sbt" id="gEmo" title="絵文字">😀</button><span class="sp"></span><button type="button" class="btn" id="saveDraft">下書きに保存</button>`
       : kind === "msgr"
         ? `<button type="button" class="btn" id="copyDraft">コピー</button><span class="sp"></span><button type="button" class="btn" id="saveDraft">入力欄に入れる</button><button type="button" class="btn send" id="sendMsgr">送信…</button>`
       : kind === "slacklive"
@@ -665,8 +667,9 @@
       head = `<div class="mhead"><div class="rmode"><button type="button" class="btn" id="rOne" title="差出人だけに返す">↩ 返信</button><button type="button" class="btn" id="rAll" title="宛先・CC の全員に返す">↩↩ 全員に返信</button></div><label>To<input id="dTo" value="${esc(f.to)}" spellcheck="false"></label><label>Cc<input id="dCc" value="${esc(f.cc)}" placeholder="Cc（カンマ区切り）" spellcheck="false"></label><div class="msub">件名 ${esc(f.subject)}</div></div>`;
     }
     return `<div class="draft${kind === "gmail" ? " gcomp" : ""}" id="${kind === "gmail" ? "gcomp" : "dbox"}"><div class="dh"><span>下書き（送るまで送信されません）</span><span id="draftState">${saved}</span></div>${head}
+      ${kind === "gmail" ? mailToolbar() : ""}
       <textarea id="draftText" aria-label="下書き" placeholder="真ん中で「下書き書いて」と言うとここに入ります。直接書いても OK。">${esc(t.draft || "")}</textarea>
-      ${kind === "gmail" ? `<div class="satt" id="gAtt"></div>` : ""}
+      ${kind === "gmail" ? `<div class="sprev mprev" id="gPrev" hidden></div><div class="satt" id="gAtt"></div>` : ""}
       <div class="df">${actions}</div>
       <div class="confirm" id="sendConfirm" hidden></div></div>`;
   }
@@ -677,9 +680,47 @@
     const lastOther = [...msgs].reverse().find((m) => !me.test(m.from)) || last;
     const cc = [lastOther.to, lastOther.cc].join(",").split(",").map((s) => s.trim()).filter((s) => s && !me.test(s) && emailOf(s) !== emailOf(lastOther.from)).join(", ");
     const subject = /^re[:：]/i.test(last.subject) ? last.subject : "Re: " + last.subject;
-    return { draftId: t.draftId, replyToMessageId: lastOther.id, to: t.to != null ? t.to : lastOther.from, cc: t.cc != null ? t.cc : cc, subject, body,
+    const rich = MARKUP_RE.test(body || "");
+    return { draftId: t.draftId, replyToMessageId: lastOther.id, to: t.to != null ? t.to : lastOther.from, cc: t.cc != null ? t.cc : cc, subject, body: rich ? mailPlain(body) : body, bodyHtml: rich ? mailHtml(body) : "",
       files: (t.files || []).map((f) => ({ name: f.name, data: f.data })) };
   }
+  // ---------- メールの書式（Gmail と同じ: 太字・斜体・下線・取り消し・リスト・引用・リンク） ----------
+  // 下書き欄は普通の文字（Aqua Voice がそのまま入る）。*太字* _斜体_ ++下線++ ~取り消し~ と行頭の「• 」「1. 」「> 」を、送るときに書式付きのメールにする
+  function mailToolbar() {
+    const tool = [["b", "<b>B</b>", "太字（⌘B）"], ["i", "<i>I</i>", "斜体（⌘I）"], ["u", "<u>U</u>", "下線（⌘U）"], ["s", "<s>S</s>", "取り消し線（⌘⇧X）"], ["|"], ["link", "🔗", "リンク（⌘⇧U）"], ["ol", "1.", "番号付きリスト"], ["ul", "•", "箇条書き"], ["quote", "❝", "引用"]];
+    return `<div class="stool mtool" role="toolbar" aria-label="書式">${tool.map((x) => (x[0] === "|" ? `<i class="ssep"></i>` : `<button type="button" data-fmt="${x[0]}" title="${x[2]}">${x[1]}</button>`)).join("")}</div>`;
+  }
+  const MARKUP_RE = /(^|[\s(（「])([*_~]|\+\+)[^\n]+?\2(?=$|[\s)）」。、！!?？.,])|^\s*(•|\d+\.)\s|^>\s?|\[[^\]\n]+\]\(https?:/m;
+  function mailInline(line) {
+    const ph = [], keep = (h) => { ph.push(h); return "\u0001" + (ph.length - 1) + "\u0001"; };
+    let t = String(line)
+      .replace(/\[([^\]\n]{1,120})\]\((https?:\/\/[^)\s]+)\)/g, (m, l, u) => keep(`<a href="${esc(u)}">${esc(l)}</a>`))
+      .replace(/https?:\/\/[^\s<>"」）)]+/g, (u) => keep(`<a href="${esc(u)}">${esc(u)}</a>`));
+    t = esc(t);
+    const edge = "(^|[\\s(（「『、。!！?？:：])", tail = "(?=$|[\\s)）」』、。!！?？.,:：])";
+    t = t.replace(new RegExp(edge + "\\*([^*\\n]+)\\*" + tail, "g"), "$1<b>$2</b>")
+      .replace(new RegExp(edge + "_([^_\\n]+)_" + tail, "g"), "$1<i>$2</i>")
+      .replace(new RegExp(edge + "\\+\\+([^+\\n]+)\\+\\+" + tail, "g"), "$1<u>$2</u>")
+      .replace(new RegExp(edge + "~([^~\\n]+)~" + tail, "g"), "$1<s>$2</s>");
+    return t.replace(/\u0001(\d+)\u0001/g, (m, n) => ph[+n]);
+  }
+  function mailHtml(raw) {
+    let html = "", list = "";
+    const close = () => { if (list) { html += `</${list}>`; list = ""; } };
+    for (const line of String(raw || "").split("\n")) {
+      let m;
+      if ((m = line.match(/^\s*•\s+(.*)$/))) { if (list !== "ul") { close(); html += "<ul>"; list = "ul"; } html += `<li>${mailInline(m[1])}</li>`; continue; }
+      if ((m = line.match(/^\s*\d+\.\s+(.*)$/))) { if (list !== "ol") { close(); html += "<ol>"; list = "ol"; } html += `<li>${mailInline(m[1])}</li>`; continue; }
+      close();
+      if ((m = line.match(/^>\s?(.*)$/))) { html += `<blockquote style="margin:0 0 0 .8ex;border-left:1px solid #ccc;padding-left:1ex">${mailInline(m[1])}</blockquote>`; continue; }
+      html += line.trim() ? `${mailInline(line)}<br>` : "<br>";
+    }
+    close();
+    return `<div dir="ltr">${html}</div>`;
+  }
+  // プレーンの本文: 書式の記号は外し、リンクは「文字（URL）」にする
+  const mailPlain = (raw) => String(raw || "").replace(/\[([^\]\n]{1,120})\]\((https?:\/\/[^)\s]+)\)/g, "$1（$2）").replace(/(^|[\s(（「])(\*|_|~|\+\+)([^\n]+?)\2(?=$|[\s)）」。、！!?？.,])/g, "$1$3");
+
   // ---------- メールの下書き欄: 宛先・CC を直せる、ファイルを付けられる ----------
   function bindGmailComposer(i, ta) {
     const t = i.thread; t.files = t.files || [];
@@ -702,6 +743,20 @@
       draw(); dirty();
     };
     draw();
+    box.querySelectorAll("[data-fmt]").forEach((b) => (b.onmousedown = (e) => { e.preventDefault(); applyFmt(ta, b.dataset.fmt); }));
+    ta.addEventListener("keydown", (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "b") { e.preventDefault(); applyFmt(ta, "b"); } else if (k === "i") { e.preventDefault(); applyFmt(ta, "i"); }
+      else if (k === "u" && !e.shiftKey) { e.preventDefault(); applyFmt(ta, "u"); } else if (k === "u" && e.shiftKey) { e.preventDefault(); applyFmt(ta, "link"); }
+      else if (k === "x" && e.shiftKey) { e.preventDefault(); applyFmt(ta, "s"); }
+    });
+    const prev = $("gPrev");
+    const showPrev = () => { prev.innerHTML = ta.value.trim() ? mailHtml(ta.value) : `<span class="hint">（空です）</span>`; prev.querySelectorAll("a").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openLink(a.href, a.textContent, e); })); };
+    $("gAa").onclick = () => { const on = prev.hidden; prev.hidden = !on; $("gAa").setAttribute("aria-pressed", on); if (on) showPrev(); };
+    ta.addEventListener("input", () => { if (!prev.hidden) showPrev(); });
+    $("gLink").onclick = () => applyFmt(ta, "link");
+    $("gEmo").onclick = () => emojiPicker($("gEmo"), { stdOnly: true }, (n) => { const ch = STD_EMOJI[n] || ""; if (!ch) return; const p = ta.selectionStart; ta.value = ta.value.slice(0, p) + ch + ta.value.slice(p); ta.selectionStart = ta.selectionEnd = p + ch.length; ta.dispatchEvent(new Event("input")); ta.focus(); });
     $("gAdd").onclick = () => $("gFile").click();
     $("gFile").onchange = () => { add([...$("gFile").files]); $("gFile").value = ""; };
     ta.addEventListener("paste", (e) => { const fs = [...((e.clipboardData && e.clipboardData.files) || [])]; if (fs.length) { e.preventDefault(); add(fs); } });
@@ -764,6 +819,7 @@
   function bindDraft(i) {
     const t = i.thread, ta = $("draftText"), btn = $("saveDraft");
     if (!ta || !btn) return;
+    if ($("unschedDraft")) $("unschedDraft").onclick = async () => { await window.ball.gmailUnschedule(t.draftId); t.scheduled = 0; saveChat(i); toast("予約を取り消しました（Gmail の下書きには残っています）"); renderThread(i); };
     if ($("discardDraft")) $("discardDraft").onclick = () => { t.draft = ""; t.aiDraft = false; saveChat(i); renderThread(i); toast("AI の下書きを消しました"); };
     ta.oninput = () => { t.draft = ta.value; t.aiDraft = false; saveChat(i); if (t.kind === "gmail") $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
     if (t.kind === "slack" && t.live) {
@@ -836,10 +892,33 @@
     // 送信は2段階: 「送信…」で宛先・件名を確認 →「この内容で送信」を本人が押したときだけ送る
     const sendBtn = $("sendMail");
     if (!sendBtn) return;
-    sendBtn.onclick = () => {
+    const gs = $("gSched");
+    if (gs) gs.onclick = () => {
+      if (!live) return toast("見本なので予約できません");
+      if (!ta.value.trim()) return toast("下書きが空です");
+      schedMenu(gs, (d) => { t.schedAt = d.getTime(); sendBtn.onclick(); });
+    };
+    sendBtn.onclick = (ev) => {
+      if (ev && ev.isTrusted) t.schedAt = 0;
       if (!live) return toast("見本なので送信しません");
       if (!ta.value.trim()) return toast("下書きが空です");
       const f = replyFields(t, ta.value), box = $("sendConfirm");
+      if (t.schedAt) {
+        box.innerHTML = `<b>この内容を <u>${esc(fmtWhen(t.schedAt))}</u> に予約送信しますか？</b>
+          <dl class="kv"><dt>宛先</dt><dd>${esc(f.to)}</dd>${f.cc ? `<dt>CC</dt><dd>${esc(f.cc)}</dd>` : ""}<dt>件名</dt><dd>${esc(f.subject)}</dd>${f.files.length ? `<dt>添付</dt><dd>${esc((t.files || []).map((x) => x.name).join("、"))}</dd>` : ""}</dl>
+          <div class="hint">Gmail の下書きに保存しておき、時刻になったら BALL が送ります（BALL を開いている間だけ。閉じていて時刻を過ぎたら、送らずに知らせます）</div>
+          <div class="crow"><span class="sp"></span><button type="button" class="btn" id="sendCancel">やめる</button><button type="button" class="btn send" id="sendGo">この内容で予約</button></div>`;
+        box.hidden = false;
+        $("sendCancel").onclick = () => { box.hidden = true; t.schedAt = 0; };
+        $("sendGo").onclick = async () => {
+          $("sendGo").disabled = true; $("sendGo").textContent = "予約しています…";
+          const at = t.schedAt;
+          const r = await window.ball.gmailSchedule({ d: replyFields(t, ta.value), at, ballId: i.id });
+          if (r.ok) { box.hidden = true; t.draftId = r.data.draftId; t.schedAt = 0; t.scheduled = at; t.aiDraft = false; saveChat(i); toast(`予約しました（${fmtWhen(at)} に送ります）`); renderThread(i); }
+          else { $("sendGo").disabled = false; $("sendGo").textContent = "この内容で予約"; toast("予約できませんでした：" + r.error); }
+        };
+        return;
+      }
       box.innerHTML = `<b>この内容で送信しますか？</b>
         <dl class="kv"><dt>宛先</dt><dd>${esc(f.to)}</dd>${f.cc ? `<dt>CC</dt><dd>${esc(f.cc)}</dd>` : ""}<dt>件名</dt><dd>${esc(f.subject)}</dd>${f.files.length ? `<dt>添付</dt><dd>${esc((t.files || []).map((x) => x.name).join("、"))}</dd>` : ""}</dl>
         <div class="crow"><span class="sp"></span><button type="button" class="btn" id="sendCancel">やめる</button><button type="button" class="btn send" id="sendGo">この内容で送信</button></div>`;
@@ -939,7 +1018,7 @@
   }
   function saveChat(i) {
     const st = chats();
-    st[i.id] = { sid: i.claudeSid || "", feed: i.feed.slice(-200), memo: i.memo || "", draft: (i.thread && i.thread.draft) || "", aiDraft: !!(i.thread && i.thread.aiDraft), ctx: i.ctxHash || "", at: Date.now() };
+    st[i.id] = { sid: i.claudeSid || "", feed: i.feed.slice(-200), memo: i.memo || "", draft: (i.thread && i.thread.draft) || "", aiDraft: !!(i.thread && i.thread.aiDraft), scheduled: (i.thread && i.thread.scheduled) || 0, draftId: (i.thread && i.thread.draftId) || "", ctx: i.ctxHash || "", at: Date.now() };
     const keys = Object.keys(st);
     if (keys.length > 400) keys.sort((a, b) => (st[a].at || 0) - (st[b].at || 0)).slice(0, keys.length - 400).forEach((k) => delete st[k]);
     try { localStorage.setItem(CHAT_KEY, JSON.stringify(st)); } catch (e) { /* 保存できなくても会話は続けられる */ }
@@ -951,6 +1030,7 @@
     i.claudeSid = c.sid || ""; i.ctxHash = c.ctx || "";
     if (c.memo && !i.memo) i.memo = c.memo;
     if (i.thread && c.draft && !i.thread.draft) { i.thread.draft = c.draft; i.thread.aiDraft = !!c.aiDraft; }
+    if (i.thread && c.scheduled > Date.now()) { i.thread.scheduled = c.scheduled; if (c.draftId) i.thread.draftId = c.draftId; }
   }
   const hashOf = (s) => { let h = 5381; for (let k = 0; k < s.length; k++) h = ((h << 5) + h + s.charCodeAt(k)) | 0; return (h >>> 0).toString(36) + ":" + s.length; };
   const cut = (s, n) => { s = String(s || ""); return s.length > n ? s.slice(0, n) + `…（以下 ${s.length - n} 文字省略）` : s; };
@@ -1133,6 +1213,12 @@
 ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skills.length} 個: ${skills.join(", ")}\n・コネクタ: ${lastInit.mcp.join(", ") || "なし"}` : "\n（一度話しかけると、読み込まれたスキルとコネクタがここに出ます）"}`,
       triageOff() ? "巡回の判断を再開する" : "巡回の判断を止める", () => { try { localStorage.setItem("ball.triage.off", triageOff() ? "0" : "1"); } catch (e) {} toast(triageOff() ? "巡回の判断を止めました" : "巡回の判断を再開しました"); $("infoDlg").hidden = true; queueJudge(); });
   };
+  if (IS_APP && window.ball.onGmailSched) window.ball.onGmailSched((ev) => {
+    const i = items.find((x) => x.id === ev.ballId || (x.thread && x.thread.draftId === ev.draftId));
+    if (ev.type === "sent") { toast(`予約していたメールを送りました：${ev.subject || ""}`); if (i) { i.thread.scheduled = 0; i.thread.draftId = null; i.thread.draft = ""; markDone(i); left(); } }
+    else if (ev.type === "missed") { showInfo("予約の時刻を過ぎていました", `「${ev.subject || ""}」（宛先 ${ev.to || ""}）は、予約の時刻（${fmtWhen(ev.at)}）に BALL が開いていなかったので、送っていません。\nGmail の下書きに残っています。送るなら、そのボールの「送信 ▶」から送ってください。`, "", null); if (i) i.thread.scheduled = 0; }
+    else if (ev.type === "error") toast(`予約していたメールを送れませんでした（5分後にもう一度）：${ev.err || ""}`);
+  });
   if (IS_APP && window.ball.onClaude) { window.ball.onClaude(onClaudeEvent); window.ball.onClaudeTool(onClaudeTool); }
   checkClaude();
 
@@ -1292,11 +1378,12 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     const mock = items.find((x) => x.id === "msgr"); if (mock) mock.hidden = true;
     const want = new Map();
     data.convos.filter((c) => !isMuted(c.name)).forEach((c, idx) => {
-      if (c.unread || (!c.mine && idx < 8)) want.set("m-" + c.id, c);
+      // 会話は名前で見分ける（Messenger のリンクは読み方によって取れたり取れなかったりするので、名札がぶれる）
+      if (c.unread || (!c.mine && idx < 8)) want.set("m-" + String(c.name || c.id).trim(), c);
     });
     // 返信済みになったものは閉じる
     items.filter((x) => x.msgr && !x.done && !want.has(x.id)).forEach((x) => {
-      x.done = true; D.closed.unshift(`Messenger: ${x.msgrName} · 返信済み`);
+      markDone(x); D.closed.unshift(`Messenger: ${x.msgrName} · 返信済み`);
     });
     want.forEach((c, id) => {
       let it = items.find((x) => x.id === id);
@@ -1401,7 +1488,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       } else { Object.assign(it, fields); }
     });
     // 一覧から消えた（返信した・完了のスタンプを押した）ものは閉じる
-    items.filter((x) => x.live && x.src === "slack" && !x.done && !ids.has(x.id)).forEach((x) => { x.done = true; D.closed.unshift(`Slack: ${x.title.slice(0, 30)} · 返信済み`); });
+    items.filter((x) => x.live && x.src === "slack" && !x.done && !ids.has(x.id)).forEach((x) => { markDone(x); D.closed.unshift(`Slack: ${x.title.slice(0, 30)} · 返信済み`); });
     const n = data.items.length, dm = data.items.filter((x) => x.kind === "dm").length;
     setFt("ft-slack", `Slack ${agoText(data.at)} · メンション${n - dm}・DM${dm}${data.warn ? "（DM 一覧は読めず・押して詳細）" : ""}`, data.warn ? "mock" : "");
     queueJudge();
@@ -1540,13 +1627,13 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     const r = anchor.getBoundingClientRect();
     box.style.left = Math.max(8, Math.min(window.innerWidth - 340, r.left)) + "px";
     box.style.top = (r.top > 340 ? r.top - 330 : r.bottom + 6) + "px";
-    const all = () => Object.assign({}, emojiAllCache || {}, ctx.emoji || {});
+    const all = () => (ctx.stdOnly ? {} : Object.assign({}, emojiAllCache || {}, ctx.emoji || {}));
     const draw = (q) => {
       q = String(q || "").trim().toLowerCase();
       const custom = Object.keys(all());
       const names = q
         ? [...new Set([...custom, ...Object.keys(STD_EMOJI)])].filter((n) => n.includes(q)).slice(0, 96)
-        : [...new Set([...recentEmoji(), ...Object.keys(ctx.emoji || {}), "white_check_mark", "+1", "pray", "bow", "eyes", "ok_hand", "raised_hands", "clap", "tada", "joy", "sob", "sweat_smile", "fire", "100", "muscle", "heart", "thinking_face", "memo", "rocket", "sparkles"])].slice(0, 48);
+        : [...new Set([...recentEmoji().filter((n) => !ctx.stdOnly || STD_EMOJI[n]), ...Object.keys(ctx.emoji || {}), "white_check_mark", "+1", "pray", "bow", "eyes", "ok_hand", "raised_hands", "clap", "tada", "joy", "sob", "sweat_smile", "fire", "100", "muscle", "heart", "thinking_face", "memo", "rocket", "sparkles"])].slice(0, 48);
       const c2 = { emoji: all() };
       box.querySelector(".eg").innerHTML = names.map((n) => `<button type="button" data-n="${esc(n)}" title=":${esc(n)}:">${slackEmoji(n, c2)}</button>`).join("") || `<span class="hint">見つかりません</span>`;
       box.querySelectorAll(".eg button").forEach((b) => (b.onmousedown = (e) => { e.preventDefault(); pushRecent(b.dataset.n); box.remove(); onPick(b.dataset.n); }));
@@ -1558,7 +1645,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     setTimeout(() => inp.focus(), 0);
     const off = (e) => { if (!box.contains(e.target) && e.target !== anchor) { box.remove(); document.removeEventListener("mousedown", off, true); } };
     document.addEventListener("mousedown", off, true);
-    if (!emojiAllCache && IS_APP && window.ball.slackEmojiAll) window.ball.slackEmojiAll().then((x) => { if (x && x.ok) { emojiAllCache = x.emoji; if (document.body.contains(box)) draw(inp.value); } });
+    if (!ctx.stdOnly && !emojiAllCache && IS_APP && window.ball.slackEmojiAll) window.ball.slackEmojiAll().then((x) => { if (x && x.ok) { emojiAllCache = x.emoji; if (document.body.contains(box)) draw(inp.value); } });
   }
 
   // ---------- Slack の入力欄 ----------
@@ -1615,6 +1702,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     if (k === "b") fmtWrap(ta, "*", "*", "太字");
     else if (k === "i") fmtWrap(ta, "_", "_", "斜体");
     else if (k === "s") fmtWrap(ta, "~", "~", "取り消し");
+    else if (k === "u") fmtWrap(ta, "++", "++", "下線");
     else if (k === "code") fmtWrap(ta, "`", "`", "コード");
     else if (k === "block") fmtWrap(ta, "```\n", "\n```", "コード");
     else if (k === "link") {
@@ -1904,7 +1992,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       } else Object.assign(it, fields);
     });
     // 一覧から消えた（＝返信した・アーカイブした）ものは閉じる
-    items.filter((x) => x.live && x.src === "gmail" && !x.done && !ids.has(x.id)).forEach((x) => { x.done = true; D.closed.unshift(`Gmail: ${x.title.slice(0, 30)} · 返信済み`); });
+    items.filter((x) => x.live && x.src === "gmail" && !x.done && !ids.has(x.id)).forEach((x) => { markDone(x); D.closed.unshift(`Gmail: ${x.title.slice(0, 30)} · 返信済み`); });
     gmailAt = Date.now(); gmailCount = r.data.length;
     setFt("ft-gmail", `Gmail ${agoText(gmailAt)} · ${gmailCount}件`, "");
     queueJudge();
