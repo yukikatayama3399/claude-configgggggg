@@ -81,6 +81,20 @@
       <span class="m"><span class="proj"><span class="pd" style="background:${pj.color}"></span>${esc(pj.name)}</span>${esc(i.sub)}${i.ago ? ` · ${esc(i.ago)}` : ""}</span>
       ${i.chips.length ? `<span class="m">${i.chips.map((c) => `<span class="chip c-${c[1]}">${esc(c[0])}</span>`).join("")}</span>` : ""}</span></button>`;
   }
+  // ---------- 並び順 ----------
+  // メール・Slack・Messenger は受け取った時刻の新しい順（新着が上）。カレンダーの作業は、これから来る時刻の早い順
+  function dateTime(str) { const d = new Date(String(str || "").replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T")); return isNaN(d) ? 0 : d.getTime(); }
+  function relTime(t) {
+    t = String(t || "").trim();
+    const m = t.match(/^(\d+)\s*(分|時間|日|週間|か月|ヶ月|年|m|h|d|w|y)/);
+    if (m) { const n = +m[1], u = { "分": 60e3, m: 60e3, "時間": 3600e3, h: 3600e3, "日": 86400e3, d: 86400e3, "週間": 7 * 86400e3, w: 7 * 86400e3, "か月": 30 * 86400e3, "ヶ月": 30 * 86400e3, "年": 365 * 86400e3, y: 365 * 86400e3 }[m[2]]; return Date.now() - n * u; }
+    const hm = t.match(/^(\d{1,2}):(\d{2})$/);
+    if (hm) { const d = new Date(); d.setHours(+hm[1], +hm[2], 0, 0); return d.getTime(); }
+    if (/たった今|now/i.test(t)) return Date.now();
+    return 0;
+  }
+  const byNewest = (a, b) => (b.at || 0) - (a.at || 0);
+  const byStart = (a, b) => (a.calStart < b.calStart ? -1 : a.calStart > b.calStart ? 1 : 0);
   function left() {
     const vis = items.filter((i) => !i.done && !i.hidden && (S.proj === "all" || i.proj === S.proj));
     const by = (s) => vis.filter((i) => i.sec === s);
@@ -92,19 +106,19 @@
     if (pins.length) html += `<div class="sec"><div class="sech"><span>ピン留め</span></div>${pins.map(card).join("")}</div>`;
     // カレンダーの作業は、時刻の早い順（時系列で片付けるので）。他のボールはこれまでどおりの順で、その下に並べる
     const mine = by("me").filter((i) => !i.pinned);
-    const calMine = mine.filter((i) => i.calStart).sort((a, b) => (a.calStart < b.calStart ? -1 : a.calStart > b.calStart ? 1 : 0));
-    html += sec("自分ボール", mine.filter((i) => !i.calStart).concat(calMine));
-    html += sec("AI 作業中", by("ai"));
-    if (by("notes").length) html += sec("会議メモ（議事録）", by("notes"));
-    html += sec("返事待ち（相手ボール）", by("them"));
-    const fyi = by("fyi");
+    const calMine = mine.filter((i) => i.calStart).sort(byStart);
+    html += sec("自分ボール", mine.filter((i) => !i.calStart).sort(byNewest).concat(calMine));
+    html += sec("AI 作業中", by("ai").sort(byNewest));
+    if (by("notes").length) html += sec("会議メモ（議事録）", by("notes").sort(byNewest));
+    html += sec("返事待ち（相手ボール）", by("them").sort(byNewest));
+    const fyi = by("fyi").sort(byNewest);
     if (fyi.length) html += `<details class="sec fyi"${S.fyiOpen ? " open" : ""}><summary class="sech"><span>返事不要（AI 判断）</span><span class="n">${fyi.length}</span></summary>${fyi.map(card).join("")}</details>`;
     const liveCal = items.filter((x) => x.live && x.src === "cal" && x.sec === "cal" && !x.hidden && (S.proj === "all" || x.proj === S.proj));
     if (calLoaded) {
       const byDay = {};
       liveCal.forEach((x) => { (byDay[x.calDay] = byDay[x.calDay] || []).push(x); });
       Object.keys(byDay).sort().forEach((day) => {
-        html += `<div class="sec"><div class="sech"><span>${day === todayStr() ? "今日の予定" : dayLabel(day) + "の予定"}</span><span class="n">${byDay[day].length}</span></div>${byDay[day].map((x) => `<button type="button" class="ev" data-id="${x.id}" aria-current="${S.cur === x.id}"><time>${esc(x.calTime)}</time><span>${esc(x.title)}</span></button>`).join("")}</div>`;
+        html += `<div class="sec"><div class="sech"><span>${day === todayStr() ? "今日の予定" : dayLabel(day) + "の予定"}</span><span class="n">${byDay[day].length}</span></div>${byDay[day].sort(byStart).map((x) => `<button type="button" class="ev" data-id="${x.id}" aria-current="${S.cur === x.id}"><time>${esc(x.calTime)}</time><span>${esc(x.title)}</span></button>`).join("")}</div>`;
       });
     } else {
       html += `<div class="sec"><div class="sech"><span>今日の予定</span><span class="n">${D.todayCal.length}</span></div>${D.todayCal.map((e) => `<button type="button" class="ev" ${e[2] ? `data-id="${e[2]}"` : "data-none='1'"} aria-current="${S.cur === e[2]}"><time>${e[0]}</time><span>${esc(e[1])}</span></button>`).join("")}</div>`;
@@ -526,7 +540,7 @@
       <div class="thd"><h4>Messenger：${esc(t.name)}</h4><span><button type="button" class="btn" id="msgrMute" title="仕事と関係ない相手を BALL に出さないようにする">今後この相手を出さない</button> <button type="button" class="btn" id="msgrReload">読み直す</button> <button type="button" class="btn" id="openInMsgr">Messenger で開く ↗</button></span></div>
       ${t.live && t.data ? `<div class="hint">${t.data.reachedTop ? "最初のメッセージまで読みました" : "直近から遡って読んでいます"}（${msgs.length}件）${more ? ` <button type="button" class="btn" id="msgrMore">もっと過去を読む</button>` : ""}</div>` : ""}
       ${t.error ? `<div class="empty">${esc(t.error)}</div>` : `<div class="bubs">${msgs.map((m, k) => `<div class="bubrow${m.mine ? " mine" : ""}">${
-        m.image ? `<button type="button" class="bbimg" data-img="${k}" title="大きく開く"><img src="${esc(m.image)}" alt="写真" loading="lazy" referrerpolicy="no-referrer"></button>`
+        m.image ? `<button type="button" class="bbimg" data-img="${k}" title="大きく開く"><img ${/^data:/.test(m.image) ? `src="${esc(m.image)}"` : `data-msgr-src="${esc(m.image)}"`} alt="写真" loading="lazy" referrerpolicy="no-referrer"></button>`
         : m.file ? `<button type="button" class="bb bbfile" data-file="${k}">${esc(m.text)}</button>`
         : `<div class="bb rich">${richBody(m.text)}</div>`}</div>`).join("")}</div>`}
       ${draftBox(i, "msgr")}
@@ -538,7 +552,13 @@
     if ($("msgrMore")) $("msgrMore").onclick = () => { t.steps = (t.steps || 4) + 10; t.data = null; t.error = null; renderMsgrThread(i); };
     $("openInMsgr").onclick = () => openConversationTab(i);
     // 写真は開けなかったら「📷 写真」の文字に差し替える。押すと右のブラウザで開く
-    $("thr").querySelectorAll(".bbimg img").forEach((im) => (im.onerror = () => { const btn = im.parentElement; btn.className = "bb bbfile"; btn.textContent = "📷 写真（押すと開く）"; }));
+    const photoFail = (im) => { const btn = im.parentElement; btn.className = "bb bbfile"; btn.textContent = "📷 写真（押すと開く）"; };
+    $("thr").querySelectorAll(".bbimg img").forEach((im) => (im.onerror = () => photoFail(im)));
+    // 写真は Messenger にログインした BALL の中から取ってくる
+    $("thr").querySelectorAll("img[data-msgr-src]").forEach((im) => {
+      if (!IS_APP || !window.ball.messengerImage) { im.src = im.dataset.msgrSrc; return; }
+      window.ball.messengerImage(im.dataset.msgrSrc).then((r) => { if (r && r.ok) im.src = r.data; else photoFail(im); });
+    });
     $("thr").querySelectorAll("[data-img]").forEach((b) => (b.onclick = () => openTab(msgs[+b.dataset.img].image, "写真")));
     $("thr").querySelectorAll("[data-file]").forEach((b) => (b.onclick = () => openTab(msgs[+b.dataset.file].file, msgs[+b.dataset.file].text.replace(/^📎\s*/, ""))));
     if (t.live && t.data) { const bx = $("thr").querySelector(".bubs"); if (bx && bx.lastElementChild) bx.lastElementChild.scrollIntoView({ block: "nearest" }); }
@@ -1104,7 +1124,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
   async function runJudge() {
     if (judging) return;
     items.forEach((x) => { if (x.title !== x.aiTitle) x.origTitle = x.title; });
-    const todo = items.filter((x) => x.live && ["gmail", "slack", "msgr"].includes(x.src) && !x.done && !x.hidden && !judged()[judgeKey(x)]).slice(0, 12);
+    const todo = items.filter((x) => x.live && ["gmail", "slack", "msgr"].includes(x.src) && !x.done && !x.hidden && !judged()[judgeKey(x)]).slice(0, 6);
     if (!todo.length) return;
     judging = true;
     setFt("ft-claude", `Claude 巡回の判断中…（${todo.length}件）`, "");
@@ -1112,7 +1132,14 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     const balls = items.filter((x) => !x.done && !x.hidden && !todo.includes(x) && x.id !== "home").slice(0, 80).map((x) => ({ id: x.id, title: x.title, project: x.proj }));
     const r = await window.ball.claudeJudge({ items: batch, balls, model: MODEL_KEYS[$("model").value] || "opus" });
     judging = false;
-    if (!r.ok) { judgeStat.err = r.error; setFt("ft-claude", "Claude: 巡回の判断でエラー（押して詳細）", "ng"); return; }
+    if (!r.ok) {
+      judgeStat.err = r.error; judgeStat.fails = (judgeStat.fails || 0) + 1;
+      setFt("ft-claude", "Claude: 巡回の判断でエラー（押して詳細）", "ng");
+      // 3回続けて失敗するまでは、少し待って取り直す
+      if (judgeStat.fails < 3) judgeTimer = setTimeout(runJudge, 60000);
+      return;
+    }
+    judgeStat.fails = 0;
     const st = judged();
     for (const j of r.items) if (j && j.key && batch.some((b) => b.key === j.key)) st[j.key] = { ...j, at: Date.now() };
     // 答えが返ってこなかったものも、同じものを何度も聞かないように印を付ける
@@ -1143,7 +1170,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
   $("addForm").onsubmit = (e) => {
     e.preventDefault();
     const t = $("addInput").value.trim(); if (!t) return;
-    const it = { id: "n" + Date.now(), sec: "me", proj: "in", src: "doc", title: t, sub: "手入力", chips: [["新規", "me"]], ago: "今", feed: [["ai", "ボールにしました。関係するスレッドや予定があれば紐づけます。"]], memo: "", thread: null, tabs: [{ title: "新しいタブ", url: "https://www.google.com/", sim: "plain" }], activeTab: 0 };
+    const it = { id: "n" + Date.now(), at: Date.now(), sec: "me", proj: "in", src: "doc", title: t, sub: "手入力", chips: [["新規", "me"]], ago: "今", feed: [["ai", "ボールにしました。関係するスレッドや予定があれば紐づけます。"]], memo: "", thread: null, tabs: [{ title: "新しいタブ", url: "https://www.google.com/", sim: "plain" }], activeTab: 0 };
     it.tabs[0].key = it.id + "-0";
     items.unshift(it); $("addInput").value = ""; select(it.id);
   };
@@ -1194,7 +1221,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
   }
   let lastMsgrData = null;
   // 仕事と関係ない相手は出さない。最初から外すもの + 「今後この相手を出さない」で足したもの（この Mac に保存）
-  const MUTE_DEFAULT = [/nu\s*star/i, /voyage\s*poker/i];
+  const MUTE_DEFAULT = [/nu\s*star/i, /voyage\w*\s*poker/i];
   const mutedNames = () => { try { return JSON.parse(store.get("ball.msgrMute") || "[]"); } catch (e) { return []; } };
   const isMuted = (name) => MUTE_DEFAULT.some((re) => re.test(name || "")) || mutedNames().includes(name);
   function muteName(name) { const l = mutedNames(); if (!l.includes(name)) l.push(name); store.set("ball.msgrMute", JSON.stringify(l)); }
@@ -1217,7 +1244,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       const chips = [[c.unread ? "未読" : "既読・未返信", c.unread ? "warn" : "me"]];
       if (c.time) chips.push([c.time, "them"]);
       const fields = {
-        sec: "me", proj: "none", src: "msgr", ago: c.time || "", msgr: true, msgrName: c.name, done: false, hidden: false,
+        sec: "me", proj: "none", src: "msgr", ago: c.time || "", at: relTime(c.time), msgr: true, msgrName: c.name, done: false, hidden: false,
         title: `Messenger：${c.name}`, sub: c.snippet ? c.snippet.slice(0, 40) : "Facebook メッセンジャー", chips,
       };
       if (!it) {
@@ -1302,7 +1329,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       else chips.push([m.kind === "dm" ? "DM・未返信" : "未返信", "me"]);
       chips.push([slackAgo(m.at), "them"]);
       const fields = {
-        sec: "me", proj: "none", src: "slack", live: true, hidden: false, done: false,
+        sec: "me", proj: "none", src: "slack", live: true, hidden: false, done: false, at: m.at || 0,
         title: `${m.userName}：${flat(m.text).replace(/\s+/g, " ").slice(0, 34)}`, sub: where, ago: "", chips,
       };
       let it = items.find((x) => x.id === id);
@@ -1692,7 +1719,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       const fields = {
         sec: t.notes ? "notes" : "me", proj: "none", src: "gmail", live: true, hidden: false, done: false,
         title: t.notes ? "議事録：" + (t.subject || "").replace(/^(Fwd|FW)[:：]\s*/i, "").replace(/^(メモ|共有されたドキュメント)[:：]\s*/, "").replace(/^「|」.*$|（\d{4}年.*$/g, "").replace(/\s*-\s*\d{4}\/\d{2}\/\d{2}.*$/, "") : (t.subject || "（件名なし）"),
-        sub: nameOf(t.from), ago: (t.date || "").slice(5, 16), notes: !!t.notes,
+        sub: nameOf(t.from), ago: (t.date || "").slice(5, 16), at: dateTime(t.date), notes: !!t.notes,
         chips: t.notes ? [["議事録", "ai"]] : [[t.unread ? "未読" : "未返信", t.unread ? "warn" : "me"]].concat(t.count > 1 ? [[t.count + "通", "them"]] : []),
       };
       let it = items.find((x) => x.id === id);

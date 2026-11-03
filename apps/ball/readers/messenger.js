@@ -165,6 +165,33 @@ function convColumn() {
 }
 const SKIP_SEL = '[contenteditable="true"], [role="textbox"], [role="navigation"], [role="banner"], [role="complementary"], [role="toolbar"], [role="dialog"]';
 const bgUrl = (el) => { const m = (el.style.backgroundImage || "").match(/url\(["']?([^"')]+)/); return m ? m[1] : ""; };
+// 写真として拾うのは、Facebook の写真の置き場（scontent… / fbcdn の /v/）と、暗号化チャットの一時アドレス（blob:）だけ。
+// Messenger の画面の飾りの絵（rsrc.php・static.xx.fbcdn.net・SVG）は拾わない
+function isPhoto(src) {
+  if (/^blob:/.test(src)) return true;
+  if (/rsrc\.php|static\.xx\.fbcdn\.net|\.svg(\?|$)|^data:image\/svg/i.test(src)) return false;
+  return /^https:\/\/[^/]*(scontent|fbcdn\.net\/v\/|fbsbx\.com|lookaside\.fbsbx)/i.test(src) || /^https:\/\/[^/]*fbcdn\.net\/.+\/v\//i.test(src);
+}
+// 写真をこのページの中で画像データにする（blob: はこのページでしか使えない。大きい写真は縮める）
+async function toDataUrl(src) {
+  try {
+    const blob = await (await fetch(src)).blob();
+    if (!/^image\//.test(blob.type)) return "";
+    const bmp = await createImageBitmap(blob);
+    const k = Math.min(1, 900 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", 0.85);
+  } catch (e) { return ""; }
+}
+// 会話が開けていない（「チャットが選択されていません」の画面など）かどうか
+function noChatOpen() {
+  const box = document.querySelector('[role="textbox"][contenteditable="true"]');
+  if (box) return false;
+  return true;
+}
+const EMPTY_RE = /チャットが選択されていません|チャットを選択|No chat selected|Select a chat|Choose a conversation/;
+
 // 今画面に見えている会話欄のメッセージ（文字・写真・ファイル）を上から順に集める
 function collectItems(col) {
   const { colL, colR, center, bottom } = col;
@@ -175,7 +202,7 @@ function collectItems(col) {
     const r = el.getBoundingClientRect();
     if (!inCol(r) || r.width > (colR - colL) * 0.9) continue;
     const text = el.innerText.trim();
-    if (!text || /^(\d{1,2}:\d{2}|\d+月\d+日.*|今日|昨日|既読|送信済み|Seen|Sent|入力中…?)$/.test(text)) continue;
+    if (!text || /^(\d{1,2}:\d{2}|\d+月\d+日.*|今日|昨日|既読|送信済み|Seen|Sent|入力中…?)$/.test(text) || EMPTY_RE.test(text)) continue;
     items.push({ el, top: r.top, mine: r.left + r.width / 2 > center, text });
   }
   // 写真: img と、背景に貼られた画像。アイコンは小さいので入れない
@@ -185,7 +212,7 @@ function collectItems(col) {
     const r = im.getBoundingClientRect();
     if (!inCol(r) || r.width < 60 || r.height < 60) continue;
     const src = im.tagName === "IMG" ? (im.currentSrc || im.src) : bgUrl(im);
-    if (!src) continue;
+    if (!src || !isPhoto(src)) continue;
     items.push({ el: im, top: r.top, mine: r.left + r.width / 2 > center, image: src, text: "📷 写真" });
   }
   for (const a of document.querySelectorAll("a[href]")) {
@@ -208,6 +235,19 @@ function scrollBox(col) {
   return null;
 }
 // 直近から過去へ、上にスクロールしながら集める。steps 回まで（足りなければ「もっと過去を読む」で増やす）
+// 写真は文字よりあとから読み込まれるので、見えている写真の読み込みが終わるまで少し待つ（最大 3 秒）
+async function waitPhotos(col) {
+  for (let i = 0; i < 15; i++) {
+    const pending = [...document.querySelectorAll("img")].filter((im) => {
+      if (im.closest(SKIP_SEL)) return false;
+      const r = im.getBoundingClientRect();
+      if (r.width < 60 || r.height < 60 || r.left < col.colL - 2 || r.right > col.colR + 2 || r.top <= 120 || r.bottom >= col.bottom) return false;
+      return !(im.currentSrc || im.src) || !im.complete;
+    });
+    if (!pending.length) return;
+    await sleep(200);
+  }
+}
 async function readConversation(steps = 4) {
   const col = convColumn();
   const seen = new Set();
@@ -215,6 +255,7 @@ async function readConversation(steps = 4) {
   const box = scrollBox(col);
   let reachedTop = false;
   for (let i = 0; i <= steps; i++) {
+    await waitPhotos(col);
     const batch = collectItems(col).filter((it) => !seen.has(it.el));
     batch.forEach((it) => seen.add(it.el));
     all = batch.concat(all); // 上にスクロールして出てきたものほど古いので、前に足す
@@ -230,6 +271,8 @@ async function readConversation(steps = 4) {
     if (prev && it.image && prev.image === it.image) continue;
     out.push({ mine: it.mine, text: it.text, image: it.image || "", file: it.file || "" });
   }
+  // 暗号化チャットの写真（blob:）は、このページの中でしか見られないので画像データにして渡す
+  for (const m of out) if (/^blob:/.test(m.image)) m.image = (await toDataUrl(m.image)) || "";
   const name = (document.querySelector('[role="main"] h1, [role="main"] h2, h1, h2') || {}).innerText || "";
   return { name: name.trim(), messages: out.slice(-400), rows: all.length, reachedTop: reachedTop || !box, url: location.href };
 }
@@ -250,7 +293,11 @@ ipcRenderer.on("read-thread", async (_e, { href, name, steps, reqId }) => {
     else if (/\/t\//.test(path)) { history.pushState({}, "", path); window.dispatchEvent(new PopStateEvent("popstate")); }
     else throw new Error("一覧に " + (name ? "その名前の" : "") + "会話が見つかりませんでした");
     // 会話が開いて最初のメッセージが出るまで待ってから、過去へ遡って読む
-    for (let i = 0; i < 12; i++) { await sleep(700); if (collectItems(convColumn()).length) break; }
+    for (let i = 0; i < 15; i++) { await sleep(700); if (!noChatOpen() && collectItems(convColumn()).length) break; }
+    // 会話が開けていない（空の画面）なら、読まずに知らせる
+    if (noChatOpen() || EMPTY_RE.test((document.querySelector('[role="main"]') || document.body).innerText.slice(0, 2000)) && !document.querySelector('[role="textbox"][contenteditable="true"]')) {
+      throw new Error("会話を開けませんでした（Messenger の画面が「チャットが選択されていません」のままでした）。「Messenger で開く」で開いてから「読み直す」を押してください");
+    }
     const res = await readConversation(steps || 4);
     ipcRenderer.send("thread-result", { reqId, ok: true, ...res });
   } catch (err) {

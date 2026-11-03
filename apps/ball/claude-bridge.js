@@ -237,24 +237,41 @@ async function judge({ items, balls, model }) {
   if (!bin) return { ok: false, error: (await status()).error };
   const prompt = `新しく届いたもの（JSON）:\n${JSON.stringify(items)}\n\n今あるボール（JSON、続きかどうかの判断用）:\n${JSON.stringify(balls)}\n\n全部について判断して items に入れてください。key はそのまま返します。`;
   const args = ["-p", "--output-format", "json", "--model", process.env.BALL_TRIAGE_MODEL || MODELS[model] || MODELS.opus, "--effort", "low",
-    "--tools", "", "--no-session-persistence", "--append-system-prompt", JUDGE_SYS, "--json-schema", JSON.stringify(JUDGE_SCHEMA)];
+    "--tools", "", "--strict-mcp-config", "--no-session-persistence", "--append-system-prompt", JUDGE_SYS, "--json-schema", JSON.stringify(JUDGE_SCHEMA)];
+  // 判断は道具を使わないので、コネクタ（MCP）はつながない（起動が速くなる）。CLAUDE.md とメモリーはいつもどおり読む
   const env = { ...process.env }; delete env.ELECTRON_RUN_AS_NODE;
   return new Promise((resolve) => {
     const child = spawn(bin, args, { cwd: WORK, env, stdio: ["pipe", "pipe", "pipe"] });
     let out = "", err = "";
-    const timer = setTimeout(() => child.kill("SIGTERM"), 240000);
+    const started = Date.now();
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill("SIGTERM"); }, 600000);
     child.stdout.on("data", (d) => (out += d));
-    child.stderr.on("data", (d) => (err = (err + d).slice(-3000)));
+    child.stderr.on("data", (d) => (err = (err + d).slice(-6000)));
     child.on("error", (e) => { clearTimeout(timer); resolve({ ok: false, error: e.message }); });
-    child.on("close", () => {
+    child.on("close", (code, signal) => {
       clearTimeout(timer);
-      const line = out.trim().split("\n").reverse().find((l) => l.startsWith("{"));
-      try {
-        const d = JSON.parse(line);
-        const so = d.structured_output || (typeof d.result === "string" ? JSON.parse(d.result) : null);
-        if (d.is_error || !so) return resolve({ ok: false, error: String(d.result || "判断できませんでした").slice(0, 300) });
-        resolve({ ok: true, items: so.items || [], cost: d.total_cost_usd || 0 });
-      } catch (e) { resolve({ ok: false, error: (err.trim().split("\n").slice(-3).join(" ") || "判断の結果を読めませんでした").slice(0, 300) }); }
+      const secs = Math.round((Date.now() - started) / 1000);
+      // うまくいかなかったときに原因が分かるように、出力を残す（~/.ball/logs/judge-last.txt）
+      const keepLog = (why) => {
+        try {
+          const dir = path.join(HOME, ".ball", "logs"); fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(path.join(dir, "judge-last.txt"), `${new Date().toISOString()} ${why}\nexit=${code} signal=${signal} ${secs}s\n--- stdout ---\n${out.slice(0, 20000)}\n--- stderr ---\n${err}\n`);
+        } catch (e) { /* 残せなくても動く */ }
+      };
+      const line = out.trim().split("\n").reverse().find((l) => l.trim().startsWith("{"));
+      let d = null;
+      try { d = JSON.parse(line); } catch (e) { /* 下で扱う */ }
+      if (!d) {
+        const why = timedOut ? `時間切れ（${secs}秒）` : `結果を読めませんでした（終了コード ${code}${signal ? " / " + signal : ""}・${secs}秒）`;
+        keepLog(why);
+        const head = (err.trim().split("\n").filter(Boolean).slice(-2).join(" ") || out.trim().slice(0, 160)).slice(0, 200);
+        return resolve({ ok: false, error: `${why}${head ? "：" + head : ""}（詳しくは ~/.ball/logs/judge-last.txt）` });
+      }
+      let so = d.structured_output;
+      if (!so && typeof d.result === "string") { try { so = JSON.parse(d.result); } catch (e) { /* 形が違う */ } }
+      if (d.is_error || !so) { keepLog("判断できませんでした"); return resolve({ ok: false, error: String(d.result || d.subtype || "判断できませんでした").slice(0, 300) }); }
+      resolve({ ok: true, items: so.items || [], cost: d.total_cost_usd || 0, secs });
     });
     child.stdin.end(prompt);
   });

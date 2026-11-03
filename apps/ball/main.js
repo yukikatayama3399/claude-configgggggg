@@ -171,6 +171,24 @@ ipcMain.handle("slack-image", async (e, url) => {
     return { ok: true, data };
   } catch (err) { return { ok: false, error: String(err.message || err) }; }
 });
+// Messenger の写真: Messenger にログインした裏の読み取り画面（persist:ball-messenger）のクッキーで取ってくる
+const msgrImgCache = new Map();
+ipcMain.handle("msgr-image", async (e, url) => {
+  if (!win || e.sender !== win.webContents) return { ok: false };
+  url = String(url || "");
+  if (!/^https:\/\/[\w.-]*(fbcdn\.net|fbsbx\.com|facebook\.com|messenger\.com)\//.test(url)) return { ok: false, error: "Facebook の写真以外は取りません" };
+  if (msgrImgCache.has(url)) return { ok: true, data: msgrImgCache.get(url) };
+  try {
+    const r = await session.fromPartition(MSGR_PARTITION).fetch(url);
+    const type = (r.headers.get("content-type") || "").split(";")[0];
+    if (!r.ok || !/^image\//.test(type)) return { ok: false, error: `取れませんでした（${r.status}）` };
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 10 * 1024 * 1024) return { ok: false, error: "大きすぎます" };
+    const data = `data:${type};base64,${buf.toString("base64")}`;
+    msgrImgCache.set(url, data); if (msgrImgCache.size > 300) msgrImgCache.delete(msgrImgCache.keys().next().value);
+    return { ok: true, data };
+  } catch (err) { return { ok: false, error: String(err.message || err) }; }
+});
 ipcMain.handle("slack-people", (_e, a) => askSlack("slack-people", { channel: a.channel }, "slack-people-result", 60000));
 // 送信: BALL 本体の画面（片山さんが押す確認ボタン）からだけ受け付ける。AI や右のブラウザのページからは呼べない
 ipcMain.handle("slack-send", async (e, a) => {
