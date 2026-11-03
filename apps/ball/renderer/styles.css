@@ -430,3 +430,5 @@ details.sctx[open] summary::before{content:"▾ "}
 .mcard.open .msnip{display:none}
 .msnip{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mclip{font-size:11px;color:var(--muted)}
+.chip.c-time{background:transparent;border:1px solid var(--line);color:var(--ink);font-family:var(--f-mono);font-weight:600}
+.chip.c-time.cal{border-color:var(--them);color:var(--them)}

@@ -78,8 +78,22 @@
     return `<button type="button" class="card${i.sec === "me" ? " me" : ""}" data-id="${i.id}" aria-current="${S.cur === i.id}">
       ${srcIcon(i.src)}
       <span class="ct"><span class="t">${esc(i.title)}</span>
-      <span class="m"><span class="proj"><span class="pd" style="background:${pj.color}"></span>${esc(pj.name)}</span>${esc(i.sub)}${i.ago ? ` · ${esc(i.ago)}` : ""}</span>
-      ${i.chips.length ? `<span class="m">${i.chips.map((c) => `<span class="chip c-${c[1]}">${esc(c[0])}</span>`).join("")}</span>` : ""}</span></button>`;
+      <span class="m"><span class="proj"><span class="pd" style="background:${pj.color}"></span>${esc(pj.name)}</span>${esc(i.sub)}${i.ago && !(i.at || i.calStart) ? ` · ${esc(i.ago)}` : ""}</span>
+      ${i.chips.length || cardWhen(i) ? `<span class="m">${cardWhen(i)}${i.chips.map((c) => `<span class="chip c-${c[1]}">${esc(c[0])}</span>`).join("")}</span>` : ""}</span></button>`;
+  }
+  // カードの時刻: 受け取った時刻（メール・Slack・Messenger）と、予定の時刻（カレンダーの作業）を同じ場所に出す
+  function fmtWhen(ms, approx) {
+    if (!ms) return "";
+    const x = new Date(ms), now = new Date();
+    const day0 = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diff = Math.round((day0(x) - day0(now)) / 86400e3);
+    const dl = diff === 0 ? "今日" : diff === -1 ? "昨日" : diff === 1 ? "明日" : `${x.getMonth() + 1}/${x.getDate()}（${"日月火水木金土"[x.getDay()]}）`;
+    if (approx) return (diff === 0 ? "今日" : diff === -1 ? "昨日" : `${x.getMonth() + 1}/${x.getDate()}`) + "頃";
+    return `${dl} ${x.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}`;
+  }
+  function cardWhen(i) {
+    if (i.calStart) { const t = Date.parse(i.calStart); return t ? `<span class="chip c-time cal">📅 ${esc(fmtWhen(t))}</span>` : ""; }
+    return i.at ? `<span class="chip c-time" title="受け取った時刻">🕘 ${esc(fmtWhen(i.at, i.atApprox))}</span>` : "";
   }
   // ---------- 並び順 ----------
   // メール・Slack・Messenger は受け取った時刻の新しい順（新着が上）。カレンダーの作業は、これから来る時刻の早い順
@@ -1255,7 +1269,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       const chips = [[c.unread ? "未読" : "既読・未返信", c.unread ? "warn" : "me"]];
       if (c.time) chips.push([c.time, "them"]);
       const fields = {
-        sec: "me", proj: "none", src: "msgr", ago: c.time || "", at: relTime(c.time), msgr: true, msgrName: c.name, done: false, hidden: false,
+        sec: "me", proj: "none", src: "msgr", ago: c.time || "", at: relTime(c.time), atApprox: /日|週|か月|ヶ月|年|^\d+\s*[dwy]$/.test(c.time || ""), msgr: true, msgrName: c.name, done: false, hidden: false,
         title: `Messenger：${c.name}`, sub: c.snippet ? c.snippet.slice(0, 40) : "Facebook メッセンジャー", chips,
       };
       if (!it) {
@@ -1721,7 +1735,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       const fields = {
         sec: isBall ? "me" : "cal", proj: "none", src: "cal", live: true, hidden: false,
         title: isBall ? e.summary.replace(/^\[作業[^\]]*\]\s*/, "") : e.summary,
-        sub: isBall ? `カレンダーの作業 · ${dayLabel(day) === "明日" ? "明日" : day === todayStr() ? "今日" : dayLabel(day)} ${hhmm(e.start)}` : `${hhmm(e.start)}〜${hhmm(e.end)}`,
+        sub: isBall ? "カレンダーの作業" : `${hhmm(e.start)}〜${hhmm(e.end)}`,
         ago: "", calDay: day, calTime: e.allDay ? "終日" : hhmm(e.start), calStart: e.start,
         chips: isBall ? [[day === todayStr() ? "今日" : dayLabel(day), "me"]] : [],
       };
