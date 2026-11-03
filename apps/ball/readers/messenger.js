@@ -1,5 +1,6 @@
 // Messenger 読み取り係（見えない裏ウィンドウの preload）。
-// 右側のブラウザと同じログイン状態（partition "persist:ball"）で facebook.com/messages を開き、
+// 右側のブラウザとは別の保存場所（partition "persist:ball-messenger"）で facebook.com/messages を開き、
+// （初回だけ、この読み取り画面で Facebook にログインが必要）
 // 会話一覧を1分ごとに読んで、アプリ本体に送る。書き込み・送信は一切しない。
 const { ipcRenderer } = require("electron");
 

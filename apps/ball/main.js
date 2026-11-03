@@ -32,6 +32,7 @@ function createWindow() {
 // ---------- Messenger の読み取り（見えない裏ウィンドウ） ----------
 // 読みに行く候補。会話一覧が読めなければ次を試す。片山さんが選んだ URL があれば最優先。
 const fs = require("fs");
+const MSGR_PARTITION = "persist:ball-messenger";
 const MSGR_CANDIDATES = ["https://www.facebook.com/messages/t/", "https://www.messenger.com/t/", "https://www.facebook.com/messages/"];
 const msgrPrefFile = () => path.join(app.getPath("userData"), "messenger.json");
 function loadMsgrPref() { try { return JSON.parse(fs.readFileSync(msgrPrefFile(), "utf8")).url || null; } catch (e) { return null; } }
@@ -48,7 +49,9 @@ function startMessenger() {
     show: false, width: 1200, height: 900, title: "BALL - Messenger 読み取り",
     opacity: 0, skipTaskbar: true, focusable: false, hasShadow: false,
     webPreferences: {
-      partition: "persist:ball",
+      // 右のブラウザとは保存場所を分ける（Messenger は会話データをブラウザ内に保存するので、
+      // 同じ場所で2画面同時に開くと取り合いになって一覧が読み込み中のまま止まることがある）
+      partition: MSGR_PARTITION,
       preload: path.join(__dirname, "readers", "messenger.js"),
       contextIsolation: true, nodeIntegration: false, backgroundThrottling: false,
     },
@@ -109,6 +112,7 @@ app.on("before-quit", () => { app.isQuitting = true; });
 
 app.whenReady().then(() => {
   session.fromPartition("persist:ball").setUserAgent(CHROME_UA);
+  session.fromPartition(MSGR_PARTITION).setUserAgent(CHROME_UA);
   createWindow();
   if (process.env.BALL_NO_MSGR !== "1") startMessenger();
   // 裏の Messenger ウィンドウは数えずに、本体ウィンドウが無ければ作り直す
