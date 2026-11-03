@@ -24,9 +24,12 @@ function gogEnv() {
 }
 
 // 送信を許すのは sendDraft の1か所だけ（allowSend）。それ以外は常に --gmail-no-send で送信を禁止する
-function run(args, { input, timeout = 60000, allowSend = false } = {}) {
+// ai=true（真ん中の Claude からの呼び出し）では、送信・返信・転送・下書き送信のコマンドそのものも無効にする
+const AI_BLOCK = "gmail.send,gmail.drafts.send,gmail.reply,gmail.forward,chat.messages.send,chat.send";
+function run(args, { input, timeout = 60000, allowSend = false, ai = false } = {}) {
   return new Promise((resolve, reject) => {
-    const guard = allowSend ? [] : ["--gmail-no-send"];
+    const guard = allowSend && !ai ? [] : ["--gmail-no-send"];
+    if (ai) guard.push("--disable-commands", AI_BLOCK);
     const child = execFile(GOG, ["--account", ACCOUNT, ...guard, "--no-input", ...args],
       { timeout, maxBuffer: 64 * 1024 * 1024, env: gogEnv() }, (err, stdout, stderr) => {
         if (err) return reject(new Error((stderr || err.message).trim().split("\n").slice(-3).join(" ")));
@@ -178,7 +181,8 @@ async function calendar(days = 2) {
       return {
         id: e.id, summary: e.summary || "（タイトルなし）", allDay: !!(e.start && e.start.date),
         start: (e.start && (e.start.dateTime || e.start.date)) || "", end: (e.end && (e.end.dateTime || e.end.date)) || "",
-        location: e.location || "", description: e.description || "", meet, htmlLink: e.htmlLink || "",
+        location: e.location || "", description: /<\/?(a|br|p|div|b|ul|li|span)\b/i.test(e.description || "") ? htmlToText(e.description) : (e.description || ""), meet, htmlLink: e.htmlLink || "",
+        attachments: (e.attachments || []).map((a) => ({ title: a.title || "", url: a.fileUrl || "", mimeType: a.mimeType || "" })).filter((a) => a.url),
         organizer: (e.organizer && (e.organizer.displayName || e.organizer.email)) || "", organizerSelf: !!(e.organizer && e.organizer.self),
         myStatus: self ? self.responseStatus : (e.organizer && e.organizer.self ? "organizer" : ""),
         attendees: (e.attendees || []).filter((a) => !a.resource).map((a) => ({ name: a.displayName || a.email, email: a.email, status: a.responseStatus, self: !!a.self })),
@@ -201,4 +205,32 @@ async function driveMeta(ids) {
   return out;
 }
 
-module.exports = { status, inbox, thread, openAttachment, saveDraft, sendDraft, calendar, driveMeta, ACCOUNT };
+// ---------- 真ん中の Claude 用（読み取り中心。Sheets の記入だけは「シート記入まで」のときに main.js が許す） ----------
+const ensureGog = async () => { if (!GOG && !(await findGog())) throw new Error("gog が見つかりません"); };
+const idOf = (x) => { const m = String(x || "").match(/\/d\/([a-zA-Z0-9_-]{20,})/) || String(x || "").match(/[?&]id=([a-zA-Z0-9_-]{20,})/); return m ? m[1] : String(x || "").trim(); };
+const ai = {
+  async searchMail(query, max = 10) {
+    await ensureGog();
+    const d = await runJson(["gmail", "search", String(query), "--max", String(Math.min(25, max || 10))], { ai: true, timeout: 30000 });
+    return (d.threads || []).map((t) => ({ id: t.id, date: t.date, from: t.from, subject: t.subject, snippet: t.snippet || "" }));
+  },
+  async readThread(id) { await ensureGog(); return thread(String(id)); },
+  async calendar(days) { await ensureGog(); return calendar(Math.min(31, Math.max(1, days || 7))); },
+  async searchDrive(query, max = 10) {
+    await ensureGog();
+    const d = await runJson(["drive", "search", String(query), "--max", String(Math.min(25, max || 10))], { ai: true, timeout: 30000 });
+    return (d.files || d || []).map((f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, modifiedTime: f.modifiedTime, webViewLink: f.webViewLink || "" }));
+  },
+  async readDoc(doc) { await ensureGog(); return run(["docs", "cat", idOf(doc)], { ai: true, timeout: 60000 }); },
+  async readSheet(sheet, range) { await ensureGog(); return runJson(["sheets", "get", idOf(sheet), String(range)], { ai: true, timeout: 30000 }); },
+  async writeSheet(sheet, range, values) {
+    await ensureGog();
+    if (!Array.isArray(values) || !values.every(Array.isArray)) throw new Error("values は2次元の配列にしてください（例: [[\"済\", \"11/4\"]]）");
+    return runJson(["sheets", "update", idOf(sheet), String(range), "--values-json", JSON.stringify(values)], { ai: true, timeout: 30000 });
+  },
+};
+
+// 真ん中の Claude が Bash で gog を使うとき用: 本物の gog の場所と、BALL 用の環境変数（個人 Mac の専用 gog など）
+async function gogForClaude() { await ensureGog(); return { bin: GOG, env: gogEnv() }; }
+
+module.exports = { status, inbox, thread, openAttachment, saveDraft, sendDraft, calendar, driveMeta, ai, gogForClaude, ACCOUNT };

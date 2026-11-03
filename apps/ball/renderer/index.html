@@ -49,10 +49,10 @@
         <form class="comp" id="comp">
           <textarea id="compText" aria-label="メッセージ" placeholder="メッセージ（Aqua Voice の音声入力もそのまま入ります · ⌘Enter で送信）"></textarea>
           <div class="crow">
-            <select id="perm" aria-label="AI の権限"><option>下書きまで</option><option>シート記入まで</option><option>読むだけ</option></select>
+            <select id="perm" aria-label="AI の権限" title="いつもどおり: 普段の Claude と同じ道具を全部使う（送信だけは止める）"><option>いつもどおり</option><option>読むだけ</option></select>
             <select id="model" aria-label="モデル"><option>Opus 5.5</option><option>Sonnet 5.5</option></select>
-            <span class="sp"></span><span class="hint">送信は自分で</span>
-            <button class="btn dark" type="submit">送信</button>
+            <span class="sp"></span><span class="hint" title="AI には送信の手段がありません。返信は下書き欄に入るので、自分で確認して送ります">送信は自分で</span>
+            <button class="btn dark" type="submit" id="compSend">送信</button>
           </div>
         </form>
       </div>
@@ -88,7 +88,7 @@
 
   <div class="ft">
     <button type="button" class="ok mock ftbtn" id="ft-gmail" title="押すと Gmail を読み込み直します"><i></i><span>Gmail 見本</span></button><button type="button" class="ok mock ftbtn" id="ft-slack" title="押すと Slack の読み取りの状態を見ます"><i></i><span>Slack 見本</span></button><button type="button" class="ok mock ftbtn" id="ft-msgr" title="押すと Messenger の読み取り画面を開きます"><i></i><span>Messenger 見本</span></button><button type="button" class="ok mock ftbtn" id="ft-cal" title="押すとカレンダーを読み込み直します"><i></i><span>カレンダー 見本</span></button>
-    <span>裏側はまだつないでいません（画面と操作の確認用）</span>
+    <button type="button" class="ok mock ftbtn" id="ft-claude" title="真ん中の Claude（Mac の Claude Code）の状態"><i></i><span>Claude 見本</span></button>
     <span class="sp"></span>
     <span>Claude 5h<span class="bar"><i style="width:18%"></i></span>18% · 週<span class="bar"><i style="width:41%"></i></span>41%</span>
   </div>

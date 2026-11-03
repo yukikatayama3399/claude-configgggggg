@@ -29,4 +29,10 @@ contextBridge.exposeInMainWorld("ball", {
   slackScan: () => ipcRenderer.send("slack-scan"),
   slackThread: (a) => ipcRenderer.invoke("slack-thread", a),
   slackSend: (a) => ipcRenderer.invoke("slack-send", a),
+  // 真ん中の Claude（Mac の Claude Code）。送信の道具は持たせていない
+  claudeStatus: () => ipcRenderer.invoke("claude-status"),
+  claudeAsk: (a) => ipcRenderer.invoke("claude-ask", a),
+  claudeStop: (reqId) => ipcRenderer.send("claude-stop", reqId),
+  onClaude: (cb) => ipcRenderer.on("claude-event", (_e, ev) => cb(ev)),
+  onClaudeTool: (cb) => ipcRenderer.on("claude-tool", (_e, req) => cb(req, (r) => ipcRenderer.send("claude-tool-done", { callId: req.callId, ...r }))),
 });

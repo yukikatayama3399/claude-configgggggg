@@ -320,3 +320,7 @@ td.new{background:var(--cell)}
 .bubrow.mine .bb .lnk{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.4);color:#fff}
 .bubrow.mine .bb .lnk small{color:rgba(255,255,255,.75)}
 .bb.rich .ln,.sm .x.rich .ln{white-space:pre-wrap}
+.notesbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--side);margin:0 0 10px}
+.notesbar .nbl{font-size:11px;font-weight:700;color:var(--muted)}
+.notesbar .sp{flex:1}
+.lnk.big{font-size:13px;padding:5px 14px}

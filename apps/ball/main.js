@@ -233,3 +233,54 @@ ipcMain.on("open-preview", (e, a) => {
 ipcMain.on("open-external", (_e, url) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url);
 });
+
+// ---------- 真ん中の Claude ----------
+// 画面（BALL 本体）からの送信で claude を呼び、返事を画面へ流す。道具の呼び出しはここで処理する。
+// 送信の道具は無い。下書き・メモは画面に渡して反映するだけ。Sheets の記入は「シート記入まで」のときだけ。
+const claude = require("./claude-bridge");
+const clip = (s, n) => { s = String(s || ""); return s.length > n ? s.slice(0, n) + `\n…（長いので ${s.length - n} 文字省略）` : s; };
+const askRenderer = (() => {
+  let seq = 0; const wait = new Map();
+  ipcMain.on("claude-tool-done", (e, r) => { if (win && e.sender === win.webContents && wait.has(r.callId)) { wait.get(r.callId)(r); wait.delete(r.callId); } });
+  return (payload) => new Promise((resolve) => {
+    if (!win || win.isDestroyed()) return resolve({ ok: false, error: "BALL の画面が閉じています" });
+    const callId = ++seq; wait.set(callId, resolve);
+    win.webContents.send("claude-tool", { callId, ...payload });
+    setTimeout(() => { if (wait.has(callId)) { wait.delete(callId); resolve({ ok: false, error: "画面からの返事がありませんでした" }); } }, 10000);
+  });
+})();
+async function claudeTool(ctx, name, a) {
+  const g = gmail.ai;
+  if (name === "gmail_search") return JSON.stringify(await g.searchMail(a.query, a.max), null, 1);
+  if (name === "gmail_read_thread") {
+    const t = await g.readThread(a.thread_id);
+    return clip(t.messages.map((m) => `差出人: ${m.from}\n宛先: ${m.to}${m.cc ? "\nCC: " + m.cc : ""}\n日時: ${m.date}\n件名: ${m.subject}${(m.attachments || []).length ? "\n添付: " + m.attachments.map((x) => x.filename).join(", ") : ""}\n\n${clip(m.body, 8000)}`).join("\n\n----\n\n"), 60000);
+  }
+  if (name === "calendar_events") return clip(JSON.stringify((await g.calendar(a.days || 7)).map((e) => ({ 予定: e.summary, 開始: e.start, 終了: e.end, 場所: e.location, 主催: e.organizer, 自分の返事: e.myStatus, 参加者: e.attendees.map((x) => x.name).slice(0, 15), 説明: clip(e.description, 600) })), null, 1), 40000);
+  if (name === "drive_search") return JSON.stringify((await g.searchDrive(a.query, a.max)).map((f) => ({ ...f, url: f.webViewLink || `https://drive.google.com/open?id=${f.id}` })), null, 1);
+  if (name === "docs_read") return clip(await g.readDoc(a.doc), 80000);
+  if (name === "sheets_read") return clip(JSON.stringify(await g.readSheet(a.sheet, a.range)), 60000);
+  if (name === "sheets_write") {
+    if (ctx.perm === "read") throw new Error("今の権限は「読むだけ」なので書けません");
+    await g.writeSheet(a.sheet, a.range, a.values);
+    return `${a.range} に書きました`;
+  }
+  if (name === "ball_set_draft" || name === "ball_set_memo") {
+    if (ctx.perm === "read") throw new Error("今の権限は「読むだけ」なので書けません");
+    const r = await askRenderer({ ballId: ctx.ballId, name, args: a });
+    if (!r.ok) throw new Error(r.error || "書けませんでした");
+    return r.text || "OK";
+  }
+  throw new Error("知らない道具です: " + name);
+}
+ipcMain.handle("claude-status", async () => ({ ...(await claude.status()), cwd: claude.WORK }));
+ipcMain.handle("claude-ask", (e, a) => {
+  if (!win || e.sender !== win.webContents) return { ok: false, error: "BALL 本体の画面からだけ受け付けます" };
+  const reqId = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const emit = (ev) => { if (win && !win.isDestroyed()) win.webContents.send("claude-event", { reqId, ballId: a.ballId, ...ev }); };
+  gmail.gogForClaude().catch(() => null)
+    .then((gog) => claude.ask({ reqId, ballId: a.ballId, sessionId: a.sessionId, prompt: a.prompt, model: a.model, perm: a.perm, gog }, emit, claudeTool))
+    .catch((err) => emit({ type: "error", error: String(err.message || err) }));
+  return { ok: true, reqId };
+});
+ipcMain.on("claude-stop", (e, reqId) => { if (win && e.sender === win.webContents) claude.stop(reqId); });

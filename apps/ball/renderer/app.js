@@ -70,7 +70,10 @@
     let html = "";
     const pins = vis.filter((i) => i.pinned);
     if (pins.length) html += `<div class="sec"><div class="sech"><span>ピン留め</span></div>${pins.map(card).join("")}</div>`;
-    html += sec("自分ボール", by("me").filter((i) => !i.pinned));
+    // カレンダーの作業は、時刻の早い順（時系列で片付けるので）。他のボールはこれまでどおりの順で、その下に並べる
+    const mine = by("me").filter((i) => !i.pinned);
+    const calMine = mine.filter((i) => i.calStart).sort((a, b) => (a.calStart < b.calStart ? -1 : a.calStart > b.calStart ? 1 : 0));
+    html += sec("自分ボール", mine.filter((i) => !i.calStart).concat(calMine));
     html += sec("AI 作業中", by("ai"));
     if (by("notes").length) html += sec("会議メモ（議事録）", by("notes"));
     html += sec("返事待ち（相手ボール）", by("them"));
@@ -102,18 +105,34 @@
   // ---------- 中：このボールの AI ----------
   function center() {
     const i = curItem(), pj = D.projects[i.proj];
+    loadChat(i);
     const ball = { me: ["自分ボール", "c-me"], ai: ["AI 作業中", "c-ai"], them: ["相手ボール", "c-them"], cal: ["予定", "c-them"], notes: ["会議メモ", "c-ai"] }[i.sec] || ["", "c-them"];
     $("chHead").innerHTML = `<span class="proj"><span class="pd" style="background:${pj.color}"></span>${esc(pj.name)}</span><h2>${esc(i.title)}</h2><span class="chip ${ball[1]}">${ball[0]}</span>`;
     $("ct-chat").setAttribute("aria-pressed", S.ctab === "chat");
     $("ct-memo").setAttribute("aria-pressed", S.ctab === "memo");
     if (S.ctab === "chat") {
-      $("feed").innerHTML = i.feed.map(([k, t]) => (k === "prog" ? `<div class="prog"><b>Progress</b>${esc(t)}</div>` : `<div class="bub ${k}">${esc(t)}</div>`)).join("");
+      $("feed").innerHTML = feedHtml(i);
+      bindLinks($("feed"));
     } else {
       $("feed").innerHTML = `<textarea class="memo" id="memoText" aria-label="メモ" placeholder="メモはまだありません。チャットで「メモに入れといて」と言うと AI が書きます。">${esc(i.memo)}</textarea>`;
-      $("memoText").oninput = (e) => (i.memo = e.target.value);
+      $("memoText").oninput = (e) => { i.memo = e.target.value; saveChat(i); };
     }
     $("feed").scrollTop = $("feed").scrollHeight;
-    $("state").innerHTML = i.sec === "ai" ? `<b>作業中</b> 終わったら自分ボールに戻します` : `<b>待機中</b> あなたの番`;
+    renderState(i);
+  }
+  function feedHtml(i) {
+    const run = running[i.id];
+    return i.feed.map(([k, t], n) => (k === "prog" ? `<div class="prog"><b>Progress</b>${esc(t)}</div>`
+      : k === "ai" ? `<div class="bub ai rich${run && run.cur === n ? " live" : ""}">${t ? richBody(t) : `<span class="hint">考え中…</span>`}</div>`
+      : k === "err" ? `<div class="bub ai err">${esc(t)}</div>`
+      : `<div class="bub ${k}">${esc(t)}</div>`)).join("");
+  }
+  function renderState(i) {
+    const run = running[i.id];
+    $("state").innerHTML = run ? `<b>Claude が作業中</b> ${esc(run.note || "考えています…")}`
+      : i.sec === "ai" ? `<b>作業中</b> 終わったら自分ボールに戻します` : `<b>待機中</b> あなたの番`;
+    $("compSend").textContent = run ? "止める" : "送信";
+    $("compSend").classList.toggle("stop", !!run);
   }
 
   // ---------- 右：ブラウザ / スレッド ----------
@@ -317,6 +336,9 @@
         (m.files || []).forEach((f) => add({ kind: "link", url: f.url, name: f.name, mime: f.mimetype, date }));
         linksIn(m.text, date);
       });
+    } else if (t.kind === "cal" && t.ev) {
+      (t.ev.attachments || []).forEach((a) => add({ kind: "link", url: a.url, name: a.title, mime: a.mimeType, gid: gFileId(a.url) }));
+      linksIn(t.ev.description || "");
     } else if (t.kind === "msgr") {
       const msgs = t.live ? (t.data ? t.data.messages : []) : (t.messages || []);
       msgs.forEach((m) => { if (m.file) add({ kind: "link", url: m.file, name: m.text.replace(/^📎\s*/, "") }); linksIn(m.text || ""); });
@@ -336,11 +358,12 @@
   function mountDocsBar(i, anchorSel) {
     const docs = collectDocs(i);
     const host = $("thr").querySelector(anchorSel);
-    if (!host || !docs.length) return;
+    if (!host) return false;
+    if (!docs.length) return true;
     host.insertAdjacentHTML("afterend", docsBarHtml(docs));
     bindDocsBar(i, docs);
     const need = [...new Set(docs.filter((d) => d.gid && !driveCache[d.gid]).map((d) => d.gid))];
-    if (!need.length || !IS_APP || !window.ball.driveMeta) return;
+    if (!need.length || !IS_APP || !window.ball.driveMeta) return true;
     window.ball.driveMeta(need).then((r) => {
       if (!r.ok) return;
       Object.assign(driveCache, r.data);
@@ -349,6 +372,7 @@
       bar.outerHTML = docsBarHtml(docs);
       bindDocsBar(i, docs);
     });
+    return true;
   }
   function bindDocsBar(i, docs) {
     const bar = $("thr").querySelector(".docbar"); if (!bar) return;
@@ -369,6 +393,21 @@
   }
   function bindLinks(root) { root.querySelectorAll(".lnk[data-url]").forEach((b) => (b.onclick = (e) => openLink(b.dataset.url, b.dataset.label, e))); }
 
+  // 会議メモ: Gemini のメモ本体（Google ドキュメント）・文字起こし・録画へのリンクを一番上に出す。Claude に読ませて議事録にするため
+  function notesDocs(msgs) {
+    const out = [], seen = new Set();
+    (msgs || []).forEach((m) => parseLinks(m.body).links.forEach((L) => {
+      const u = L.url;
+      if (!/docs\.google\.com\/document\/d\/|drive\.google\.com\/(file\/d|open)/.test(u)) return;
+      const id = gFileId(u) || u; if (seen.has(id)) return; seen.add(id);
+      out.push({ url: u, label: L.label && !/^(こちら|リンク|here)$/i.test(L.label) ? L.label : /drive\.google/.test(u) ? "録画・ファイル" : "会議メモ（ドキュメント）" });
+    }));
+    return out;
+  }
+  function notesBar(msgs) {
+    const docs = notesDocs(msgs);
+    return `<div class="notesbar"><span class="nbl">議事録の元</span>${docs.length ? docs.map((d) => linkBtn({ url: d.url, label: d.label }).replace('class="lnk"', 'class="lnk big"')).join("") : `<span class="hint">メモ本体へのリンクが見つかりませんでした（本文から作ります）</span>`}<span class="sp"></span><button type="button" class="btn send" id="notesToClaude" title="会議メモ（リンク先のドキュメントも）を Claude に読ませて、議事録をメモ欄に作ります">Claude で議事録にする</button></div>`;
+  }
   function msgCard(m, open, full) {
     // 会議メモ（転送されたものも）は本文がまるごと大事なので、引用を省かない
     const q = full ? { text: String(m.body || "").trim(), trimmed: false } : trimQuote(m.body);
@@ -415,13 +454,18 @@
     if (i.notes && t.live) { i.chips = [["議事録", "ai"]].concat(mine.length ? [[`自分の担当 ${mine.length}件`, "me"]] : []); if (mine.length) i.sec = "me"; }
     $("thr").innerHTML = `<div class="thr">
       <div class="thd"><h4>${esc(subject)}</h4><button type="button" class="btn" id="openInGmail">Gmail で開く ↗</button></div>
-      ${i.notes ? `<div class="mine-box"><b>${mine.length ? `自分の担当（${mine.length}件）` : "自分の担当はありませんでした"}</b>${mine.length ? `<ul>${mine.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<span class="hint">議事録の作成や、担当をボールに分けるのは Claude をつないだあとにここで</span></div>` : ""}
+      ${i.notes ? notesBar(msgs) : ""}
+      ${i.notes ? `<div class="mine-box"><b>${mine.length ? `自分の担当（${mine.length}件）` : "自分の担当はありませんでした"}</b>${mine.length ? `<ul>${mine.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<span class="hint">議事録の清書は真ん中の Claude に頼めます</span></div>` : ""}
       ${last ? msgCard(last, true, !!i.notes) : ""}
       ${older.length ? `<details class="older"><summary>過去のやり取り（${older.length}件）</summary>${older.map((m) => msgCard(m, false, !!i.notes)).join("")}</details>` : ""}
       ${draftBox(i, "gmail")}
     </div>`;
     bindLinks($("thr"));
-    mountDocsBar(i, ".thd");
+    mountDocsBar(i, ".notesbar") || mountDocsBar(i, ".thd");
+    if ($("notesToClaude")) $("notesToClaude").onclick = () => {
+      $("compText").value = "この会議の議事録を、いつも Claude で作っているのと同じやり方（メモリー・スキル・CLAUDE.md の決まり。顧客フォルダの 1_議事録 への格納、フォルダが無ければ作るところまで）で作って。会議メモのドキュメント（リンク先）も読んで。できたら議事録のリンクと要点をこのボールのメモにも入れて。";
+      $("comp").requestSubmit();
+    };
     if (i.notes && t.live) left();
     $("openInGmail").onclick = () => { const url = gmailUrl(t.threadId || ""); if (!t.threadId) return toast("見本のスレッドです"); const tab = i.tabs.find((x) => x.url === url); if (tab) { i.activeTab = i.tabs.indexOf(tab); S.rmode = "browser"; right(); } else openTab(url, "Gmail - このスレッド"); };
     $("thr").querySelectorAll(".att").forEach((b) => (b.onclick = () => {
@@ -518,7 +562,7 @@
   }
   function draftBox(i, kind) {
     const t = i.thread;
-    const saved = t.draftId ? `Gmail の下書きに保存済み` : kind === "msgr" ? "送るのは Messenger で Enter" : "まだ保存していません";
+    const saved = t.aiDraft ? "AI が書きました（未保存・未送信）" : t.draftId ? `Gmail の下書きに保存済み` : kind === "msgr" ? "送るのは Messenger で Enter" : "まだ保存していません";
     const actions = kind === "gmail"
       ? `<span class="hint">AI は下書きまで。送るのは「送信」を押して確認したときだけ</span><span class="sp"></span><button type="button" class="btn" id="saveDraft">下書きに保存</button><button type="button" class="btn send" id="sendMail">送信…</button>`
       : kind === "msgr"
@@ -543,7 +587,7 @@
   function bindDraft(i) {
     const t = i.thread, ta = $("draftText"), btn = $("saveDraft");
     if (!ta || !btn) return;
-    ta.oninput = () => { t.draft = ta.value; if (t.kind === "gmail") $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
+    ta.oninput = () => { t.draft = ta.value; t.aiDraft = false; saveChat(i); if (t.kind === "gmail") $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
     if (t.kind === "slack" && t.live) {
       const cp = $("copyDraft");
       if (cp) cp.onclick = () => navigator.clipboard.writeText(ta.value).then(() => toast("コピーしました"), () => { ta.select(); toast("選択しました。⌘C でコピーしてください"); });
@@ -594,7 +638,7 @@
       btn.disabled = true; $("draftState").textContent = "保存中…";
       const r = await window.ball.gmailDraft(replyFields(t, ta.value));
       btn.disabled = false;
-      if (r.ok) { t.draftId = r.data.draftId || t.draftId; $("draftState").textContent = "Gmail の下書きに保存済み"; toast("Gmail の下書きに保存しました（送信はしていません）"); }
+      if (r.ok) { t.aiDraft = false; t.draftId = r.data.draftId || t.draftId; $("draftState").textContent = "Gmail の下書きに保存済み"; toast("Gmail の下書きに保存しました（送信はしていません）"); }
       else { $("draftState").textContent = "保存できませんでした"; toast("保存できませんでした：" + r.error); }
     };
     // 送信は2段階: 「送信…」で宛先・件名を確認 →「この内容で送信」を本人が押したときだけ送る
@@ -682,12 +726,226 @@
   $("navFwd").onclick = () => { const w = curWebview(); if (w && w.canGoForward()) w.goForward(); };
   $("navReload").onclick = () => { const w = curWebview(); if (w) w.reload(); else toast("見本ページです"); };
   $("navOut").onclick = () => { const t = activeTab(); if (!t) return; if (IS_APP) window.ball.openExternal(t.url); else window.open(t.url, "_blank"); };
+  // ---------- 真ん中の Claude（Mac の Claude Code をボールごとの会話として呼ぶ） ----------
+  // 送信の絶対ルール: Claude には送信の手段が無い。返信は右の下書き欄に入るだけで、送るのは片山さんのボタン。
+  // 会話はボールごとに続く（Claude Code の --resume）。会話・メモ・下書きはこの Mac の中にだけ保存する
+  var running = {};   // ballId -> { reqId, cur（いま書いている吹き出しの位置）, note, hash }
+  var chatStore = null;
+  const CHAT_KEY = "ball.chat.v1";
+  const PERMS = { "いつもどおり": "full", "読むだけ": "read" };
+  const MODEL_KEYS = { "Opus 5.5": "opus", "Sonnet 5.5": "sonnet" };
+  let claudeState = null; // { ok, version, error, cwd }
+  let lastInit = null;    // 直近の会話で読み込まれたスキル・コネクタ
+  function chats() {
+    if (!chatStore) { try { chatStore = JSON.parse(localStorage.getItem(CHAT_KEY) || "{}") || {}; } catch (e) { chatStore = {}; } }
+    return chatStore;
+  }
+  function saveChat(i) {
+    const st = chats();
+    st[i.id] = { sid: i.claudeSid || "", feed: i.feed.slice(-200), memo: i.memo || "", draft: (i.thread && i.thread.draft) || "", aiDraft: !!(i.thread && i.thread.aiDraft), ctx: i.ctxHash || "", at: Date.now() };
+    const keys = Object.keys(st);
+    if (keys.length > 400) keys.sort((a, b) => (st[a].at || 0) - (st[b].at || 0)).slice(0, keys.length - 400).forEach((k) => delete st[k]);
+    try { localStorage.setItem(CHAT_KEY, JSON.stringify(st)); } catch (e) { /* 保存できなくても会話は続けられる */ }
+  }
+  function loadChat(i) {
+    if (i._chat) return; i._chat = true;
+    const c = chats()[i.id]; if (!c) return;
+    if (c.feed && c.feed.length) i.feed = c.feed;
+    i.claudeSid = c.sid || ""; i.ctxHash = c.ctx || "";
+    if (c.memo && !i.memo) i.memo = c.memo;
+    if (i.thread && c.draft && !i.thread.draft) { i.thread.draft = c.draft; i.thread.aiDraft = !!c.aiDraft; }
+  }
+  const hashOf = (s) => { let h = 5381; for (let k = 0; k < s.length; k++) h = ((h << 5) + h + s.charCodeAt(k)) | 0; return (h >>> 0).toString(36) + ":" + s.length; };
+  const cut = (s, n) => { s = String(s || ""); return s.length > n ? s.slice(0, n) + `…（以下 ${s.length - n} 文字省略）` : s; };
+  const jstToday = () => { const d = new Date(Date.now() + 9 * 3600e3); return `${d.toISOString().slice(0, 10)}（${"日月火水木金土"[d.getUTCDay()]}）`; };
+
+  // ボールの中身を Claude に渡す形にする。スレッド部分（大きい）と、メモ・下書き（よく変わる）は分けて持つ
+  function threadText(i) {
+    const t = i.thread; if (!t) return "（スレッドなし）";
+    if (t.kind === "gmail") {
+      const msgs = t.live ? (t.data ? t.data.messages : null) : t.messages;
+      if (!msgs) return t.error ? `（スレッドを読めませんでした: ${t.error}）` : "（スレッドは未読み込み）";
+      return `Gmail スレッド（id: ${t.threadId || "見本"}、古い順）\n` + msgs.map((m) => `--- ${m.date}\n差出人: ${m.from}\n宛先: ${m.to}${m.cc ? "\nCC: " + m.cc : ""}\n件名: ${m.subject}${(m.attachments || []).length ? "\n添付: " + m.attachments.map((a) => a.filename).join(", ") : ""}\n\n${cut(i.notes ? m.body : trimQuote(m.body).text, i.notes ? 30000 : 8000)}`).join("\n\n");
+    }
+    if (t.kind === "slack") {
+      if (t.live) {
+        if (!t.data) return t.error ? `（読めませんでした: ${t.error}）` : "（未読み込み）";
+        return `Slack ${t.where}${t.threadTs ? " のスレッド" : ""}（古い順）\n` + t.data.messages.map((m) => `--- ${new Date(parseFloat(m.ts) * 1000).toLocaleString("ja-JP")} ${m.name}${m.mine ? "（片山）" : ""}\n${m.text}${m.files.length ? "\n添付: " + m.files.map((f) => f.name).join(", ") : ""}${m.reactions.length ? "\nリアクション: " + m.reactions.map((r) => `:${r.name}:${r.mine ? "(自分)" : ""}`).join(" ") : ""}`).join("\n");
+      }
+      return `Slack ${t.ch}（見本）\n` + t.msgs.map((m) => `--- ${m[2]} ${m[1]}\n${m[3]}`).join("\n");
+    }
+    if (t.kind === "msgr") {
+      const msgs = t.live ? (t.data ? t.data.messages : null) : t.messages;
+      if (!msgs) return t.error ? `（読めませんでした: ${t.error}）` : "（未読み込み）";
+      return `Messenger ${t.name}さんとの会話（古い順・時刻は取れていません）\n` + msgs.map((m) => `${m.mine ? "片山" : t.name}: ${m.image ? "（写真）" : m.text}`).join("\n");
+    }
+    if (t.kind === "cal") {
+      const e = t.ev || {};
+      return `予定: ${e.summary}\n日時: ${e.start} 〜 ${e.end}\n場所: ${e.location || "-"}\n主催: ${e.organizer || "-"}\n参加者: ${(e.attendees || []).map((a) => `${a.name}(${a.status || "?"})`).join(", ")}\nMeet: ${e.meet || "-"}\n説明:\n${cut(e.description, 6000)}`;
+    }
+    return "（スレッドなし）";
+  }
+  function ballParts(i) {
+    const pj = D.projects[i.proj] || {};
+    const src = { gmail: "Gmail", slack: "Slack", msgr: "Messenger", cal: "カレンダー" }[i.src] || (i.thread && i.thread.kind) || "手入力";
+    const head = [`ボール: ${i.title}`, `出どころ: ${src}`, pj.name ? `分類: ${pj.name}` : "", i.sub ? `補足: ${i.sub}` : "", (i.chips || []).length ? `状態: ${i.chips.map((c) => c[0]).join(" / ")}` : "", i.notes ? "種類: 会議メモ（Gemini）" : ""].filter(Boolean).join("\n");
+    let extra = "";
+    if (i.notes && i.thread && i.thread.kind === "gmail") {
+      const msgs = i.thread.live ? (i.thread.data ? i.thread.data.messages : []) : i.thread.messages;
+      const nd = notesDocs(msgs);
+      if (nd.length) extra = "\n会議メモの元（docs_read で読めます）:\n" + nd.map((d) => `・${d.label}: ${d.url}`).join("\n");
+    }
+    return { body: head + extra + "\n\n" + cut(threadText(i), 90000), memo: i.memo || "", draft: (i.thread && i.thread.draft) || "" };
+  }
+  function buildPrompt(i, text, perm) {
+    const p = ballParts(i);
+    const hBody = hashOf(p.body), hSide = hashOf(p.memo + "\u0001" + p.draft);
+    const [oldBody, oldSide] = String(i.ctxHash || "").split("|");
+    const permLine = `今の権限: ${$("perm").value}`;
+    let pre = "";
+    if (!i.claudeSid || oldBody !== hBody) {
+      pre = `<ball>\n今日: ${jstToday()}\n${permLine}\n\n${p.body}\n\n今のメモ:\n${p.memo || "（なし）"}\n\n今の下書き欄:\n${p.draft || "（空）"}\n</ball>\n\n`;
+    } else if (oldSide !== hSide) {
+      pre = `<ball_update>\n${permLine}\n今のメモ:\n${p.memo || "（なし）"}\n\n今の下書き欄:\n${p.draft || "（空）"}\n</ball_update>\n\n`;
+    } else pre = `（${permLine}）\n\n`;
+    return { prompt: pre + text, hash: hBody + "|" + hSide };
+  }
+  // 送る前に、まだ読んでいないスレッドを読んでおく（Claude が中身を知った状態で答えられるように）
+  async function ensureThread(i) {
+    const t = i.thread; if (!t || !t.live || t.data || t.loading || !IS_APP) return;
+    try {
+      if (t.kind === "gmail") { const r = await window.ball.gmailThread(t.threadId); if (r.ok) t.data = r.data; }
+      else if (t.kind === "slack") { const r = await window.ball.slackThread({ channel: t.channel, threadTs: t.threadTs }); if (r.ok) t.data = r; }
+      else if (t.kind === "msgr") { const r = await window.ball.messengerThread({ href: t.href, name: t.name, steps: t.steps || 4 }); if (r.ok && r.messages && r.messages.length) t.data = r; }
+    } catch (e) { /* 読めなくても、分かっている範囲で答える */ }
+  }
+  const TOOL_LABEL = {
+    gmail_search: (a) => `Gmail を検索：${a.query || ""}`, gmail_read_thread: () => "メールのスレッドを読む",
+    calendar_events: (a) => `カレンダーを見る（${a.days || 7}日分）`, drive_search: (a) => `Drive を検索：${a.query || ""}`,
+    docs_read: () => "ドキュメントを読む", sheets_read: (a) => `シートを読む：${a.range || ""}`, sheets_write: (a) => `シートに記入：${a.range || ""}`,
+    ball_set_draft: () => "下書き欄に入れる（未送信）", ball_set_memo: () => "メモに書く",
+  };
+  let feedTick = 0;
+  function refreshFeed(i) {
+    if (curItem() !== i || S.ctab !== "chat") return;
+    if (feedTick) return;
+    feedTick = requestAnimationFrame(() => {
+      feedTick = 0;
+      if (curItem() !== i || S.ctab !== "chat") return;
+      const f = $("feed"), atBottom = f.scrollHeight - f.scrollTop - f.clientHeight < 80;
+      f.innerHTML = feedHtml(i); bindLinks(f);
+      if (atBottom) f.scrollTop = f.scrollHeight;
+      renderState(i);
+    });
+  }
+  async function askClaude(i, text) {
+    const perm = PERMS[$("perm").value] || "full", model = MODEL_KEYS[$("model").value] || "opus";
+    i.feed.push(["me", text]);
+    const run = running[i.id] = { reqId: null, cur: null, note: "ボールの中身を読んでいます…" };
+    S.ctab = "chat"; center();
+    await ensureThread(i);
+    const { prompt, hash } = buildPrompt(i, text, perm);
+    run.hash = hash; run.note = "考えています…"; refreshFeed(i);
+    const r = await window.ball.claudeAsk({ ballId: i.id, sessionId: i.claudeSid || "", prompt, model, perm });
+    if (!r.ok) { delete running[i.id]; i.feed.push(["err", "Claude を呼べませんでした：" + r.error]); saveChat(i); center(); return; }
+    run.reqId = r.reqId;
+    if (run.stopAsked) window.ball.claudeStop(r.reqId);
+  }
+  function onClaudeEvent(ev) {
+    const i = items.find((x) => x.id === ev.ballId), run = running[ev.ballId];
+    if (!i || !run || (run.reqId && run.reqId !== ev.reqId)) return;
+    if (ev.type === "start") { if (ev.sessionId) i.claudeSid = ev.sessionId; lastInit = ev; }
+    else if (ev.type === "delta") {
+      if (run.cur == null) { i.feed.push(["ai", ""]); run.cur = i.feed.length - 1; }
+      i.feed[run.cur][1] += ev.text; run.note = "書いています…";
+    } else if (ev.type === "tool") {
+      run.cur = null;
+      const label = (TOOL_LABEL[ev.name] || (() => ev.name))(ev.input || {});
+      i.feed.push(["prog", label]); run.note = label;
+    } else if (ev.type === "toolError") {
+      i.feed.push(["prog", "うまくいきませんでした：" + String(ev.text || "").slice(0, 160)]);
+    } else if (ev.type === "done" || ev.type === "error") {
+      delete running[i.id];
+      if (ev.sessionId) i.claudeSid = ev.sessionId;
+      (ev.denied || []).forEach((d) => i.feed.push(["prog", "許可していない道具なので止めました：" + d]));
+      if (ev.stopped) i.feed.push(["prog", "止めました"]);
+      else if (ev.type === "error" || ev.isError) {
+        const msg = String(ev.error || "エラー");
+        // 会話が見つからない（Claude Code 側で消えた）ときは、次は新しい会話で始める
+        if (/No conversation found|session.*not found|--resume/i.test(msg)) { i.claudeSid = ""; i.ctxHash = ""; }
+        i.feed.push(["err", "Claude でエラーになりました：" + msg.slice(0, 600)]);
+      } else i.ctxHash = run.hash;
+      // 空の吹き出しは消す
+      i.feed = i.feed.filter(([k, t]) => !(k === "ai" && !t));
+      saveChat(i);
+      if (curItem() === i) center(); else left();
+      return;
+    }
+    refreshFeed(i);
+  }
+  // Claude の道具のうち、画面の中身を変えるもの（下書き欄・メモ）
+  function onClaudeTool(req, reply) {
+    const i = items.find((x) => x.id === req.ballId);
+    if (!i) return reply({ ok: false, error: "このボールはもう一覧にありません" });
+    const a = req.args || {};
+    if (req.name === "ball_set_draft") {
+      const text = String(a.text || "").trim();
+      if (!text) return reply({ ok: false, error: "下書きが空です" });
+      const t = i.thread;
+      if (!t || t.kind === "cal") {
+        i.memo = (i.memo ? i.memo.replace(/\s+$/, "") + "\n\n" : "") + "【下書き】\n" + text; saveChat(i);
+        if (curItem() === i && S.ctab === "memo") center();
+        return reply({ ok: true, text: "このボールには返信先のスレッドが無いので、メモ欄に【下書き】として入れました（送信はしていません）" });
+      }
+      t.draft = text; t.aiDraft = true; saveChat(i);
+      if (curItem() === i) { S.rmode = "thread"; right(); }
+      const where = t.kind === "gmail" ? "Gmail の返信" : t.kind === "msgr" ? "Messenger の返信" : "Slack の返信";
+      return reply({ ok: true, text: `${where}の下書き欄に入れました。まだ送信していません（Gmail の下書きにも未保存）。送るのは片山さんが確認してからです。` });
+    }
+    if (req.name === "ball_set_memo") {
+      const text = String(a.text || "");
+      i.memo = a.mode === "replace" ? text : (i.memo ? i.memo.replace(/\s+$/, "") + "\n\n" : "") + text;
+      saveChat(i);
+      if (curItem() === i && S.ctab === "memo") center();
+      return reply({ ok: true, text: "メモ欄に書きました" });
+    }
+    reply({ ok: false, error: "知らない道具です" });
+  }
+  async function checkClaude() {
+    if (!IS_APP || !window.ball.claudeStatus) { setFt("ft-claude", "Claude 見本（アプリ版でつながります）", "mock"); return; }
+    setFt("ft-claude", "Claude 確認中…", "mock");
+    claudeState = await window.ball.claudeStatus();
+    if (claudeState.ok) setFt("ft-claude", "Claude つながっています", "");
+    else setFt("ft-claude", "Claude: 見つかりません（押して詳細）", "ng");
+  }
+  $("ft-claude").onclick = () => {
+    if (!IS_APP) return toast("真ん中の Claude はデスクトップアプリ版でつながります");
+    if (claudeState && !claudeState.ok) return showInfo("Claude（Claude Code）が見つかりません", claudeState.error + "\n\nターミナルで次が動けば OK です:\n  claude --version\n\nclaude が別の場所にあるなら、BALL_CLAUDE=<claude のパス> npm start で起動してください。", "もう一度確かめる", checkClaude);
+    const skills = lastInit ? lastInit.skills.filter((x) => !/^(session-start-hook|update-config|verify|debug|code-review|simplify|batch|fewer-permission-prompts|doctor|loop|claude-api|workflow-authoring|run|run-skill-generator|plugin-authoring|design|design-sync|slides|dataviz|artifact-|cowork-plugin)/.test(x)) : [];
+    showInfo("真ん中の Claude", `Claude Code ${claudeState ? claudeState.version : ""}（${claudeState ? claudeState.path : ""}）
+作業フォルダ: ${(lastInit && lastInit.cwd) || (claudeState && claudeState.cwd) || ""}
+
+・いつもの Claude Code と同じ CLAUDE.md・メモリー・スキル（アカウントのスキルも）・ルーティン・コネクタ・gog で動きます。ボールごとに会話が続きます
+・許可の判断は Claude Code の auto モード（危ない操作は自動で止まる）と、普段の許可設定のとおりです
+・止めてあるもの（送信の絶対ルール）: メールの送信・返信・転送、Slack の投稿・リアクション、カレンダーの招待・変更・出欠の返事、Drive の共有。送るのは右の「送信…」を自分で押したときだけです
+${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skills.length} 個: ${skills.join(", ")}\n・コネクタ: ${lastInit.mcp.join(", ") || "なし"}` : "\n（一度話しかけると、読み込まれたスキルとコネクタがここに出ます）"}`, "", null);
+  };
+  if (IS_APP && window.ball.onClaude) { window.ball.onClaude(onClaudeEvent); window.ball.onClaudeTool(onClaudeTool); }
+  checkClaude();
+
   $("comp").onsubmit = (e) => {
     e.preventDefault();
-    const t = $("compText").value.trim(); if (!t) return;
     const i = curItem();
-    i.feed.push(["me", t], ["ai", "了解です。（見本なので、ここでは返事の例だけ出しています。裏側をつなぐと、このボールの中身を知った Claude が実際に作業します）"]);
-    $("compText").value = ""; S.ctab = "chat"; center();
+    const run = running[i.id];
+    if (run) { run.stopAsked = true; if (run.reqId) window.ball.claudeStop(run.reqId); run.note = "止めています…"; renderState(i); return; }
+    const t = $("compText").value.trim(); if (!t) return;
+    $("compText").value = "";
+    if (!IS_APP || !window.ball.claudeAsk) {
+      i.feed.push(["me", t], ["ai", "了解です。（ブラウザ版の見本なので、返事の例だけ出しています。デスクトップアプリ版では、このボールの中身を知った Claude が実際に答えます）"]);
+      S.ctab = "chat"; center(); return;
+    }
+    if (claudeState && !claudeState.ok) { i.feed.push(["me", t], ["err", "Claude（Claude Code）が見つかりません。下のステータス行の「Claude」を押すと確かめ方が出ます"]); center(); return; }
+    askClaude(i, t);
   };
   $("compText").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); $("comp").requestSubmit(); } });
   $("addForm").onsubmit = (e) => {
@@ -773,7 +1031,7 @@
       if (!it) {
         it = Object.assign({ id, memo: "", activeTab: 0,
           thread: { kind: "msgr", live: true, href: c.href, name: c.name, draft: "" },
-          feed: [["prog", "Messenger から自動で取り込み"], ["ai", `${c.name}さんとの会話です。${c.unread ? "未読があります。" : "相手の発言で止まっています。"}\n最後のメッセージ：${c.snippet || "（読み取れず）"}\n\n右に直近のやり取りを出しています。返信の段取りはここで相談できるようになります（Claude をつないだあと）。今は右の下書き欄に書いて「Messenger の入力欄に入れる」で送れます。`]],
+          feed: [["prog", "Messenger から自動で取り込み"], ["ai", `${c.name}さんとの会話です。${c.unread ? "未読があります。" : "相手の発言で止まっています。"}\n最後のメッセージ：${c.snippet || "（読み取れず）"}\n\n右に直近のやり取りを出しています。返信はここで頼めます（例:「返信の下書き書いて」）。下書きは右の下書き欄に入り、送るのは自分です。`]],
           tabs: [{ title: `${c.name} - Messenger`, url: c.href, sim: "messenger", key: id + "-0" }] }, fields);
         items.unshift(it);
       } else {
@@ -857,7 +1115,7 @@
       let it = items.find((x) => x.id === id);
       if (!it) {
         it = Object.assign({ id, memo: "", activeTab: 0,
-          feed: [["prog", "Slack から自動で取り込み"], ["ai", `${where} で ${m.userName}さんから${m.kind === "dm" ? "の DM" : "メンション"}です。${m.state === "ack" ? `\n:${m.emoji}: を押してあるので返信は済み扱いです。作業が残っていれば、ここで片付けます。` : ""}\n\n「${flat(m.text).slice(0, 120)}」\n\n右にスレッドを出しています。返信の下書きはここで相談できるようになります（Claude をつないだあと）。今は右の下書き欄に書いて「送信…」で送れます。`]],
+          feed: [["prog", "Slack から自動で取り込み"], ["ai", `${where} で ${m.userName}さんから${m.kind === "dm" ? "の DM" : "メンション"}です。${m.state === "ack" ? `\n:${m.emoji}: を押してあるので返信は済み扱いです。作業が残っていれば、ここで片付けます。` : ""}\n\n「${flat(m.text).slice(0, 120)}」\n\n右にスレッドを出しています。返信の下書きはここで頼めます。下書きは右の下書き欄に入り、送るのは「送信…」で確認したときだけです。`]],
           thread: { kind: "slack", live: true, channel: m.channel, threadTs: m.threadTs, ts: m.ts, where, permalink: m.permalink, draft: "" },
           tabs: m.permalink ? [{ title: "Slack", url: m.permalink, sim: "slack", key: id + "-0" }] : [{ title: "Slack", url: "https://app.slack.com/client", sim: "slack", key: id + "-0" }] }, fields);
         items.unshift(it);
@@ -931,13 +1189,13 @@
         sec: isBall ? "me" : "cal", proj: "none", src: "cal", live: true, hidden: false,
         title: isBall ? e.summary.replace(/^\[作業[^\]]*\]\s*/, "") : e.summary,
         sub: isBall ? `カレンダーの作業 · ${dayLabel(day) === "明日" ? "明日" : day === todayStr() ? "今日" : dayLabel(day)} ${hhmm(e.start)}` : `${hhmm(e.start)}〜${hhmm(e.end)}`,
-        ago: "", calDay: day, calTime: e.allDay ? "終日" : hhmm(e.start),
+        ago: "", calDay: day, calTime: e.allDay ? "終日" : hhmm(e.start), calStart: e.start,
         chips: isBall ? [[day === todayStr() ? "今日" : dayLabel(day), "me"]] : [],
       };
       let it = items.find((x) => x.id === id);
       if (!it) {
         it = Object.assign({ id, memo: "", activeTab: 0, done: false,
-          feed: [["prog", "カレンダーから自動で取り込み"], ["ai", isBall ? `カレンダーに入れていた作業です（${hhmm(e.start)}〜）。右に予定の中身を出しています。` : `${hhmm(e.start)} の予定です。右に参加者や説明を出しています。\n商談なら、予習のブリーフはここで作れるようになります（Claude をつないだあと）。`]],
+          feed: [["prog", "カレンダーから自動で取り込み"], ["ai", isBall ? `カレンダーに入れていた作業です（${hhmm(e.start)}〜）。右に予定の中身を出しています。` : `${hhmm(e.start)} の予定です。右に参加者や説明を出しています。\n商談なら、予習のブリーフはここで頼めます（例:「この商談の予習して」）。`]],
           thread: { kind: "cal", live: true, ev: e },
           tabs: e.htmlLink ? [{ title: "Google カレンダー", url: e.htmlLink, sim: "calev", key: id + "-0" }] : [] }, fields);
         items.push(it);
@@ -961,8 +1219,10 @@
         ${e.myStatus ? `<dt>自分</dt><dd>${esc(STATUS_JA[e.myStatus] || e.myStatus)}</dd>` : ""}
         ${e.attendees.length ? `<dt>参加者</dt><dd>${e.attendees.map((a) => `${esc(a.self ? "自分" : a.name)}<span class="hint">（${esc(STATUS_JA[a.status] || a.status || "")}）</span>`).join("、")}</dd>` : ""}
       </dl></div>
-      ${e.description ? `<div class="mcard"><div class="mb">${esc(e.description)}</div></div>` : ""}
+      ${e.description ? `<div class="mcard open"><div class="mb rich">${richBody(e.description)}</div></div>` : ""}
     </div>`;
+    bindLinks($("thr"));
+    mountDocsBar(i, ".thd");
     if ($("calMeet")) $("calMeet").onclick = () => (IS_APP ? window.ball.openExternal(e.meet) : window.open(e.meet, "_blank"));
     if ($("calOpen")) $("calOpen").onclick = () => openTab(e.htmlLink, "Google カレンダー");
   }
@@ -994,8 +1254,8 @@
       if (!it) {
         it = Object.assign({ id, memo: "", activeTab: 0,
           feed: t.notes
-            ? [["prog", "会議メモ（Gemini）を自動で取り込み"], ["ai", `会議のメモです。右に要点と、自分（Yuki Katayama）の担当を色付きで出しています。リンクはボタンから開けます。\n\n議事録への清書や、担当ごとのボール分けは、Claude をつないだあとにここで頼めるようになります。`]]
-            : [["prog", "Gmail から自動で取り込み"], ["ai", `${nameOf(t.from)}さんからのメールです。右にスレッドを出しています。\n\n返信の段取りはここで相談できるようになります（Claude をつないだあと）。今は右の下書き欄に直接書いて、Gmail の下書きに保存できます。`]],
+            ? [["prog", "会議メモ（Gemini）を自動で取り込み"], ["ai", `会議のメモです。右に要点と、自分（Yuki Katayama）の担当を色付きで出しています。リンクはボタンから開けます。\n\n議事録への清書や担当の整理はここで頼めます（例:「議事録にしてメモに入れといて」）。`]]
+            : [["prog", "Gmail から自動で取り込み"], ["ai", `${nameOf(t.from)}さんからのメールです。右にスレッドを出しています。\n\n返信はここで頼めます（例:「丁寧めに返信の下書き書いて」）。下書きは右の下書き欄に入り、Gmail への保存も送信も自分のボタンです。`]],
           thread: { kind: "gmail", live: true, threadId: t.id, draft: "" },
           tabs: [{ title: "Gmail - このスレッド", url: gmailUrl(t.id), sim: "gmail", key: id + "-0" }] }, fields);
         items.unshift(it);
