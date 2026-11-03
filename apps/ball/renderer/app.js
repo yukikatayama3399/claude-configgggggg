@@ -30,10 +30,19 @@
     if (/mercari/.test(t.url)) return `<i class="fav" style="background:#E8340C"></i>`;
     return `<i class="fav"></i>`;
   }
+  // アプリ版では見本のデータを出さない（本物と混ざって紛らわしいので）。最初は「はじめに」だけ置いて、読み込んだ本物を並べる
+  if (IS_APP) {
+    D.items.splice(0, D.items.length, {
+      id: "home", hidden: true, sec: "me", proj: "none", src: "doc", title: "BALL", sub: "", chips: [], ago: "", memo: "", thread: null,
+      feed: [["ai", "左の一覧からボールを選ぶと、ここでそのボールの相談ができます。\nGmail・Slack・Messenger・カレンダーは裏で読み込んでいます（状態は下の帯）。"]],
+      tabs: [{ title: "Google", url: "https://www.google.com/", sim: "plain" }],
+    });
+    D.jobs = []; D.closed = []; D.todayCal = [];
+  }
   const items = D.items;
   items.forEach((it) => { it.activeTab = 0; it.tabs.forEach((t, k) => (t.key = it.id + "-" + k)); });
   let tabSeq = 100;
-  const S = { proj: "all", cur: "iwata", ctab: "chat", rmode: "browser" };
+  const S = { proj: "all", cur: IS_APP ? "home" : "iwata", ctab: "chat", rmode: "browser" };
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -43,7 +52,14 @@
 
   document.body.classList.add(IS_APP ? "electron" : "web");
   if (IS_APP && window.ball.platform === "darwin") document.body.classList.add("mac");
-  if (IS_APP) $("cap").hidden = true;
+  if (IS_APP) {
+    $("cap").hidden = true;
+    // 見本の表示（日付・稼働・同期・使用量・番頭）を本物に合わせる
+    const d = new Date();
+    $("today").textContent = `${d.getMonth() + 1}/${d.getDate()}（${"日月火水木金土"[d.getDay()]}）`;
+    $("dateEn").textContent = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
+    $("sync").hidden = true; $("usage").hidden = true; $("banto").hidden = true;
+  }
 
   // ---------- 上のバー ----------
   function ptabs() {
