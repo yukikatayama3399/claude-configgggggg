@@ -10,10 +10,23 @@ const ACCOUNT = process.env.BALL_GOG_ACCOUNT || "yuki.katayama@fout.jp";
 const CANDIDATES = [process.env.BALL_GOG, "gog", "/opt/homebrew/bin/gog", "/usr/local/bin/gog", path.join(os.homedir(), "bin", "gog")].filter(Boolean);
 let GOG = null;
 
+// 個人 Mac 用: scripts/setup-gog-mac.sh で用意した BALL 専用の gog（~/.ball/gog）があれば、そちらを使う
+const BALL_HOME = path.join(os.homedir(), ".ball");
+function gogEnv() {
+  const env = { ...process.env };
+  const home = process.env.BALL_GOG_HOME || path.join(BALL_HOME, "gog");
+  const envFile = process.env.BALL_GOG_ENV || path.join(BALL_HOME, "gog.env");
+  if (fs.existsSync(home) && fs.existsSync(envFile)) {
+    const m = fs.readFileSync(envFile, "utf8").match(/^\s*GOG_KEYRING_PASSWORD\s*=\s*["']?(.*?)["']?\s*$/m);
+    if (m) { env.GOG_HOME = home; env.GOG_KEYRING_BACKEND = "file"; env.GOG_KEYRING_PASSWORD = m[1]; }
+  }
+  return env;
+}
+
 function run(args, { input, timeout = 60000 } = {}) {
   return new Promise((resolve, reject) => {
     const child = execFile(GOG, ["--account", ACCOUNT, "--gmail-no-send", "--no-input", ...args],
-      { timeout, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
+      { timeout, maxBuffer: 64 * 1024 * 1024, env: gogEnv() }, (err, stdout, stderr) => {
         if (err) return reject(new Error((stderr || err.message).trim().split("\n").slice(-3).join(" ")));
         resolve(stdout);
       });

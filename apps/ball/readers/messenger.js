@@ -44,17 +44,40 @@ function readRow(a) {
   return { id: m[1], name, snippet, time, unread, mine, href: abs };
 }
 
+// 診断: 名前やメッセージの中身は入れず、画面の作りだけを数える
+function diagnose(anchors) {
+  const shape = (s) => String(s).replace(/\d+/g, "#");
+  const roles = {};
+  const samples = anchors.slice(0, 8).map((a) => {
+    const lines = (a.innerText || "").split("\n").map((s) => s.trim()).filter(Boolean);
+    const leaves = [...a.querySelectorAll("*")].filter((el) => el.childElementCount === 0 && el.textContent.trim()).length;
+    const row = a.closest("[role]");
+    const role = row ? row.getAttribute("role") : "-";
+    roles[role] = (roles[role] || 0) + 1;
+    return { href: shape(a.getAttribute("href") || ""), lines: lines.length, leaves, role, aria: !!a.getAttribute("aria-label"), visible: a.getBoundingClientRect().height > 0 };
+  });
+  return {
+    path: shape(location.pathname), title: document.title.replace(/\(\d+\)/, "(#)").slice(0, 40),
+    anchorsT: document.querySelectorAll('a[href*="/t/"]').length,
+    anchorsMessages: document.querySelectorAll('a[href*="/messages/"]').length,
+    grids: document.querySelectorAll('[role="grid"], [role="list"], [role="navigation"]').length,
+    rows: document.querySelectorAll('[role="row"], [role="listitem"]').length,
+    samples, roles,
+  };
+}
+
 function scrape() {
   const at = Date.now();
   if (isLoginPage()) return ipcRenderer.send("msgr-result", { at, status: "login", url: location.href, convos: [] });
+  const anchors = [...document.querySelectorAll('a[href*="/t/"]')];
   const seen = new Set(), convos = [];
-  for (const a of document.querySelectorAll('a[href*="/t/"]')) {
+  for (const a of anchors) {
     const r = readRow(a);
     if (!r || seen.has(r.id)) continue;
     seen.add(r.id); convos.push(r);
     if (convos.length >= 30) break;
   }
-  ipcRenderer.send("msgr-result", { at, status: convos.length ? "ok" : "nolist", url: location.href, convos });
+  ipcRenderer.send("msgr-result", { at, status: convos.length ? "ok" : "nolist", url: location.href, convos, diag: diagnose(anchors) });
 }
 
 window.addEventListener("DOMContentLoaded", () => {

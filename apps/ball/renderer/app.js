@@ -420,6 +420,30 @@
     });
     left();
   }
+  // Messenger 読み取りの診断（名前・本文は含まない）。コピーして送ってもらう用
+  function showMsgrDiag(data) {
+    const info = { status: data.status, convos: (data.convos || []).length, unread: (data.convos || []).filter((c) => c.unread).length, mine: (data.convos || []).filter((c) => c.mine).length, note: data.note || "", diag: data.diag || null };
+    const text = JSON.stringify(info, null, 1);
+    let el = $("diag");
+    if (!el) {
+      el = document.createElement("div"); el.id = "diag"; el.className = "ov";
+      el.innerHTML = `<div class="ovc" role="dialog" aria-modal="true" aria-labelledby="diagTitle" style="max-width:720px">
+        <h2 id="diagTitle">Messenger 読み取りの診断</h2>
+        <p class="hint">名前やメッセージの中身は入っていません。画面の作りだけです。うまく読めないときは、これをコピーして Claude に送ってください。</p>
+        <pre id="diagText" style="white-space:pre-wrap;font-family:var(--f-mono);font-size:11.5px;background:var(--soft);border-radius:8px;padding:12px;max-height:50vh;overflow:auto;margin:0"></pre>
+        <div class="ovf"><span class="hint">右のブラウザで Messenger の一覧を開いて下の帯を押すと、そのページを読むように切り替わります</span><span><button type="button" class="btn" id="diagCopy">コピー</button> <button type="button" class="btn dark" id="diagClose">閉じる</button></span></div></div>`;
+      document.body.appendChild(el);
+      el.onclick = (e) => { if (e.target === el) el.hidden = true; };
+      $("diagClose").onclick = () => (el.hidden = true);
+      $("diagCopy").onclick = () => {
+        const tx = $("diagText").textContent;
+        navigator.clipboard.writeText(tx).then(() => toast("コピーしました"), () => { const r = document.createRange(); r.selectNodeContents($("diagText")); getSelection().removeAllRanges(); getSelection().addRange(r); toast("選択しました。⌘C でコピーしてください"); });
+      };
+    }
+    $("diagText").textContent = text;
+    el.hidden = false;
+  }
+
   // ---------- Gmail の取り込み（アプリ版のみ・Mac の gog 経由） ----------
   // 受信トレイで「最後のメールが自分以外の人から」のスレッドを自分ボールにする。返信すると次の取り込みで閉じる。
   function setFt(id, text, cls) {
@@ -486,7 +510,7 @@
       toast("右に開いている Messenger のページを読むように切り替えました");
       return;
     }
-    if (lastMsgrData && lastMsgrData.status === "ok") { toast("読めています。右のブラウザで Messenger を開いた状態で押すと、そのページを読むように切り替えます"); return; }
+    if (lastMsgrData) { showMsgrDiag(lastMsgrData); return; }
     toast("右のブラウザで Messenger の会話一覧を開いてから、もう一度ここを押してください");
     window.ball.messengerShow();
   };
