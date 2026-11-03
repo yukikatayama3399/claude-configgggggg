@@ -4,7 +4,8 @@
 // 会話一覧を1分ごとに読んで、アプリ本体に送る。書き込み・送信は一切しない。
 const { ipcRenderer } = require("electron");
 
-const TIME_RE = /(\d+\s*(秒|分|時間|日|週|か月|年|m|h|d|w|y))$|^(月|火|水|木|金|土|日)(曜日?)?$|^\d{1,2}\/\d{1,2}$|^\d{1,2}:\d{2}$/;
+// 一覧の時刻表示（「5日」「3時間」「火」「10/30」「14:05」など）。行全体が時刻のときだけ一致させる
+const TIME_RE = /^(\d+\s*(秒|分|時間|日|週|か月|年|m|h|d|w|y)|(月|火|水|木|金|土|日)(曜日?)?|\d{1,2}\/\d{1,2}|\d{1,2}:\d{2})$/;
 
 function isLoginPage() {
   return /login|checkpoint/.test(location.pathname) ||
@@ -25,28 +26,38 @@ function absUrl(href) {
   try { return new URL(href, location.href.startsWith("http") ? location.origin : "https://www.facebook.com").href; }
   catch (e) { return "https://www.facebook.com" + href; }
 }
+// 名前の代わりに出てくる状態表示（アイコンの「オンライン中」など）。名前としては使わない
+const STATUS_RE = /^(オンライン中|オンライン|アクティブ|アクティブ中|Active now|Online|\d+\s*(分|時間)前にアクティブ|Active \d+\w* ago)$/i;
 function readItem(el, href) {
-  const lines = linesOf(el);
+  let lines = linesOf(el).filter((l) => !STATUS_RE.test(l));
+  // 読み上げ用の「未読メッセージ:」は外して、未読の印として使う
+  let unreadMark = false;
+  lines = lines.map((l) => { const x = l.replace(/^(未読メッセージ|Unread message)\s*[:：]\s*/i, ""); if (x !== l) unreadMark = true; return x; }).filter(Boolean);
   if (lines.length < 2) return null;
-  const name = lines[0];
+  let name = lines[0];
   if (name.length > 60) return null;
   let rest = lines.slice(1);
   let time = "";
   if (rest.length && TIME_RE.test(rest[rest.length - 1])) time = rest.pop();
+  // 名前の途中に絵文字があると名前が2行に割れる（例: オーリーズ✖alpaka）。短くて「:」の無い行は名前の続きとみなす
+  while (rest.length >= 2 && !/[:：]/.test(rest[0]) && rest[0].length <= 24) name += " " + rest.shift();
   let snippet = rest.join(" ").replace(/\s*·\s*$/, "");
   const mt = snippet.match(/\s·\s([^·]+)$/);
   if (!time && mt && TIME_RE.test(mt[1].trim())) { time = mt[1].trim(); snippet = snippet.slice(0, mt.index); }
+  snippet = snippet.replace(/\s*·?\s*返信しますか？\s*$/, "").trim();
   // 自分が最後に送った / 相手が自分のメッセージにリアクションしただけ → こちらの返事は要らない
-  const mine = /^(あなた|You)\s*[:：]/.test(snippet) || /あなたのメッセージに.*リアクション|reacted .* to your message/i.test(snippet);
-  snippet = snippet.replace(/\s*·?\s*返信しますか？\s*$/, "");
-  // 未読の判定: aria-label に「未読」、または名前が太字
+  const reactedOnly = /あなたのメッセージに.*リアクション|reacted .* to your message/i.test(snippet);
+  const mine = /^(あなた|You)\s*[:：]/.test(snippet) || reactedOnly;
+  // 未読の判定: 「未読メッセージ:」、aria-label に「未読」、または名前が太字
   const row = el.closest('[role="row"], [role="listitem"], [role="gridcell"]') || el;
   const label = (el.getAttribute("aria-label") || "") + " " + (row.getAttribute("aria-label") || "");
-  let unread = /未読|unread/i.test(label) || !!el.querySelector('[aria-label*="未読"], [aria-label*="nread"]');
+  let unread = unreadMark || /未読|unread/i.test(label) || !!el.querySelector('[aria-label*="未読"], [aria-label*="nread"]');
   if (!unread) {
-    const nameSpan = [...el.querySelectorAll("*")].find((x) => x.childElementCount === 0 && x.textContent.trim() === name);
+    const first = lines[0];
+    const nameSpan = [...el.querySelectorAll("*")].find((x) => x.childElementCount === 0 && x.textContent.trim() === first);
     if (nameSpan && parseInt(getComputedStyle(nameSpan).fontWeight, 10) >= 600) unread = true;
   }
+  if (reactedOnly) unread = false; // リアクションだけなら返事は要らないので、未読でもボールにしない
   const m = (href || "").match(/\/t\/([^/?#]+)/);
   return { id: m ? m[1] : "n:" + name, name, snippet, time, unread, mine, href: m ? absUrl(href) : location.href, byRow: !m };
 }
@@ -57,6 +68,21 @@ function listRows() {
     const b = r.getBoundingClientRect();
     return b.height >= 36 && b.height <= 160 && b.left < w * 0.45 && b.width > 120;
   });
+}
+
+// 目印（role やリンク）が無い作りのための候補: 見た目で探す。
+// 画面の左側にあって、高さが1行ぶん、アイコン画像と2〜5行の文字を含む部品のうち、いちばん内側のもの。
+function visualRows() {
+  const w = window.innerWidth || 1200;
+  const isCand = (el) => {
+    const b = el.getBoundingClientRect();
+    if (b.height < 48 || b.height > 130 || b.width < 200 || b.width > w * 0.6 || b.left > w * 0.4 || b.top < 120) return false;
+    const n = linesOf(el).length;
+    if (n < 2 || n > 6) return false;
+    return [...el.querySelectorAll("img, svg image, [style*='background-image']")].some((im) => { const r = im.getBoundingClientRect(); return r.width >= 24 && r.width <= 80; });
+  };
+  const all = [...document.querySelectorAll("div, a, li")].filter(isCand);
+  return all.filter((el) => !all.some((o) => o !== el && el.contains(o)));
 }
 
 // 診断: 名前やメッセージの中身は入れず、画面の作りだけを数える
@@ -77,7 +103,8 @@ function diagnose(anchors) {
     anchorsMessages: document.querySelectorAll('a[href*="/messages/"]').length,
     links: document.querySelectorAll("a[href]").length, iframes: document.querySelectorAll("iframe").length,
     grids: document.querySelectorAll('[role="grid"], [role="list"], [role="navigation"]').length,
-    rows: rows.length, listRows: listRows().length,
+    rows: rows.length, listRows: listRows().length, visualRows: visualRows().length,
+    visualSamples: visualRows().slice(0, 4).map((el) => ({ tag: el.tagName, role: el.getAttribute("role") || "-", tabindex: el.getAttribute("tabindex") || "-", lines: linesOf(el).length, h: Math.round(el.getBoundingClientRect().height), clickable: !!el.closest('a, [role="link"], [role="button"], [tabindex]') })),
     anchorSamples: anchors.slice(0, 4).map(sample), rowSamples: rows.slice(0, 8).map(sample),
   };
 }
@@ -95,6 +122,8 @@ function scrape() {
   anchors.forEach((a) => push(readItem(a, a.getAttribute("href"))));
   // リンクで1件も取れないときは、一覧の行から読む
   if (!convos.length) listRows().forEach((r) => { const a = r.querySelector('a[href*="/t/"]'); push(readItem(r, a ? a.getAttribute("href") : "")); });
+  // それでも取れないときは、見た目の形で探す
+  if (!convos.length) visualRows().forEach((r) => { const a = r.querySelector('a[href*="/t/"]') || r.closest('a[href*="/t/"]'); push(readItem(r, a ? a.getAttribute("href") : "")); });
   ipcRenderer.send("msgr-result", { at, status: convos.length ? "ok" : "nolist", url: location.href, convos, diag: diagnose(anchors) });
 }
 
@@ -122,7 +151,29 @@ function readConversation() {
     if (prev && prev.text === text && prev.mine === mine) continue;
     out.push({ mine, text });
   }
-  const name = (document.querySelector('[role="main"] h1, [role="main"] h2') || {}).innerText || "";
+  // 吹き出しに目印（role=row）が無い作りのときは、見た目の位置で読む:
+  // 画面の右側（会話欄）にある文字のかたまりを上から順に、中央より右なら自分、左なら相手
+  if (!out.length) {
+    const w = window.innerWidth || 1200, h = window.innerHeight || 900;
+    const left = main === document.body ? w * 0.35 : mrect.left;
+    const center = main === document.body ? left + (w - left) / 2 : mid;
+    const blocks = [...document.querySelectorAll('div[dir="auto"], span[dir="auto"]')].filter((el) => {
+      if (el.closest('[contenteditable="true"], [role="textbox"], [role="navigation"], [role="banner"]')) return false;
+      if (el.querySelector('div[dir="auto"], span[dir="auto"]')) return false; // いちばん内側だけ
+      const b = el.getBoundingClientRect();
+      return b.width > 0 && b.height > 0 && b.left >= left && b.top > 140 && b.bottom < h - 60;
+    }).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+    for (const el of blocks) {
+      const text = el.innerText.trim();
+      if (!text || /^(\d{1,2}:\d{2}|\d+月\d+日.*|今日|昨日|既読|送信済み|Seen|Sent)$/.test(text)) continue;
+      const b = el.getBoundingClientRect();
+      const mine = b.left + b.width / 2 > center;
+      const prev = out[out.length - 1];
+      if (prev && prev.text === text) continue;
+      out.push({ mine, text });
+    }
+  }
+  const name = (document.querySelector('[role="main"] h1, [role="main"] h2, h1, h2') || {}).innerText || "";
   return { name: name.trim(), messages: out.slice(-12), rows: rows.length };
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -135,8 +186,9 @@ ipcRenderer.on("read-thread", async (_e, { href, name, reqId }) => {
     const path = new URL(href).pathname;
     const link = /\/t\//.test(path) && [...document.querySelectorAll('a[href*="/t/"]')].find((a) => (a.getAttribute("href") || "").startsWith(path) || href.includes(a.getAttribute("href")));
     // リンクの無い作りでは、名前が一致する一覧の行を押す
-    const row = !link && name && listRows().find((r) => linesOf(r)[0] === name);
-    const target = link || (row && (row.querySelector('[role="link"], [role="button"], [tabindex="0"]') || row));
+    // 「オンライン中」などを外したあとの名前で一覧の行を探す
+    const row = !link && name && [...listRows(), ...visualRows()].find((r) => { const it = readItem(r, ""); return it && it.name === name; });
+    const target = link || (row && (row.closest('a, [role="link"], [role="button"], [tabindex="0"]') || row.querySelector('[role="link"], [role="button"], [tabindex="0"]') || row));
     if (target) target.click();
     else if (/\/t\//.test(path)) { history.pushState({}, "", path); window.dispatchEvent(new PopStateEvent("popstate")); }
     else throw new Error("一覧に " + (name ? "その名前の" : "") + "会話が見つかりませんでした");
