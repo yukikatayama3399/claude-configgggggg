@@ -36,7 +36,9 @@ function readItem(el, href) {
   let snippet = rest.join(" ").replace(/\s*·\s*$/, "");
   const mt = snippet.match(/\s·\s([^·]+)$/);
   if (!time && mt && TIME_RE.test(mt[1].trim())) { time = mt[1].trim(); snippet = snippet.slice(0, mt.index); }
-  const mine = /^(あなた|You)\s*[:：]/.test(snippet);
+  // 自分が最後に送った / 相手が自分のメッセージにリアクションしただけ → こちらの返事は要らない
+  const mine = /^(あなた|You)\s*[:：]/.test(snippet) || /あなたのメッセージに.*リアクション|reacted .* to your message/i.test(snippet);
+  snippet = snippet.replace(/\s*·?\s*返信しますか？\s*$/, "");
   // 未読の判定: aria-label に「未読」、または名前が太字
   const row = el.closest('[role="row"], [role="listitem"], [role="gridcell"]') || el;
   const label = (el.getAttribute("aria-label") || "") + " " + (row.getAttribute("aria-label") || "");
