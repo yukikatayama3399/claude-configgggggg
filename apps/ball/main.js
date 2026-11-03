@@ -70,6 +70,16 @@ function toBackground() {
 }
 let msgrMiss = 0;
 ipcMain.on("msgr-result", (_e, data) => {
+  // Messenger 以外のページ（パスキー案内のあとのホームなど）にいたら、Messenger に戻す。
+  // ただし片山さんが読み取り画面を見ている間（操作中）は戻さない
+  if (data.status === "away") {
+    const userIsLooking = msgrWin && !msgrWin.isDestroyed() && msgrWin.getOpacity() > 0;
+    if (!userIsLooking && msgrWin && !msgrWin.isDestroyed()) msgrWin.loadURL(msgrUrls[msgrIdx] || MSGR_CANDIDATES[0]);
+    data = { ...data, note: userIsLooking ? "読み取り画面で操作中" : "Messenger のページに戻しています" };
+    lastMsgr = data;
+    if (win && !win.isDestroyed()) win.webContents.send("msgr-update", data);
+    return;
+  }
   // 一覧が3回続けて読めないときだけ、次の候補 URL に切り替える（読み込み途中で見切らない）
   if (data.status === "nolist") msgrMiss += 1; else msgrMiss = 0;
   if (data.status === "nolist" && msgrMiss >= 3 && msgrIdx < msgrUrls.length - 1 && !process.env.BALL_MSGR_URL) {

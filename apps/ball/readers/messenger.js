@@ -80,9 +80,13 @@ function diagnose(anchors) {
   };
 }
 
+// Messenger のページにいるか（パスキー案内やホームに飛ばされていないか）
+const onMessages = () => location.protocol === "file:" /* 練習用の画面 */ || /^\/(messages|t)(\/|$)/.test(location.pathname) || /messenger\.com$/.test(location.hostname);
+
 function scrape() {
   const at = Date.now();
   if (isLoginPage()) return ipcRenderer.send("msgr-result", { at, status: "login", url: location.href, convos: [] });
+  if (!onMessages()) return ipcRenderer.send("msgr-result", { at, status: "away", url: location.href, convos: [] });
   const anchors = [...document.querySelectorAll('a[href*="/t/"]')];
   const seen = new Set(), convos = [];
   const push = (r) => { if (r && !seen.has(r.id) && convos.length < 30) { seen.add(r.id); convos.push(r); } };

@@ -474,6 +474,7 @@
     let text;
     if (!data) { text = "Messenger 読み取り準備中"; el.classList.add("mock"); }
     else if (data.status === "login") { text = "Messenger: 読み取り画面でログインが必要（押す →「読み取り画面を見る」）"; el.classList.add("ng"); }
+    else if (data.status === "away") { text = "Messenger: " + (data.note || "Messenger 以外のページにいます"); el.classList.add("mock"); }
     else if (data.status === "nolist") { text = data.note ? "Messenger: " + data.note : "Messenger: 会話一覧が読めません（右で Messenger を開いて押す）"; el.classList.add("ng"); }
     else text = `Messenger ${agoText(data.at)} · 会話${data.convos.length}件・未読${data.convos.filter((c) => c.unread).length}`;
     el.querySelector("span").textContent = text;
