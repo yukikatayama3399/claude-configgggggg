@@ -1,7 +1,12 @@
 # BALL（使用感プレビュー版）
 
 Slack・Gmail・Messenger・カレンダーを1つにまとめるタスクハブの、**画面と操作だけ**の版。
-Gmail（gog 経由）と Messenger（アプリ内のブラウザ経由）は実データを取り込む。Slack・カレンダー・真ん中の Claude はまだ見本。
+実データを取り込む:
+- **Gmail・カレンダー**: Mac の gog 経由（個人 Mac は `scripts/setup-gog-mac.sh` で BALL 専用に用意）
+- **Messenger**: 透明な裏ウィンドウで facebook.com/messages を読む（初回だけ「読み取り画面を見る」でログイン）
+- **Slack**: 透明な裏ウィンドウで、BALL の中でログインした Slack（app.slack.com）から読む。自分宛てメンション（7日）と、相手の発言で止まっている DM
+
+真ん中の Claude はまだ見本（つなぐのは次の段階）。
 
 - 左: ボール一覧（番頭・自分ボール・AI 作業中・返事待ち・今日の予定）
 - 中: このボールの AI（チャット / メモ）。入力欄は普通のテキスト欄なので Aqua Voice がそのまま入る

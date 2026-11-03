@@ -120,11 +120,49 @@ ipcMain.on("msgr-show", () => {
 ipcMain.on("msgr-refresh", () => { if (msgrWin) msgrWin.reload(); });
 app.on("before-quit", () => { app.isQuitting = true; });
 
+// ---------- Slack の読み取り（透明な裏ウィンドウ・右のブラウザと同じログイン） ----------
+const SLACK_URL = process.env.BALL_SLACK_URL || "https://app.slack.com/client";
+let slackWin = null, lastSlack = null;
+function startSlack() {
+  slackWin = new BrowserWindow({
+    show: false, width: 1200, height: 900, title: "BALL - Slack 読み取り",
+    opacity: 0, skipTaskbar: true, focusable: false, hasShadow: false,
+    webPreferences: { partition: "persist:ball", preload: path.join(__dirname, "readers", "slack.js"), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+  });
+  slackWin.loadURL(SLACK_URL);
+  const toBg = () => { if (!slackWin || slackWin.isDestroyed()) return; slackWin.setOpacity(0); slackWin.setIgnoreMouseEvents(true); slackWin.setFocusable(false); if (!slackWin.isVisible()) slackWin.showInactive(); };
+  slackWin.once("ready-to-show", toBg);
+  slackWin.on("close", (e) => { if (!app.isQuitting) { e.preventDefault(); toBg(); slackWin.webContents.send("slack-scan-now"); } });
+  setInterval(() => { if (slackWin && !slackWin.isDestroyed()) slackWin.reload(); }, 30 * 60 * 1000);
+}
+ipcMain.on("slack-result", (_e, data) => { lastSlack = data; if (win && !win.isDestroyed()) win.webContents.send("slack-update", data); });
+ipcMain.handle("slack-last", () => lastSlack);
+ipcMain.on("slack-show", () => { if (!slackWin || slackWin.isDestroyed()) return; slackWin.setIgnoreMouseEvents(false); slackWin.setFocusable(true); slackWin.setOpacity(1); slackWin.show(); slackWin.focus(); });
+ipcMain.on("slack-scan", () => { if (slackWin && !slackWin.isDestroyed()) slackWin.webContents.send("slack-scan-now"); });
+function askSlack(channel, payload, resultChannel, timeoutMs) {
+  return new Promise((resolve) => {
+    if (!slackWin || slackWin.isDestroyed()) return resolve({ ok: false, error: "Slack の読み取り画面がありません" });
+    const reqId = Math.random().toString(36).slice(2);
+    const timer = setTimeout(() => { ipcMain.removeListener(resultChannel, onRes); resolve({ ok: false, error: "時間内に返事がありませんでした" }); }, timeoutMs);
+    function onRes(_ev, data) { if (data.reqId !== reqId) return; clearTimeout(timer); ipcMain.removeListener(resultChannel, onRes); resolve(data); }
+    ipcMain.on(resultChannel, onRes);
+    slackWin.webContents.send(channel, { ...payload, reqId });
+  });
+}
+ipcMain.handle("slack-thread", (_e, a) => askSlack("slack-thread", { channel: a.channel, threadTs: a.threadTs }, "slack-thread-result", 30000));
+// 送信: BALL 本体の画面（片山さんが押す確認ボタン）からだけ受け付ける。AI や右のブラウザのページからは呼べない
+ipcMain.handle("slack-send", (e, a) => {
+  if (!win || e.sender !== win.webContents) return { ok: false, error: "BALL 本体の画面からの送信だけ受け付けます" };
+  if (!a || !a.channel || !String(a.text || "").trim()) return { ok: false, error: "送り先か本文が空です" };
+  return askSlack("slack-send", { channel: a.channel, threadTs: a.threadTs || "", text: a.text }, "slack-send-result", 30000);
+});
+
 app.whenReady().then(() => {
   session.fromPartition("persist:ball").setUserAgent(CHROME_UA);
   session.fromPartition(MSGR_PARTITION).setUserAgent(CHROME_UA);
   createWindow();
   if (process.env.BALL_NO_MSGR !== "1") startMessenger();
+  if (process.env.BALL_NO_SLACK !== "1") startSlack();
   // 裏の Messenger ウィンドウは数えずに、本体ウィンドウが無ければ作り直す
   app.on("activate", () => { if (!win || win.isDestroyed()) createWindow(); });
 });

@@ -291,3 +291,5 @@ td.new{background:var(--cell)}
 .bbimg{border:0;padding:0;background:transparent;border-radius:14px;overflow:hidden;max-width:60%;cursor:zoom-in}
 .bbimg img{display:block;max-width:100%;max-height:260px;border-radius:14px}
 .bbfile{border:1px solid var(--line);cursor:pointer;text-align:left}
+.sm.hl{background:var(--me-bg);border-radius:8px;padding:6px;margin:-6px}
+.react.mine{border-color:var(--ai);color:var(--ai)}

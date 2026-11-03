@@ -1,0 +1,153 @@
+// Slack 読み取り係（透明な裏ウィンドウの preload）。
+// BALL の中で Slack にログインした画面（app.slack.com）の中から、Slack のウェブ版が使っている API を呼んで読む。
+// 読むのは: 自分宛てのメンション（直近7日）と、相手の発言で止まっている DM。
+// 書き込みは chat.postMessage の1か所だけで、片山さんが BALL 本体で「この内容で送信」を押したときにしか呼ばれない。
+const { ipcRenderer } = require("electron");
+
+const DONE_RE = /^(white_check_mark|heavy_check_mark|ballot_box_with_check|done|kanryo|kanryou|sumi|zumi|済|完了|finish|finished|ok_done)/i;
+const ACK_RE = /^(\+1|thumbsup|ok|ok_hand|pray|eyes|bow|raised_hands|ryoukai|shouchi|kakunin|roger|承知|了解|確認)/i;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function config() {
+  try {
+    const c = JSON.parse(localStorage.getItem("localConfig_v2") || "null");
+    if (!c || !c.teams) return null;
+    const id = c.lastActiveTeamId && c.teams[c.lastActiveTeamId] ? c.lastActiveTeamId : Object.keys(c.teams)[0];
+    const t = c.teams[id];
+    if (!t || !t.token) return null;
+    return { teamId: id, token: t.token, url: (t.url || "https://slack.com/").replace(/\/?$/, "/"), userId: t.user_id, name: t.name || "" };
+  } catch (e) { return null; }
+}
+async function api(cfg, method, params = {}) {
+  const fd = new FormData();
+  fd.append("token", cfg.token);
+  Object.entries(params).forEach(([k, v]) => v != null && fd.append(k, String(v)));
+  const r = await fetch(cfg.url + "api/" + method, { method: "POST", body: fd, credentials: "include" });
+  const j = await r.json();
+  if (!j.ok) throw new Error(method + ": " + (j.error || "error"));
+  return j;
+}
+
+const users = new Map();
+async function userName(cfg, id) {
+  if (!id) return "";
+  if (users.has(id)) return users.get(id);
+  try {
+    const j = await api(cfg, "users.info", { user: id });
+    const p = j.user.profile || {};
+    const n = p.display_name || p.real_name || j.user.real_name || j.user.name || id;
+    users.set(id, n); return n;
+  } catch (e) { users.set(id, id); return id; }
+}
+// Slack の書式（<@U123>、<url|ラベル>、&amp; など）を読みやすい文字に直す
+async function plain(cfg, text) {
+  let t = String(text || "");
+  const ids = [...new Set([...t.matchAll(/<@([UW][A-Z0-9]+)>/g)].map((m) => m[1]))];
+  for (const id of ids) t = t.split(`<@${id}>`).join("@" + (await userName(cfg, id)));
+  return t.replace(/<#[A-Z0-9]+\|([^>]+)>/g, "#$1").replace(/<(https?:[^|>]+)\|([^>]+)>/g, "$2").replace(/<(https?:[^>]+)>/g, "$1")
+    .replace(/<!(here|channel|everyone)>/g, "@$1").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+}
+// 自分の反応（返信・スタンプ）からボールの状態を決める: done（閉じる）/ ack（了解済み・作業は残る）/ open
+function stateOf(cfg, msg, laterMine) {
+  if (laterMine) return { state: "done", emoji: "" };
+  const mine = (msg.reactions || []).filter((r) => (r.users || []).includes(cfg.userId)).map((r) => r.name);
+  if (mine.some((n) => DONE_RE.test(n))) return { state: "done", emoji: mine.find((n) => DONE_RE.test(n)) };
+  if (mine.length) return { state: "ack", emoji: mine[0], unsure: !mine.some((n) => ACK_RE.test(n)) };
+  return { state: "open", emoji: "" };
+}
+
+async function scan() {
+  const at = Date.now();
+  const cfg = config();
+  if (!cfg) return ipcRenderer.send("slack-result", { at, status: "login", items: [] });
+  try {
+    const since = new Date(Date.now() - 7 * 86400e3 + 9 * 3600e3).toISOString().slice(0, 10);
+    const out = [];
+    // 1) 自分宛てのメンション
+    const s = await api(cfg, "search.messages", { query: `<@${cfg.userId}> after:${since}`, count: 40, sort: "timestamp", sort_dir: "desc" });
+    const matches = (s.messages && s.messages.matches) || [];
+    for (const m of matches.slice(0, 40)) {
+      if (m.user === cfg.userId) continue;
+      const ch = m.channel || {};
+      const threadTs = (m.permalink && (m.permalink.match(/thread_ts=([\d.]+)/) || [])[1]) || m.thread_ts || m.ts;
+      let msg = m, laterMine = false;
+      try {
+        const r = await api(cfg, "conversations.replies", { channel: ch.id, ts: threadTs, limit: 200 });
+        const list = r.messages || [];
+        msg = list.find((x) => x.ts === m.ts) || m;
+        laterMine = list.some((x) => x.user === cfg.userId && parseFloat(x.ts) > parseFloat(m.ts));
+        // 他の人が ✅ を付けて片付いていれば閉じる
+        if (!laterMine && (msg.reactions || []).some((r) => DONE_RE.test(r.name) && (r.users || []).some((u) => u !== m.user))) laterMine = true;
+      } catch (e) { /* スレッドが読めなくても一覧には出す */ }
+      const st = stateOf(cfg, msg, laterMine);
+      if (st.state === "done") continue;
+      out.push({ kind: ch.is_im || ch.is_mpim ? "dm" : "mention", channel: ch.id, channelName: ch.name || "", ts: m.ts, threadTs,
+        user: m.user, userName: m.username || (await userName(cfg, m.user)), text: await plain(cfg, m.text), permalink: m.permalink || "",
+        state: st.state, emoji: st.emoji, unsureEmoji: !!st.unsure, at: Math.round(parseFloat(m.ts) * 1000) });
+    }
+    // 2) DM で相手の発言で止まっているもの（最近動いた DM から順に）
+    const ims = [];
+    let cursor = "";
+    for (let page = 0; page < 3; page++) {
+      const r = await api(cfg, "conversations.list", { types: "im,mpim", exclude_archived: true, limit: 200, cursor });
+      ims.push(...(r.channels || []));
+      cursor = r.response_metadata && r.response_metadata.next_cursor;
+      if (!cursor) break;
+    }
+    ims.sort((a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0));
+    for (const im of ims.slice(0, 25)) {
+      try {
+        const h = await api(cfg, "conversations.history", { channel: im.id, limit: 1 });
+        const last = (h.messages || [])[0];
+        if (!last || last.user === cfg.userId || last.bot_id || last.subtype) continue;
+        if (Date.now() - parseFloat(last.ts) * 1000 > 30 * 86400e3) continue;
+        if (out.some((x) => x.channel === im.id && x.ts === last.ts)) continue;
+        const st = stateOf(cfg, last, false);
+        if (st.state === "done") continue;
+        out.push({ kind: "dm", channel: im.id, channelName: im.is_mpim ? (im.name || "グループDM") : "", ts: last.ts, threadTs: last.thread_ts || "",
+          user: last.user, userName: await userName(cfg, last.user || im.user), text: await plain(cfg, last.text), permalink: "",
+          state: st.state, emoji: st.emoji, unsureEmoji: !!st.unsure, at: Math.round(parseFloat(last.ts) * 1000) });
+        await sleep(120);
+      } catch (e) { /* 読めない DM は飛ばす */ }
+    }
+    ipcRenderer.send("slack-result", { at, status: "ok", team: cfg.name, items: out });
+  } catch (err) {
+    const msg = String(err && err.message || err);
+    ipcRenderer.send("slack-result", { at, status: /invalid_auth|not_authed|token_revoked/.test(msg) ? "login" : "error", error: msg, items: [] });
+  }
+}
+
+// スレッド（またはスレッドの無い DM の直近）を読む
+ipcRenderer.on("slack-thread", async (_e, { channel, threadTs, reqId }) => {
+  const cfg = config();
+  if (!cfg) return ipcRenderer.send("slack-thread-result", { reqId, ok: false, error: "Slack にログインしていません" });
+  try {
+    const r = threadTs ? await api(cfg, "conversations.replies", { channel, ts: threadTs, limit: 200 })
+      : await api(cfg, "conversations.history", { channel, limit: 30 });
+    let list = r.messages || [];
+    if (!threadTs) list = list.slice().reverse();
+    const messages = [];
+    for (const m of list) {
+      messages.push({ user: m.user, name: m.user === cfg.userId ? "自分" : (m.username || (await userName(cfg, m.user)) || "bot"), mine: m.user === cfg.userId,
+        ts: m.ts, text: await plain(cfg, m.text), reactions: (m.reactions || []).map((x) => ({ name: x.name, count: x.count, mine: (x.users || []).includes(cfg.userId) })),
+        files: (m.files || []).map((f) => ({ name: f.name || f.title || "ファイル", url: f.permalink || f.url_private || "", mimetype: f.mimetype || "" })) });
+    }
+    ipcRenderer.send("slack-thread-result", { reqId, ok: true, messages, teamUrl: cfg.url });
+  } catch (err) { ipcRenderer.send("slack-thread-result", { reqId, ok: false, error: String(err.message || err) }); }
+});
+
+// 送信（返信）。BALL 本体が「この内容で送信」を押されたときにだけ送ってくる
+ipcRenderer.on("slack-send", async (_e, { channel, threadTs, text, reqId }) => {
+  const cfg = config();
+  if (!cfg) return ipcRenderer.send("slack-send-result", { reqId, ok: false, error: "Slack にログインしていません" });
+  try {
+    const r = await api(cfg, "chat.postMessage", { channel, text, thread_ts: threadTs || undefined });
+    ipcRenderer.send("slack-send-result", { reqId, ok: true, ts: r.ts });
+  } catch (err) { ipcRenderer.send("slack-send-result", { reqId, ok: false, error: String(err.message || err) }); }
+});
+
+ipcRenderer.on("slack-scan-now", scan);
+window.addEventListener("DOMContentLoaded", () => {
+  setTimeout(scan, 6000);
+  setInterval(scan, 2 * 60 * 1000);
+});

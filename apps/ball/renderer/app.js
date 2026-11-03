@@ -213,6 +213,7 @@
     const t = i.thread;
     if (t.kind === "msgr") { renderMsgrThread(i); return; }
     if (t.kind === "cal") { renderCalThread(i); return; }
+    if (t.kind === "slack" && t.live) { renderSlackThread(i); return; }
     if (t.kind === "slack") {
       $("thr").innerHTML = `<div class="thr"><h4>${t.ws === "DM" ? "DM: " : ""}${esc(t.ch)}${t.ws === "DM" ? "" : " のスレッド"}<span>${esc(t.ws)}</span></h4>
         ${t.msgs.map((m) => `<div class="sm"><span class="av" style="background:${m[0]}">${esc(m[1][0])}</span><div><div class="n">${esc(m[1])}<time>${esc(m[2])}</time></div><div class="x">${esc(m[3])}</div>${m[4] ? `<span class="react">${esc(m[4])}</span>` : ""}</div></div>`).join("")}
@@ -341,6 +342,8 @@
       ? `<span class="hint">AI は下書きまで。送るのは「送信」を押して確認したときだけ</span><span class="sp"></span><button type="button" class="btn" id="saveDraft">下書きに保存</button><button type="button" class="btn send" id="sendMail">送信…</button>`
       : kind === "msgr"
         ? `<button type="button" class="btn" id="copyDraft">コピー</button><span class="sp"></span><button type="button" class="btn" id="saveDraft">入力欄に入れる</button><button type="button" class="btn send" id="sendMsgr">送信…</button>`
+      : kind === "slacklive"
+        ? `<button type="button" class="btn" id="copyDraft">コピー</button><span class="hint">AI は下書きまで。送るのは「送信…」で確認したときだけ</span><span class="sp"></span><button type="button" class="btn send" id="saveDraft">送信…</button>`
         : `<span class="hint">見本です（Slack は下書きまで。投稿は自分のボタンで）</span><span class="sp"></span><button type="button" class="btn send" id="saveDraft">送信</button>`;
     return `<div class="draft"><div class="dh"><span>下書き（送るまで送信されません）</span><span id="draftState">${saved}</span></div>
       <textarea id="draftText" aria-label="下書き" placeholder="真ん中で「下書き書いて」と言うとここに入ります。直接書いても OK。">${esc(t.draft || "")}</textarea>
@@ -360,6 +363,28 @@
     const t = i.thread, ta = $("draftText"), btn = $("saveDraft");
     if (!ta || !btn) return;
     ta.oninput = () => { t.draft = ta.value; if (t.kind === "gmail") $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
+    if (t.kind === "slack" && t.live) {
+      const cp = $("copyDraft");
+      if (cp) cp.onclick = () => navigator.clipboard.writeText(ta.value).then(() => toast("コピーしました"), () => { ta.select(); toast("選択しました。⌘C でコピーしてください"); });
+      // 送信は2段階: 「送信…」→ 送り先と本文を確認 →「この内容で送信」を本人が押したときだけ。送り先はチャンネルとスレッドで決まるので取り違えない
+      btn.onclick = () => {
+        if (!IS_APP) return toast("見本なので送信しません");
+        if (!ta.value.trim()) return toast("下書きが空です");
+        const where = t.threadTs ? `${t.where} のスレッド` : t.where;
+        const box = $("sendConfirm");
+        box.innerHTML = `<b>${esc(where)}に、この内容で送信しますか？</b><div class="mb" style="max-height:120px;overflow:auto">${esc(ta.value)}</div>
+          <div class="crow"><span class="sp"></span><button type="button" class="btn" id="sendCancel">やめる</button><button type="button" class="btn send" id="sendGo">この内容で送信</button></div>`;
+        box.hidden = false;
+        $("sendCancel").onclick = () => { box.hidden = true; };
+        $("sendGo").onclick = async () => {
+          $("sendGo").disabled = true; $("sendGo").textContent = "送信中…";
+          const r = await window.ball.slackSend({ channel: t.channel, threadTs: t.threadTs, text: ta.value });
+          if (r.ok) { box.hidden = true; t.draft = ""; ta.value = ""; toast("送信しました"); i.done = true; D.closed.unshift(`Slack: ${i.title.slice(0, 30)} · 返信済み`); left(); }
+          else { $("sendGo").disabled = false; $("sendGo").textContent = "この内容で送信"; toast("送信できませんでした：" + r.error); }
+        };
+      };
+      return;
+    }
     if (t.kind === "msgr") {
       const cp = $("copyDraft");
       if (cp) cp.onclick = () => navigator.clipboard.writeText(ta.value).then(() => toast("コピーしました"), () => { ta.select(); toast("選択しました。⌘C でコピーしてください"); });
@@ -606,6 +631,80 @@
     el.classList.remove("mock", "ng"); if (cls) el.classList.add(cls);
     el.querySelector("span").textContent = text;
   }
+  // ---------- Slack の取り込み（アプリ版のみ・BALL の中でログインした Slack から） ----------
+  // 自分宛てメンションと、相手の発言で止まっている DM → 自分ボール。
+  // 自分が返信した・✅ など完了のスタンプを押した → 閉じる。👍 など了解のスタンプ → 「了解済み」で残す
+  let slackData = null;
+  const slackAgo = (ms) => { const h = (Date.now() - ms) / 3600e3; return h < 1 ? Math.max(1, Math.round(h * 60)) + "分前" : h < 24 ? Math.round(h) + "時間前" : Math.round(h / 24) + "日前"; };
+  function applySlack(data) {
+    slackData = data;
+    if (data.status === "login") return setFt("ft-slack", "Slack: 読み取り画面でログインが必要（押す）", "ng");
+    if (data.status !== "ok") return setFt("ft-slack", "Slack: 読み込みエラー（押して確認）", "ng");
+    items.filter((x) => x.src === "slack" && !x.live).forEach((x) => (x.hidden = true));
+    const ids = new Set();
+    data.items.forEach((m) => {
+      const id = "s-" + m.channel + "-" + m.ts; ids.add(id);
+      const where = m.kind === "dm" ? (m.channelName ? m.channelName : `${m.userName}さんとの DM`) : `#${m.channelName}`;
+      const chips = [];
+      if (m.state === "ack") chips.push([`${m.unsureEmoji ? "スタンプ" : "了解"}済み :${m.emoji}:`, "them"]);
+      else chips.push([m.kind === "dm" ? "DM・未返信" : "未返信", "me"]);
+      chips.push([slackAgo(m.at), "them"]);
+      const fields = {
+        sec: "me", proj: "none", src: "slack", live: true, hidden: false, done: false,
+        title: `${m.userName}：${m.text.replace(/\s+/g, " ").slice(0, 34)}`, sub: where, ago: "", chips,
+      };
+      let it = items.find((x) => x.id === id);
+      if (!it) {
+        it = Object.assign({ id, memo: "", activeTab: 0,
+          feed: [["prog", "Slack から自動で取り込み"], ["ai", `${where} で ${m.userName}さんから${m.kind === "dm" ? "の DM" : "メンション"}です。${m.state === "ack" ? `\n:${m.emoji}: を押してあるので返信は済み扱いです。作業が残っていれば、ここで片付けます。` : ""}\n\n「${m.text.slice(0, 120)}」\n\n右にスレッドを出しています。返信の下書きはここで相談できるようになります（Claude をつないだあと）。今は右の下書き欄に書いて「送信…」で送れます。`]],
+          thread: { kind: "slack", live: true, channel: m.channel, threadTs: m.threadTs, ts: m.ts, where, permalink: m.permalink, draft: "" },
+          tabs: m.permalink ? [{ title: "Slack", url: m.permalink, sim: "slack", key: id + "-0" }] : [{ title: "Slack", url: "https://app.slack.com/client", sim: "slack", key: id + "-0" }] }, fields);
+        items.unshift(it);
+      } else { Object.assign(it, fields); }
+    });
+    // 一覧から消えた（返信した・完了のスタンプを押した）ものは閉じる
+    items.filter((x) => x.live && x.src === "slack" && !x.done && !ids.has(x.id)).forEach((x) => { x.done = true; D.closed.unshift(`Slack: ${x.title.slice(0, 30)} · 返信済み`); });
+    const n = data.items.length, dm = data.items.filter((x) => x.kind === "dm").length;
+    setFt("ft-slack", `Slack ${agoText(data.at)} · メンション${n - dm}・DM${dm}`, "");
+    left();
+  }
+  function renderSlackThread(i) {
+    const t = i.thread;
+    if (!t.data && !t.error) {
+      $("thr").innerHTML = `<div class="thr"><div class="empty">${esc(t.where)} のやり取りを読み込み中…</div></div>`;
+      if (!t.loading) {
+        t.loading = true;
+        window.ball.slackThread({ channel: t.channel, threadTs: t.threadTs }).then((r) => {
+          t.loading = false;
+          if (r.ok) t.data = r; else t.error = r.error;
+          if (curItem() === i && S.rmode === "thread") renderSlackThread(i);
+        });
+      }
+      return;
+    }
+    const msgs = t.data ? t.data.messages : [];
+    $("thr").innerHTML = `<div class="thr">
+      <div class="thd"><h4>${esc(t.where)}${t.threadTs ? " のスレッド" : ""}</h4><span><button type="button" class="btn" id="slackReload">読み直す</button>${t.permalink ? ` <button type="button" class="btn" id="slackOpen">Slack で開く ↗</button>` : ""}</span></div>
+      ${t.error ? `<div class="empty">読めませんでした：${esc(t.error)}</div>` : msgs.map((m, k) => `<div class="sm${m.ts === t.ts ? " hl" : ""}"><span class="av" style="background:${m.mine ? "#1E7B4E" : "#4A154B"}">${esc((m.name || "?")[0])}</span><div style="min-width:0"><div class="n">${esc(m.name)}<time>${esc(new Date(parseFloat(m.ts) * 1000).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</time></div><div class="x">${esc(m.text)}</div>${
+        m.files.length ? `<div class="atts">${m.files.map((f, j) => `<button type="button" class="att" data-msg="${k}" data-file="${j}">📎 ${esc(f.name)}</button>`).join("")}</div>` : ""}${
+        m.reactions.length ? `<div>${m.reactions.map((r) => `<span class="react${r.mine ? " mine" : ""}">:${esc(r.name)}: ${r.count}</span>`).join(" ")}</div>` : ""}</div></div>`).join("")}
+      ${draftBox(i, "slacklive")}
+    </div>`;
+    $("slackReload").onclick = () => { t.data = null; t.error = null; renderSlackThread(i); };
+    if ($("slackOpen")) $("slackOpen").onclick = () => openTab(t.permalink, "Slack");
+    $("thr").querySelectorAll(".att[data-file]").forEach((b) => (b.onclick = () => { const f = msgs[+b.dataset.msg].files[+b.dataset.file]; if (f.url) openTab(f.url, f.name); }));
+    bindDraft(i);
+  }
+  $("ft-slack").onclick = () => {
+    if (!IS_APP) return toast("Slack の取り込みはデスクトップアプリ版で動きます");
+    if (!slackData || slackData.status !== "ok") { toast(slackData && slackData.error ? "Slack：" + slackData.error.slice(0, 120) : "読み取り画面を開きます。Slack にログインしてから閉じてください"); window.ball.slackShow(); return; }
+    toast("Slack を読み込み直しています…"); window.ball.slackScan();
+  };
+  if (IS_APP && window.ball.onSlack) {
+    window.ball.onSlack(applySlack);
+    window.ball.slackLast().then((d) => { if (d) applySlack(d); else setFt("ft-slack", "Slack 読み取り準備中", "mock"); });
+  }
+
   // ---------- カレンダーの取り込み（アプリ版のみ・Mac の gog 経由・読み取りのみ） ----------
   // [作業] の予定 → 自分ボール。それ以外 → 「今日の予定」「明日の予定」。予定は押すと右に詳細が出る
   let calLoaded = false, calAt = 0, calErr = null;
