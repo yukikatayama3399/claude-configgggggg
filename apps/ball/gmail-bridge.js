@@ -181,4 +181,17 @@ async function calendar(days = 2) {
     .sort((a, b) => (a.start < b.start ? -1 : 1));
 }
 
-module.exports = { status, inbox, thread, openAttachment, saveDraft, sendDraft, calendar, ACCOUNT };
+// ---------- Drive のファイル名（資料バーで、リンクの代わりに本当の名前を出す用・読み取りのみ） ----------
+async function driveMeta(ids) {
+  const uniq = [...new Set(ids || [])].slice(0, 30);
+  const out = {};
+  for (let k = 0; k < uniq.length; k += 4) {
+    await Promise.all(uniq.slice(k, k + 4).map(async (id) => {
+      try { const d = await runJson(["drive", "get", id], { timeout: 20000 }); const f = d.file || d; out[id] = { name: f.name || "", mimeType: f.mimeType || "", modifiedTime: f.modifiedTime || "" }; }
+      catch (e) { out[id] = { name: "", mimeType: "", error: true }; }
+    }));
+  }
+  return out;
+}
+
+module.exports = { status, inbox, thread, openAttachment, saveDraft, sendDraft, calendar, driveMeta, ACCOUNT };

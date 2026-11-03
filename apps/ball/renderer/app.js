@@ -239,6 +239,84 @@
   function myActions(raw) {
     return cleanBody(raw).split("\n").map((l) => l.match(/^\s*\[([^\]]+)\]\s*(.+)$/)).filter((m) => m && ME_RE.test(m[1])).map((m) => m[2].replace(/<https?:[^>]+>/g, "").trim());
   }
+  // ---------- 資料バー: スレッドに出てくる添付ファイルと Google のファイルを、古い順に横に並べる ----------
+  const driveCache = {};
+  const URL_RE = /<(https?:\/\/[^>\s]+)>|(https?:\/\/[^\s<>"」）)]+)/g;
+  const gFileId = (u) => { const m = String(u).match(/\/(?:d|folders)\/([a-zA-Z0-9_-]{20,})/) || String(u).match(/[?&]id=([a-zA-Z0-9_-]{20,})/); return m ? m[1] : ""; };
+  const isDocLink = (u) => /docs\.google\.com\/(document|spreadsheets|presentation|forms)|drive\.google\.com\/(file|open|drive\/folders)|\.(pdf|pptx?|key|docx?|xlsx?|csv|zip)(\?|$)/i.test(u);
+  function docIcon(name, mime, url) {
+    const x = (String(name) + " " + String(mime) + " " + String(url)).toLowerCase();
+    if (/presentation|\.pptx?\b|\.key\b|slides/.test(x)) return "📽";
+    if (/spreadsheet|\.xlsx?\b|\.csv\b|sheet/.test(x)) return "📊";
+    if (/\.pdf\b|application\/pdf/.test(x)) return "📕";
+    if (/document|\.docx?\b|wordprocessing/.test(x)) return "📄";
+    if (/image\/|\.(png|jpe?g|gif|heic)\b/.test(x)) return "🖼";
+    if (/folder/.test(x)) return "📁";
+    if (/forms/.test(x)) return "📝";
+    return "📎";
+  }
+  const shortDate = (d) => { const t = typeof d === "number" ? new Date(d) : new Date(d); return isNaN(t) ? "" : `${t.getMonth() + 1}/${t.getDate()}`; };
+  // スレッドの種類ごとに、出てきた順（古い→新しい）で集める
+  function collectDocs(i) {
+    const t = i.thread, docs = [], seen = new Set();
+    const add = (d) => { const key = d.url || d.name + "|" + d.size; if (seen.has(key)) return; seen.add(key); docs.push(d); };
+    const linksIn = (text, date) => { for (const m of cleanBody(text).matchAll(URL_RE)) { const u = (m[1] || m[2]).replace(/[.,、。]+$/, ""); if (isDocLink(u)) add({ kind: "link", url: u, gid: gFileId(u), date }); } };
+    if (t.kind === "gmail") {
+      const msgs = t.live ? (t.data ? t.data.messages : []) : (t.messages || []);
+      msgs.forEach((m) => {
+        (m.attachments || []).forEach((a, k) => { if (!/\.ics$/i.test(a.filename)) add({ kind: "att", name: a.filename, size: a.size, mime: a.mimeType, date: m.date, att: a }); });
+        linksIn(m.body, m.date);
+      });
+    } else if (t.kind === "slack" && t.live && t.data) {
+      t.data.messages.forEach((m) => {
+        const date = parseFloat(m.ts) * 1000;
+        (m.files || []).forEach((f) => add({ kind: "link", url: f.url, name: f.name, mime: f.mimetype, date }));
+        linksIn(m.text, date);
+      });
+    } else if (t.kind === "msgr") {
+      const msgs = t.live ? (t.data ? t.data.messages : []) : (t.messages || []);
+      msgs.forEach((m) => { if (m.file) add({ kind: "link", url: m.file, name: m.text.replace(/^📎\s*/, "") }); linksIn(m.text || ""); });
+    }
+    return docs;
+  }
+  function docsBarHtml(docs) {
+    if (!docs.length) return "";
+    return `<div class="docbar" role="list" aria-label="このスレッドの資料（古い順）"><span class="dbl">資料 ${docs.length}</span>${docs.map((d, k) => {
+      const meta = d.gid && driveCache[d.gid];
+      const name = d.name || (meta && meta.name) || linkLabel(d.url).replace(/^\S+\s/, "");
+      const icon = docIcon(name, d.mime || (meta && meta.mimeType) || "", d.url || "");
+      return `<button type="button" class="doc" role="listitem" data-doc="${k}" title="${esc(name)}${d.url ? "\n" + esc(d.url) : ""}"><span class="di">${icon}</span><span class="dn">${esc(name)}</span>${d.date ? `<span class="dd">${esc(shortDate(d.date))}</span>` : ""}</button>`;
+    }).join("")}</div>`;
+  }
+  // 資料バーを出して、押したら開く。Google のファイル名が分かっていなければ gog で調べて差し替える
+  function mountDocsBar(i, anchorSel) {
+    const docs = collectDocs(i);
+    const host = $("thr").querySelector(anchorSel);
+    if (!host || !docs.length) return;
+    host.insertAdjacentHTML("afterend", docsBarHtml(docs));
+    bindDocsBar(i, docs);
+    const need = [...new Set(docs.filter((d) => d.gid && !driveCache[d.gid]).map((d) => d.gid))];
+    if (!need.length || !IS_APP || !window.ball.driveMeta) return;
+    window.ball.driveMeta(need).then((r) => {
+      if (!r.ok) return;
+      Object.assign(driveCache, r.data);
+      const bar = $("thr").querySelector(".docbar");
+      if (!bar || curItem() !== i) return;
+      bar.outerHTML = docsBarHtml(docs);
+      bindDocsBar(i, docs);
+    });
+  }
+  function bindDocsBar(i, docs) {
+    const bar = $("thr").querySelector(".docbar"); if (!bar) return;
+    bar.querySelectorAll("[data-doc]").forEach((b) => (b.onclick = () => {
+      const d = docs[+b.dataset.doc];
+      if (d.kind === "att") {
+        if (!IS_APP || !i.thread.live) return toast("見本の添付ファイルです");
+        toast("添付ファイルを開いています…");
+        window.ball.gmailAttachment(d.att).then((r) => toast(r.ok ? "開きました" : "開けませんでした：" + r.error));
+      } else openTab(d.url, (d.gid && driveCache[d.gid] && driveCache[d.gid].name) || d.name || linkLabel(d.url));
+    }));
+  }
   function bindLinks(root) { root.querySelectorAll(".lnk[data-url]").forEach((b) => (b.onclick = () => openTab(b.dataset.url, b.textContent.replace(/^\S+\s/, "")))); }
 
   function msgCard(m, open, full) {
@@ -293,6 +371,7 @@
       ${draftBox(i, "gmail")}
     </div>`;
     bindLinks($("thr"));
+    mountDocsBar(i, ".thd");
     if (i.notes && t.live) left();
     $("openInGmail").onclick = () => { const url = gmailUrl(t.threadId || ""); if (!t.threadId) return toast("見本のスレッドです"); const tab = i.tabs.find((x) => x.url === url); if (tab) { i.activeTab = i.tabs.indexOf(tab); S.rmode = "browser"; right(); } else openTab(url, "Gmail - このスレッド"); };
     $("thr").querySelectorAll(".att").forEach((b) => (b.onclick = () => {
@@ -335,6 +414,7 @@
       ${draftBox(i, "msgr")}
     </div>`;
     $("msgrReload").onclick = () => { if (!t.live) return toast("見本の会話です"); t.data = null; t.error = null; renderMsgrThread(i); };
+    mountDocsBar(i, ".thd");
     $("msgrMute").onclick = () => { muteName(t.name); i.hidden = true; toast(`${t.name} は今後 BALL に出しません`); const next = items.find((x) => !x.hidden && !x.done && x.sec === "me"); if (next) select(next.id); else left(); };
     if ($("msgrMore")) $("msgrMore").onclick = () => { t.steps = (t.steps || 4) + 10; t.data = null; t.error = null; renderMsgrThread(i); };
     $("openInMsgr").onclick = () => openConversationTab(i);
@@ -759,6 +839,7 @@
       ${draftBox(i, "slacklive")}
     </div>`;
     $("slackReload").onclick = () => { t.data = null; t.error = null; renderSlackThread(i); };
+    mountDocsBar(i, ".thd");
     if ($("slackOpen")) $("slackOpen").onclick = () => openTab(t.permalink, "Slack");
     $("thr").querySelectorAll(".att[data-file]").forEach((b) => (b.onclick = () => { const f = msgs[+b.dataset.msg].files[+b.dataset.file]; if (f.url) openTab(f.url, f.name); }));
     bindDraft(i);
