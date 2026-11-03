@@ -445,12 +445,16 @@
     const docs = notesDocs(msgs);
     return `<div class="notesbar"><span class="nbl">議事録の元</span>${docs.length ? docs.map((d) => linkBtn({ url: d.url, label: d.label }).replace('class="lnk"', 'class="lnk big"')).join("") : `<span class="hint">メモ本体へのリンクが見つかりませんでした（本文から作ります）</span>`}<span class="sp"></span><button type="button" class="btn send" id="notesToClaude" title="会議メモ（リンク先のドキュメントも）を Claude に読ませて、議事録をメモ欄に作ります">Claude で議事録にする</button></div>`;
   }
+  const mailDate = (d) => { const x = new Date(d); if (isNaN(x)) return String(d || ""); const now = new Date(); const hm = x.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }); return x.toDateString() === now.toDateString() ? hm : `${x.getFullYear() !== now.getFullYear() ? x.getFullYear() + "/" : ""}${x.getMonth() + 1}/${x.getDate()}（${"日月火水木金土"[x.getDay()]}）${hm}`; };
+  // Gmail と同じ: 古い順に上から。最新のメールは開いた状態、過去のメールは差出人と冒頭だけ（押すと開く）
   function msgCard(m, open, full) {
     // 会議メモ（転送されたものも）は本文がまるごと大事なので、引用を省かない
     const q = full ? { text: String(m.body || "").trim(), trimmed: false } : trimQuote(m.body);
     const att = (m.attachments || []).map((a, k) => `<button type="button" class="att" data-msg="${esc(m.id)}" data-att="${k}" title="開く">📎 ${esc(a.filename)}<span>${esc(a.size)}</span></button>`).join("");
+    const snip = flat(q.text).replace(/\s+/g, " ").slice(0, 90);
     return `<div class="mcard${open ? " open" : ""}">
-      <div class="mhd"><b>${esc(nameOf(m.from))}</b><span>${esc(emailOf(m.from))}</span><time>${esc(m.date)}</time></div>
+      <div class="mhd" title="押すと開く / 畳む"><b>${esc(nameOf(m.from))}</b><span>${esc(emailOf(m.from))}</span>${(m.attachments || []).length ? `<span class="mclip">📎${m.attachments.length}</span>` : ""}<time title="${esc(m.date)}">${esc(mailDate(m.date))}</time></div>
+      <div class="msnip">${esc(snip)}</div>
       <div class="mto">宛先 ${esc(m.to)}${m.cc ? `　CC ${esc(m.cc)}` : ""}</div>
       ${att ? `<div class="atts">${att}</div>` : ""}
       <div class="mb rich">${richBody(q.text)}</div>
@@ -485,17 +489,15 @@
     if (t.error) { $("thr").innerHTML = `<div class="thr"><div class="empty">スレッドを読めませんでした：${esc(t.error)}</div></div>`; return; }
     const msgs = t.live ? t.data.messages : t.messages;
     const last = msgs[msgs.length - 1];
-    const older = msgs.slice(0, -1).reverse();
     const subject = (last && last.subject) || t.subject || i.title;
     const mine = i.notes ? [...new Set(msgs.flatMap((m) => myActions(m.body)))] : [];
     if (i.notes && t.live) { i.chips = [["議事録", "ai"]].concat(mine.length ? [[`自分の担当 ${mine.length}件`, "me"]] : []); if (mine.length) i.sec = "me"; }
     $("thr").innerHTML = `<div class="thr">
-      <div class="thd"><h4>${esc(subject)}</h4><button type="button" class="btn" id="openInGmail">Gmail で開く ↗</button></div>
+      <div class="thd"><h4>${esc(subject)}</h4><button type="button" class="btn" id="openInGmail" title="別ウィンドウで開く（⌘クリックで右のタブ）">Gmail で開く ↗</button></div>
       ${i.ccWarn ? `<div class="ccwarn"><b>⚠ 送り先に注意</b>${esc(i.ccWarn)}</div>` : ""}
       ${i.notes ? notesBar(msgs) : ""}
       ${i.notes ? `<div class="mine-box"><b>${mine.length ? `自分の担当（${mine.length}件）` : "自分の担当はありませんでした"}</b>${mine.length ? `<ul>${mine.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<span class="hint">議事録の清書は真ん中の Claude に頼めます</span></div>` : ""}
-      ${last ? msgCard(last, true, !!i.notes) : ""}
-      ${older.length ? `<details class="older"><summary>過去のやり取り（${older.length}件）</summary>${older.map((m) => msgCard(m, false, !!i.notes)).join("")}</details>` : ""}
+      <div class="mlist">${msgs.map((m, k) => msgCard(m, k === msgs.length - 1, !!i.notes)).join("")}</div>
       ${draftBox(i, "gmail")}
     </div>`;
     bindLinks($("thr"));
@@ -505,7 +507,10 @@
       $("comp").requestSubmit();
     };
     if (i.notes && t.live) left();
-    $("openInGmail").onclick = () => { const url = gmailUrl(t.threadId || ""); if (!t.threadId) return toast("見本のスレッドです"); const tab = i.tabs.find((x) => x.url === url); if (tab) { i.activeTab = i.tabs.indexOf(tab); S.rmode = "browser"; right(); } else openTab(url, "Gmail - このスレッド"); };
+    // Gmail で開く: BALL の画面はそのままで、別ウィンドウに Gmail を出す（⌘クリックなら右のタブ）
+    $("openInGmail").onclick = (e) => { if (!t.threadId) return toast("見本のスレッドです"); openLink(gmailUrl(t.threadId), "Gmail - " + subject, e); };
+    $("thr").querySelectorAll(".mcard .mhd").forEach((h) => (h.onclick = () => h.parentElement.classList.toggle("open")));
+    if (!t.scrolled) { t.scrolled = true; const lastCard = $("thr").querySelector(".mlist .mcard:last-child"); if (lastCard && msgs.length > 1) requestAnimationFrame(() => lastCard.scrollIntoView({ block: "start" })); }
     $("thr").querySelectorAll(".att").forEach((b) => (b.onclick = () => {
       const m = msgs.find((x) => x.id === b.dataset.msg), a = m && m.attachments[+b.dataset.att];
       if (!a) return;
@@ -537,7 +542,7 @@
     const msgs = t.live ? (t.data ? t.data.messages : []) : t.messages;
     const more = t.live && t.data && !t.data.reachedTop;
     $("thr").innerHTML = `<div class="thr">
-      <div class="thd"><h4>Messenger：${esc(t.name)}</h4><span><button type="button" class="btn" id="msgrMute" title="仕事と関係ない相手を BALL に出さないようにする">今後この相手を出さない</button> <button type="button" class="btn" id="msgrReload">読み直す</button> <button type="button" class="btn" id="openInMsgr">Messenger で開く ↗</button></span></div>
+      <div class="thd"><h4>Messenger：${esc(t.name)}</h4><span><button type="button" class="btn" id="msgrMute" title="仕事と関係ない相手を BALL に出さないようにする">今後この相手を出さない</button> <button type="button" class="btn" id="msgrReload">読み直す</button> <button type="button" class="btn" id="openInMsgr" title="別ウィンドウで開く（⌘クリックで右のタブ）">Messenger で開く ↗</button></span></div>
       ${t.live && t.data ? `<div class="hint">${t.data.reachedTop ? "最初のメッセージまで読みました" : "直近から遡って読んでいます"}（${msgs.length}件）${more ? ` <button type="button" class="btn" id="msgrMore">もっと過去を読む</button>` : ""}</div>` : ""}
       ${t.error ? `<div class="empty">${esc(t.error)}</div>` : `<div class="bubs">${msgs.map((m, k) => `<div class="bubrow${m.mine ? " mine" : ""}">${
         m.image ? `<button type="button" class="bbimg" data-img="${k}" title="大きく開く"><img ${/^data:/.test(m.image) ? `src="${esc(m.image)}"` : `data-msgr-src="${esc(m.image)}"`} alt="写真" loading="lazy" referrerpolicy="no-referrer"></button>`
@@ -550,7 +555,11 @@
     mountDocsBar(i, ".thd");
     $("msgrMute").onclick = () => { muteName(t.name); i.hidden = true; toast(`${t.name} は今後 BALL に出しません`); const next = items.find((x) => !x.hidden && !x.done && x.sec === "me"); if (next) select(next.id); else left(); };
     if ($("msgrMore")) $("msgrMore").onclick = () => { t.steps = (t.steps || 4) + 10; t.data = null; t.error = null; renderMsgrThread(i); };
-    $("openInMsgr").onclick = () => openConversationTab(i);
+    // Messenger で開く: 別ウィンドウで（⌘クリックなら右のタブ）
+    $("openInMsgr").onclick = (e) => { if (e.metaKey || e.ctrlKey) return openConversationTab(i); openLink(t.href || (i.tabs[0] && i.tabs[0].url), `${t.name} - Messenger`, e); };
+    // いちばん上までスクロールしたら、もっと過去を読む（Slack と同じ）
+    const sc = $("thr");
+    sc.onscroll = () => { if (sc.scrollTop < 40 && more && !t.loading && curItem() === i && $("msgrMore")) $("msgrMore").click(); };
     // 写真は開けなかったら「📷 写真」の文字に差し替える。押すと右のブラウザで開く
     const photoFail = (im) => { const btn = im.parentElement; btn.className = "bb bbfile"; btn.textContent = "📷 写真（押すと開く）"; };
     $("thr").querySelectorAll(".bbimg img").forEach((im) => (im.onerror = () => photoFail(im)));
@@ -1735,7 +1744,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     if (!e) { $("thr").innerHTML = `<div class="thr"><div class="empty">見本の予定です</div></div>`; return; }
     const when = e.allDay ? `${e.start.slice(5).replace("-", "/")} 終日` : `${e.start.slice(5, 10).replace("-", "/")} ${hhmm(e.start)}〜${hhmm(e.end)}`;
     $("thr").innerHTML = `<div class="thr">
-      <div class="thd"><h4>${esc(e.summary)}</h4><span>${e.meet ? `<button type="button" class="btn send" id="calMeet">Meet に入る</button> ` : ""}${e.htmlLink ? `<button type="button" class="btn" id="calOpen">カレンダーで開く ↗</button>` : ""}</span></div>
+      <div class="thd"><h4>${esc(e.summary)}</h4><span>${e.meet ? `<button type="button" class="btn send" id="calMeet">Meet に入る</button> ` : ""}${e.htmlLink ? `<button type="button" class="btn" id="calOpen" title="別ウィンドウで開く（⌘クリックで右のタブ）">カレンダーで開く ↗</button>` : ""}</span></div>
       <div class="calv"><dl class="kv">
         <dt>日時</dt><dd>${esc(when)}</dd>
         ${e.location ? `<dt>場所</dt><dd>${esc(e.location)}</dd>` : ""}
@@ -1748,7 +1757,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     bindLinks($("thr"));
     mountDocsBar(i, ".thd");
     if ($("calMeet")) $("calMeet").onclick = () => (IS_APP ? window.ball.openExternal(e.meet) : window.open(e.meet, "_blank"));
-    if ($("calOpen")) $("calOpen").onclick = () => openTab(e.htmlLink, "Google カレンダー");
+    if ($("calOpen")) $("calOpen").onclick = (ev) => openLink(e.htmlLink, "Google カレンダー - " + e.summary, ev);
   }
   $("ft-cal").onclick = () => { if (!IS_APP) return toast("カレンダーの取り込みはデスクトップアプリ版で動きます"); toast(calErr ? "読み込み直しています…（前回のエラー：" + calErr.slice(0, 80) + "）" : "カレンダーを読み込み直しています…"); loadCalendar(); };
 
