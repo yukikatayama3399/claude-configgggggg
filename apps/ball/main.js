@@ -42,8 +42,11 @@ function startMessenger() {
   const pref = process.env.BALL_MSGR_URL || loadMsgrPref();
   msgrUrls = pref ? [pref, ...MSGR_CANDIDATES.filter((u) => u !== pref)] : MSGR_CANDIDATES.slice();
   const MSGR_URL = msgrUrls[0];
+  // Facebook は「画面に見えていない」と会話一覧を描かないので、
+  // 透明・クリック素通しの状態で実際に表示しておく（片山さんの画面には映らない）
   msgrWin = new BrowserWindow({
     show: false, width: 1200, height: 900, title: "BALL - Messenger 読み取り",
+    opacity: 0, skipTaskbar: true, focusable: false, hasShadow: false,
     webPreferences: {
       partition: "persist:ball",
       preload: path.join(__dirname, "readers", "messenger.js"),
@@ -51,19 +54,28 @@ function startMessenger() {
     },
   });
   msgrWin.loadURL(MSGR_URL);
-  // 裏ウィンドウを閉じても読み取りは止めない（隠すだけ）
-  msgrWin.on("close", (e) => { if (!app.isQuitting) { e.preventDefault(); msgrWin.hide(); } });
+  msgrWin.once("ready-to-show", () => toBackground());
+  // 閉じても読み取りは止めない（透明に戻すだけ）
+  msgrWin.on("close", (e) => { if (!app.isQuitting) { e.preventDefault(); toBackground(); } });
   // 15分ごとに読み込み直して、一覧を新しくする
   setInterval(() => { if (msgrWin && !msgrWin.isDestroyed()) msgrWin.reload(); }, 15 * 60 * 1000);
 }
+function toBackground() {
+  if (!msgrWin || msgrWin.isDestroyed()) return;
+  msgrWin.setOpacity(0); msgrWin.setIgnoreMouseEvents(true); msgrWin.setFocusable(false);
+  if (!msgrWin.isVisible()) msgrWin.showInactive();
+}
+let msgrMiss = 0;
 ipcMain.on("msgr-result", (_e, data) => {
-  // 一覧が読めないときは、次の候補 URL に切り替えてみる（ログイン画面のときは切り替えない）
-  if (data.status === "nolist" && msgrIdx < msgrUrls.length - 1 && !process.env.BALL_MSGR_URL) {
-    msgrIdx += 1;
+  // 一覧が3回続けて読めないときだけ、次の候補 URL に切り替える（読み込み途中で見切らない）
+  if (data.status === "nolist") msgrMiss += 1; else msgrMiss = 0;
+  if (data.status === "nolist" && msgrMiss >= 3 && msgrIdx < msgrUrls.length - 1 && !process.env.BALL_MSGR_URL) {
+    msgrIdx += 1; msgrMiss = 0;
     data = { ...data, note: `別の URL を試しています（${msgrUrls[msgrIdx]}）` };
     if (msgrWin && !msgrWin.isDestroyed()) msgrWin.loadURL(msgrUrls[msgrIdx]);
+  } else if (data.status === "nolist") {
+    data = { ...data, note: `読み込み待ち（${msgrMiss}/3）` };
   }
-  if (data.status === "ok") msgrIdx = Math.max(0, msgrUrls.indexOf(data.url) >= 0 ? msgrUrls.indexOf(data.url) : msgrIdx);
   lastMsgr = data;
   if (win && !win.isDestroyed()) win.webContents.send("msgr-update", data);
 });
@@ -85,7 +97,11 @@ ipcMain.on("msgr-use-url", (_e, url) => {
   if (msgrWin && !msgrWin.isDestroyed()) msgrWin.loadURL(url);
 });
 ipcMain.handle("msgr-last", () => lastMsgr);
-ipcMain.on("msgr-show", () => { if (msgrWin) { msgrWin.show(); msgrWin.focus(); } });
+// 確認用に読み取り画面を見えるようにする（閉じるとまた透明に戻る）
+ipcMain.on("msgr-show", () => {
+  if (!msgrWin || msgrWin.isDestroyed()) return;
+  msgrWin.setIgnoreMouseEvents(false); msgrWin.setFocusable(true); msgrWin.setOpacity(1); msgrWin.show(); msgrWin.focus();
+});
 ipcMain.on("msgr-refresh", () => { if (msgrWin) msgrWin.reload(); });
 app.on("before-quit", () => { app.isQuitting = true; });
 

@@ -58,6 +58,7 @@ function diagnose(anchors) {
   });
   return {
     path: shape(location.pathname), title: document.title.replace(/\(\d+\)/, "(#)").slice(0, 40),
+    visibility: document.visibilityState, secondsSinceLoad: Math.round(performance.now() / 1000),
     anchorsT: document.querySelectorAll('a[href*="/t/"]').length,
     anchorsMessages: document.querySelectorAll('a[href*="/messages/"]').length,
     grids: document.querySelectorAll('[role="grid"], [role="list"], [role="navigation"]').length,
@@ -129,7 +130,10 @@ ipcRenderer.on("read-thread", async (_e, { href, reqId }) => {
 });
 
 window.addEventListener("DOMContentLoaded", () => {
-  setTimeout(scrape, 8000);
+  // 読み込みが遅いことがあるので、最初は何度か読む
+  setTimeout(scrape, 5000);
+  setTimeout(scrape, 15000);
+  setTimeout(scrape, 30000);
   setInterval(scrape, 60 * 1000);
 });
 ipcRenderer.on("scrape-now", scrape);
