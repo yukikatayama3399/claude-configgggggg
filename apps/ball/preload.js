@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld("ball", {
   slackShow: () => ipcRenderer.send("slack-show"),
   slackScan: () => ipcRenderer.send("slack-scan"),
   slackThread: (a) => ipcRenderer.invoke("slack-thread", a),
+  slackPeople: (a) => ipcRenderer.invoke("slack-people", a),
   slackSend: (a) => ipcRenderer.invoke("slack-send", a),
   // 真ん中の Claude（Mac の Claude Code）。送信の道具は持たせていない
   claudeStatus: () => ipcRenderer.invoke("claude-status"),

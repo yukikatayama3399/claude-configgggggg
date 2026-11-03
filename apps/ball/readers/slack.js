@@ -71,6 +71,38 @@ async function listDMs(cfg) {
   throw new Error(errs.join(" / "));
 }
 
+// 検索で DM を拾う: 自分宛ての DM（to:me）と自分の発言（from:me）を直近 30 日で探し、
+// 相手の最後の発言のあとに自分が何も書いていない DM を返す
+async function dmsBySearch(cfg, already) {
+  const since = new Date(Date.now() - 30 * 86400e3 + 9 * 3600e3).toISOString().slice(0, 10);
+  const find = async (query) => {
+    const r = await api(cfg, "search.messages", { query: `${query} after:${since}`, count: 100, sort: "timestamp", sort_dir: "desc" });
+    return (r.messages && r.messages.matches) || [];
+  };
+  const toMe = await find("to:me");
+  const fromMe = await find("from:me").catch(() => []);
+  const myLast = new Map();
+  for (const m of fromMe) { const ch = (m.channel || {}).id; if (ch && !(parseFloat(myLast.get(ch) || 0) >= parseFloat(m.ts))) myLast.set(ch, m.ts); }
+  const theirLast = new Map();
+  for (const m of toMe) {
+    const ch = m.channel || {};
+    if (!ch.id || !(ch.is_im || ch.is_mpim) || m.user === cfg.userId) continue;
+    if (!theirLast.has(ch.id) || parseFloat(m.ts) > parseFloat(theirLast.get(ch.id).ts)) theirLast.set(ch.id, m);
+  }
+  const out = [];
+  for (const [chId, m] of [...theirLast.entries()].slice(0, 25)) {
+    if (parseFloat(myLast.get(chId) || 0) > parseFloat(m.ts)) continue;  // 自分がそのあと返している
+    if (already.some((x) => x.channel === chId && x.ts === m.ts)) continue;
+    const st = stateOf(cfg, m, false);
+    if (st.state === "done") continue;
+    const ch = m.channel;
+    out.push({ kind: "dm", channel: chId, channelName: ch.is_mpim ? (ch.name || "グループDM") : "", ts: m.ts, threadTs: m.thread_ts || "",
+      user: m.user, userName: m.username || (await userName(cfg, m.user)), text: await plain(cfg, m.text), permalink: m.permalink || "",
+      state: st.state, emoji: st.emoji, unsureEmoji: !!st.unsure, at: Math.round(parseFloat(m.ts) * 1000) });
+  }
+  return out;
+}
+
 const users = new Map();
 async function userName(cfg, id) {
   if (!id) return "";
@@ -150,7 +182,13 @@ async function scan() {
     // DM の一覧は Enterprise Grid だと速度制限で弾かれやすい（弾かれた応答はブラウザからは「通信できない」に見える）。
     // 時間を置いて取り直し、だめなら別の API で取る。それでも取れなければメンションだけ出して、注意書きを付ける
     let warn = "";
-    const ims = await listDMs(cfg).catch((e) => { warn = "DM の一覧を読めませんでした（" + String(e.message || e).slice(0, 120) + "）。メンションだけ出しています"; return []; });
+    let listErr = "";
+    const ims = await listDMs(cfg).catch((e) => { listErr = String(e.message || e).slice(0, 160); return []; });
+    // DM の一覧が取れない Slack（Enterprise Grid でブラウザから呼べない場合など）は、検索で拾う
+    if (listErr) {
+      try { out.push(...(await dmsBySearch(cfg, out))); }
+      catch (e) { warn = `DM を読めませんでした（一覧: ${listErr} / 検索: ${String(e.message || e).slice(0, 120)}）。メンションだけ出しています`; }
+    }
     ims.sort((a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0));
     for (const im of ims.slice(0, 25)) {
       try {
@@ -184,14 +222,45 @@ ipcRenderer.on("slack-thread", async (_e, { channel, threadTs, reqId }) => {
       : await api(cfg, "conversations.history", { channel, limit: 30 });
     let list = r.messages || [];
     if (!threadTs) list = list.slice().reverse();
-    const messages = [];
+    const messages = [], ids = new Set();
     for (const m of list) {
+      if (m.user && m.user !== cfg.userId) ids.add(m.user);
+      for (const x of String(m.text || "").matchAll(/<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g)) if (x[1] !== cfg.userId) ids.add(x[1]);
       messages.push({ user: m.user, name: m.user === cfg.userId ? "自分" : (m.username || (await userName(cfg, m.user)) || "bot"), mine: m.user === cfg.userId,
         ts: m.ts, text: await plain(cfg, m.text), reactions: (m.reactions || []).map((x) => ({ name: x.name, count: x.count, mine: (x.users || []).includes(cfg.userId) })),
         files: (m.files || []).map((f) => ({ name: f.name || f.title || "ファイル", url: f.permalink || f.url_private || "", mimetype: f.mimetype || "" })) });
     }
-    ipcRenderer.send("slack-thread-result", { reqId, ok: true, messages, teamUrl: cfg.url });
+    const people = [];
+    for (const id of ids) people.push({ id, name: await userName(cfg, id) });
+    ipcRenderer.send("slack-thread-result", { reqId, ok: true, messages, people, teamUrl: cfg.url });
   } catch (err) { ipcRenderer.send("slack-thread-result", { reqId, ok: false, error: String(err.message || err) }); }
+});
+
+// メンションの候補: チャンネルのメンバー（最大 300 人。名前は覚えておいて2回目からは速い）
+const peopleCache = new Map();
+ipcRenderer.on("slack-people", async (_e, { channel, reqId }) => {
+  const cfg = config();
+  if (!cfg) return ipcRenderer.send("slack-people-result", { reqId, ok: false, error: "Slack にログインしていません" });
+  try {
+    if (!peopleCache.has(channel)) {
+      const ids = [];
+      let cursor = "";
+      for (let page = 0; page < 3; page++) {
+        const r = await api(cfg, "conversations.members", { channel, limit: 100, cursor });
+        ids.push(...(r.members || []));
+        cursor = r.response_metadata && r.response_metadata.next_cursor;
+        if (!cursor) break;
+      }
+      const people = [];
+      const todo = ids.filter((id) => id !== cfg.userId);
+      for (let k = 0; k < todo.length; k += 5) {
+        const part = await Promise.all(todo.slice(k, k + 5).map(async (id) => ({ id, name: await userName(cfg, id) })));
+        people.push(...part.filter((x) => x.name && x.name !== x.id));
+      }
+      peopleCache.set(channel, people);
+    }
+    ipcRenderer.send("slack-people-result", { reqId, ok: true, people: peopleCache.get(channel) });
+  } catch (err) { ipcRenderer.send("slack-people-result", { reqId, ok: false, error: String(err.message || err) }); }
 });
 
 // 送信（返信）。BALL 本体が「この内容で送信」を押されたときにだけ送ってくる

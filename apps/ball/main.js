@@ -150,6 +150,7 @@ function askSlack(channel, payload, resultChannel, timeoutMs) {
   });
 }
 ipcMain.handle("slack-thread", (_e, a) => askSlack("slack-thread", { channel: a.channel, threadTs: a.threadTs }, "slack-thread-result", 30000));
+ipcMain.handle("slack-people", (_e, a) => askSlack("slack-people", { channel: a.channel }, "slack-people-result", 60000));
 // 送信: BALL 本体の画面（片山さんが押す確認ボタン）からだけ受け付ける。AI や右のブラウザのページからは呼べない
 ipcMain.handle("slack-send", (e, a) => {
   if (!win || e.sender !== win.webContents) return { ok: false, error: "BALL 本体の画面からの送信だけ受け付けます" };

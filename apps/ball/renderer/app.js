@@ -584,11 +584,63 @@
     const subject = /^re[:：]/i.test(last.subject) ? last.subject : "Re: " + last.subject;
     return { draftId: t.draftId, replyToMessageId: lastOther.id, to: lastOther.from, cc, subject, body };
   }
+  // ---------- Slack のメンション ----------
+  // 下書きでは「@名前」で見せ、送る直前に Slack の本物のメンション（<@ID>）に直す。
+  // 候補はスレッドの発言者・メンションされている人 → チャンネルのメンバー（最初の @ で読み込む）
+  function slackPeople(t) {
+    const seen = new Set();
+    return [...((t.data && t.data.people) || []), ...(t.people || [])].filter((p) => p && p.id && p.name && !seen.has(p.id) && seen.add(p.id));
+  }
+  function toSlackMentions(t, text) {
+    let out = String(text || "");
+    for (const p of slackPeople(t).sort((a, b) => b.name.length - a.name.length)) out = out.split("@" + p.name).join(`<@${p.id}>`);
+    return out;
+  }
+  function bindMention(i, ta) {
+    const t = i.thread;
+    let box = null, sel = 0, matches = [], loading = false;
+    const close = () => { if (box) box.remove(); box = null; };
+    const query = () => { const m = ta.value.slice(0, ta.selectionStart).match(/(^|[\s　(（「、。])@([^\s@　]{0,30})$/); return m ? m[2] : null; };
+    const loadMembers = () => {
+      if (t.people || loading || !IS_APP || !window.ball.slackPeople) return;
+      loading = true;
+      window.ball.slackPeople({ channel: t.channel }).then((r) => { loading = false; t.people = r.ok ? r.people : []; if (document.activeElement === ta) update(); });
+    };
+    const update = () => {
+      const q = query();
+      if (q == null) return close();
+      loadMembers();
+      const ql = q.toLowerCase().replace(/\s/g, "");
+      matches = slackPeople(t).filter((p) => p.name.toLowerCase().replace(/\s/g, "").includes(ql)).slice(0, 8);
+      if (!matches.length && !loading) return close();
+      sel = Math.max(0, Math.min(sel, matches.length - 1));
+      if (!box) { box = document.createElement("div"); box.className = "mention"; box.setAttribute("role", "listbox"); ta.parentElement.appendChild(box); }
+      box.innerHTML = matches.map((p, k) => `<button type="button" role="option" data-k="${k}" aria-selected="${k === sel}">@${esc(p.name)}</button>`).join("") + (loading ? `<span class="hint">メンバーを読み込み中…</span>` : "");
+      box.querySelectorAll("button").forEach((b) => (b.onmousedown = (e) => { e.preventDefault(); pick(+b.dataset.k); }));
+    };
+    const pick = (k) => {
+      const p = matches[k]; if (!p) return;
+      const pos = ta.selectionStart, before = ta.value.slice(0, pos).replace(/@([^\s@　]{0,30})$/, "@" + p.name + " ");
+      ta.value = before + ta.value.slice(pos);
+      ta.selectionStart = ta.selectionEnd = before.length;
+      t.draft = ta.value; saveChat(i); close(); ta.focus();
+    };
+    ta.addEventListener("input", () => { sel = 0; update(); });
+    ta.addEventListener("keydown", (e) => {
+      if (!box || e.isComposing || !matches.length) { if (box && e.key === "Escape") close(); return; }
+      if (e.key === "ArrowDown") { e.preventDefault(); sel = (sel + 1) % matches.length; update(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); sel = (sel - 1 + matches.length) % matches.length; update(); }
+      else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(sel); }
+      else if (e.key === "Escape") close();
+    });
+    ta.addEventListener("blur", () => setTimeout(close, 150));
+  }
   function bindDraft(i) {
     const t = i.thread, ta = $("draftText"), btn = $("saveDraft");
     if (!ta || !btn) return;
     ta.oninput = () => { t.draft = ta.value; t.aiDraft = false; saveChat(i); if (t.kind === "gmail") $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
     if (t.kind === "slack" && t.live) {
+      bindMention(i, ta);
       const cp = $("copyDraft");
       if (cp) cp.onclick = () => navigator.clipboard.writeText(ta.value).then(() => toast("コピーしました"), () => { ta.select(); toast("選択しました。⌘C でコピーしてください"); });
       // 送信は2段階: 「送信…」→ 送り先と本文を確認 →「この内容で送信」を本人が押したときだけ。送り先はチャンネルとスレッドで決まるので取り違えない
@@ -597,13 +649,14 @@
         if (!ta.value.trim()) return toast("下書きが空です");
         const where = t.threadTs ? `${t.where} のスレッド` : t.where;
         const box = $("sendConfirm");
-        box.innerHTML = `<b>${esc(where)}に、この内容で送信しますか？</b><div class="mb" style="max-height:120px;overflow:auto">${esc(ta.value)}</div>
+        const ments = slackPeople(t).filter((p) => ta.value.includes("@" + p.name)).map((p) => p.name);
+        box.innerHTML = `<b>${esc(where)}に、この内容で送信しますか？</b>${ments.length ? `<div class="hint">メンション（通知が届きます）: ${esc(ments.join("、"))}</div>` : ""}<div class="mb" style="max-height:120px;overflow:auto">${esc(ta.value)}</div>
           <div class="crow"><span class="sp"></span><button type="button" class="btn" id="sendCancel">やめる</button><button type="button" class="btn send" id="sendGo">この内容で送信</button></div>`;
         box.hidden = false;
         $("sendCancel").onclick = () => { box.hidden = true; };
         $("sendGo").onclick = async () => {
           $("sendGo").disabled = true; $("sendGo").textContent = "送信中…";
-          const r = await window.ball.slackSend({ channel: t.channel, threadTs: t.threadTs, text: ta.value });
+          const r = await window.ball.slackSend({ channel: t.channel, threadTs: t.threadTs, text: toSlackMentions(t, ta.value) });
           if (r.ok) { box.hidden = true; t.draft = ""; ta.value = ""; toast("送信しました"); i.done = true; D.closed.unshift(`Slack: ${i.title.slice(0, 30)} · 返信済み`); left(); }
           else { $("sendGo").disabled = false; $("sendGo").textContent = "この内容で送信"; toast("送信できませんでした：" + r.error); }
         };
@@ -770,7 +823,8 @@
     if (t.kind === "slack") {
       if (t.live) {
         if (!t.data) return t.error ? `（読めませんでした: ${t.error}）` : "（未読み込み）";
-        return `Slack ${t.where}${t.threadTs ? " のスレッド" : ""}（古い順）\n` + t.data.messages.map((m) => `--- ${new Date(parseFloat(m.ts) * 1000).toLocaleString("ja-JP")} ${m.name}${m.mine ? "（片山）" : ""}\n${m.text}${m.files.length ? "\n添付: " + m.files.map((f) => f.name).join(", ") : ""}${m.reactions.length ? "\nリアクション: " + m.reactions.map((r) => `:${r.name}:${r.mine ? "(自分)" : ""}`).join(" ") : ""}`).join("\n");
+        const ppl = slackPeople(t).map((p) => p.name);
+        return `Slack ${t.where}${t.threadTs ? " のスレッド" : ""}（古い順）\n` + (ppl.length ? `メンションできる人（下書きに「@名前」と書けば、送るときに本物のメンションになります）: ${ppl.map((n) => "@" + n).join(" ")}\n` : "") + t.data.messages.map((m) => `--- ${new Date(parseFloat(m.ts) * 1000).toLocaleString("ja-JP")} ${m.name}${m.mine ? "（片山）" : ""}\n${m.text}${m.files.length ? "\n添付: " + m.files.map((f) => f.name).join(", ") : ""}${m.reactions.length ? "\nリアクション: " + m.reactions.map((r) => `:${r.name}:${r.mine ? "(自分)" : ""}`).join(" ") : ""}`).join("\n");
       }
       return `Slack ${t.ch}（見本）\n` + t.msgs.map((m) => `--- ${m[2]} ${m[1]}\n${m[3]}`).join("\n");
     }
