@@ -400,3 +400,11 @@ img.semoji{width:20px;height:20px;object-fit:contain}
 .epick .eg button{all:unset;cursor:pointer;height:34px;display:flex;align-items:center;justify-content:center;border-radius:6px}
 .epick .eg button:hover{background:var(--soft)}
 .epick .eg img.semoji{width:24px;height:24px}.epick .eg .semoji.u{font-size:21px}
+/* 巡回の判断 */
+details.fyi summary{cursor:pointer;list-style:none}
+details.fyi summary::-webkit-details-marker{display:none}
+details.fyi summary::before{content:"▸ ";color:var(--muted)}
+details.fyi[open] summary::before{content:"▾ "}
+.ccwarn{border:1px solid #E5484D;background:rgba(229,72,77,.08);color:#C2252B;border-radius:10px;padding:10px 12px;margin:0 0 10px;font-size:12.5px;line-height:1.6;display:flex;flex-direction:column;gap:2px}
+.rmode{display:flex;gap:6px}
+.rmode .btn{font-size:12px;padding:3px 10px}

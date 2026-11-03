@@ -325,4 +325,8 @@ ipcMain.handle("claude-ask", (e, a) => {
     .catch((err) => emit({ type: "error", error: String(err.message || err) }));
   return { ok: true, reqId };
 });
+ipcMain.handle("claude-judge", (e, a) => {
+  if (!win || e.sender !== win.webContents) return { ok: false, error: "BALL 本体の画面からだけ受け付けます" };
+  return claude.judge({ items: (a && a.items) || [], balls: (a && a.balls) || [], model: a && a.model });
+});
 ipcMain.on("claude-stop", (e, reqId) => { if (win && e.sender === win.webContents) claude.stop(reqId); });

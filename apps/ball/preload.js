@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld("ball", {
   claudeStatus: () => ipcRenderer.invoke("claude-status"),
   claudeAsk: (a) => ipcRenderer.invoke("claude-ask", a),
   claudeStop: (reqId) => ipcRenderer.send("claude-stop", reqId),
+  claudeJudge: (a) => ipcRenderer.invoke("claude-judge", a),
   onClaude: (cb) => ipcRenderer.on("claude-event", (_e, ev) => cb(ev)),
   onClaudeTool: (cb) => ipcRenderer.on("claude-tool", (_e, req) => cb(req, (r) => ipcRenderer.send("claude-tool-done", { callId: req.callId, ...r }))),
 });

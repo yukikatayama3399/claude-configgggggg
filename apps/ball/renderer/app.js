@@ -97,6 +97,8 @@
     html += sec("AI 作業中", by("ai"));
     if (by("notes").length) html += sec("会議メモ（議事録）", by("notes"));
     html += sec("返事待ち（相手ボール）", by("them"));
+    const fyi = by("fyi");
+    if (fyi.length) html += `<details class="sec fyi"${S.fyiOpen ? " open" : ""}><summary class="sech"><span>返事不要（AI 判断）</span><span class="n">${fyi.length}</span></summary>${fyi.map(card).join("")}</details>`;
     const liveCal = items.filter((x) => x.live && x.src === "cal" && x.sec === "cal" && !x.hidden && (S.proj === "all" || x.proj === S.proj));
     if (calLoaded) {
       const byDay = {};
@@ -110,6 +112,7 @@
     const closed = D.closed.concat(items.filter((i) => i.done).map((i) => i.title + " · 完了"));
     html += `<div class="sec"><div class="sech"><span>自動で閉じた</span><span class="n">${closed.length}</span></div><div class="closed">${closed.map((c) => `<s>${esc(c)}</s>`).join("")}</div></div>`;
     $("sections").innerHTML = html;
+    const fd = $("sections").querySelector("details.fyi"); if (fd) fd.ontoggle = () => (S.fyiOpen = fd.open);
     $("sections").querySelectorAll("[data-id]").forEach((b) => (b.onclick = () => select(b.dataset.id)));
     $("sections").querySelectorAll("[data-none]").forEach((b) => (b.onclick = () => toast("この予定はまだ予習ブリーフを作っていません（見本）")));
   }
@@ -474,6 +477,7 @@
     if (i.notes && t.live) { i.chips = [["議事録", "ai"]].concat(mine.length ? [[`自分の担当 ${mine.length}件`, "me"]] : []); if (mine.length) i.sec = "me"; }
     $("thr").innerHTML = `<div class="thr">
       <div class="thd"><h4>${esc(subject)}</h4><button type="button" class="btn" id="openInGmail">Gmail で開く ↗</button></div>
+      ${i.ccWarn ? `<div class="ccwarn"><b>⚠ 送り先に注意</b>${esc(i.ccWarn)}</div>` : ""}
       ${i.notes ? notesBar(msgs) : ""}
       ${i.notes ? `<div class="mine-box"><b>${mine.length ? `自分の担当（${mine.length}件）` : "自分の担当はありませんでした"}</b>${mine.length ? `<ul>${mine.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<span class="hint">議事録の清書は真ん中の Claude に頼めます</span></div>` : ""}
       ${last ? msgCard(last, true, !!i.notes) : ""}
@@ -594,7 +598,7 @@
     let head = "";
     if (kind === "gmail" && t.live && t.data) {
       const f = replyFields(t, "");
-      head = `<div class="mhead"><label>To<input id="dTo" value="${esc(f.to)}" spellcheck="false"></label><label>Cc<input id="dCc" value="${esc(f.cc)}" placeholder="Cc（カンマ区切り）" spellcheck="false"></label><div class="msub">件名 ${esc(f.subject)}</div></div>`;
+      head = `<div class="mhead"><div class="rmode"><button type="button" class="btn" id="rOne" title="差出人だけに返す">↩ 返信</button><button type="button" class="btn" id="rAll" title="宛先・CC の全員に返す">↩↩ 全員に返信</button></div><label>To<input id="dTo" value="${esc(f.to)}" spellcheck="false"></label><label>Cc<input id="dCc" value="${esc(f.cc)}" placeholder="Cc（カンマ区切り）" spellcheck="false"></label><div class="msub">件名 ${esc(f.subject)}</div></div>`;
     }
     return `<div class="draft${kind === "gmail" ? " gcomp" : ""}" id="${kind === "gmail" ? "gcomp" : "dbox"}"><div class="dh"><span>下書き（送るまで送信されません）</span><span id="draftState">${saved}</span></div>${head}
       <textarea id="draftText" aria-label="下書き" placeholder="真ん中で「下書き書いて」と言うとここに入ります。直接書いても OK。">${esc(t.draft || "")}</textarea>
@@ -619,6 +623,8 @@
     if (!box || !att) return;
     const dirty = () => { if ($("draftState")) $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
     if ($("dTo")) $("dTo").oninput = (e) => { t.to = e.target.value; dirty(); };
+    if ($("rOne")) $("rOne").onclick = () => { const f0 = (t.to = null, t.cc = null, replyFields(t, "")); t.to = f0.to; t.cc = ""; $("dTo").value = t.to; $("dCc").value = ""; dirty(); toast("差出人だけに返します"); };
+    if ($("rAll")) $("rAll").onclick = () => { t.to = null; t.cc = null; const f0 = replyFields(t, ""); t.to = f0.to; t.cc = f0.cc; $("dTo").value = t.to; $("dCc").value = t.cc; dirty(); toast("全員に返します（CC を確かめてください）"); };
     if ($("dCc")) $("dCc").oninput = (e) => { t.cc = e.target.value; dirty(); };
     const draw = () => {
       att.innerHTML = t.files.map((f, k) => `<span class="schip">${f.preview ? `<img src="${f.preview}" alt="">` : `<span class="fi">${fileIcon({ filetype: f.name.split(".").pop(), mimetype: f.type })}</span>`}<span class="fn"><b>${esc(f.name)}</b><span>${esc(sizeText(f.size))}</span></span><button type="button" data-rm="${k}" aria-label="外す">×</button></span>`).join("");
@@ -1039,16 +1045,85 @@
     if (!IS_APP) return toast("真ん中の Claude はデスクトップアプリ版でつながります");
     if (claudeState && !claudeState.ok) return showInfo("Claude（Claude Code）が見つかりません", claudeState.error + "\n\nターミナルで次が動けば OK です:\n  claude --version\n\nclaude が別の場所にあるなら、BALL_CLAUDE=<claude のパス> npm start で起動してください。", "もう一度確かめる", checkClaude);
     const skills = lastInit ? lastInit.skills.filter((x) => !/^(session-start-hook|update-config|verify|debug|code-review|simplify|batch|fewer-permission-prompts|doctor|loop|claude-api|workflow-authoring|run|run-skill-generator|plugin-authoring|design|design-sync|slides|dataviz|artifact-|cowork-plugin)/.test(x)) : [];
-    showInfo("真ん中の Claude", `Claude Code ${claudeState ? claudeState.version : ""}（${claudeState ? claudeState.path : ""}）
+    const tri = triageOff() ? "止めています" : `動いています（判断 ${judgeStat.n}件${judgeStat.err ? `・直近のエラー: ${judgeStat.err}` : ""}）`;
+    showInfo("真ん中の Claude", `巡回の判断: ${tri}\n新しく来たメール・Slack・Messenger を Claude が見て、返信が要るか・どの案件か・どのボールの続きかを決めます\n\nClaude Code ${claudeState ? claudeState.version : ""}（${claudeState ? claudeState.path : ""}）
 作業フォルダ: ${(lastInit && lastInit.cwd) || (claudeState && claudeState.cwd) || ""}
 
 ・いつもの Claude Code と同じ CLAUDE.md・メモリー・スキル（アカウントのスキルも）・ルーティン・コネクタ・gog で動きます。ボールごとに会話が続きます
 ・許可の判断は Claude Code の auto モード（危ない操作は自動で止まる）と、普段の許可設定のとおりです
 ・止めてあるもの（送信の絶対ルール）: メールの送信・返信・転送、Slack の投稿・リアクション、カレンダーの招待・変更・出欠の返事、Drive の共有。送るのは右の「送信…」を自分で押したときだけです
-${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skills.length} 個: ${skills.join(", ")}\n・コネクタ: ${lastInit.mcp.join(", ") || "なし"}` : "\n（一度話しかけると、読み込まれたスキルとコネクタがここに出ます）"}`, "", null);
+${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skills.length} 個: ${skills.join(", ")}\n・コネクタ: ${lastInit.mcp.join(", ") || "なし"}` : "\n（一度話しかけると、読み込まれたスキルとコネクタがここに出ます）"}`,
+      triageOff() ? "巡回の判断を再開する" : "巡回の判断を止める", () => { try { localStorage.setItem("ball.triage.off", triageOff() ? "0" : "1"); } catch (e) {} toast(triageOff() ? "巡回の判断を止めました" : "巡回の判断を再開しました"); $("infoDlg").hidden = true; queueJudge(); });
   };
   if (IS_APP && window.ball.onClaude) { window.ball.onClaude(onClaudeEvent); window.ball.onClaudeTool(onClaudeTool); }
   checkClaude();
+
+  // ---------- 巡回の判断: 新しく来たものだけ Claude に見てもらう ----------
+  // 返信が要るか・どの案件か・どのボールの続きか・一言の要約と次にやること・CC の注意。
+  // 返事が要らないものは消さずに「返事不要（AI 判断）」にまとめる。判断はこの Mac に覚えておき、同じものは二度聞かない
+  const JUDGE_KEY = "ball.judged.v1";
+  let judgedStore = null, judging = false, judgeTimer = 0, judgeStat = { n: 0, at: 0, err: "" };
+  const judged = () => { if (!judgedStore) { try { judgedStore = JSON.parse(localStorage.getItem(JUDGE_KEY) || "{}") || {}; } catch (e) { judgedStore = {}; } } return judgedStore; };
+  const saveJudged = () => { const st = judged(), ks = Object.keys(st); if (ks.length > 1500) ks.slice(0, ks.length - 1500).forEach((k) => delete st[k]); try { localStorage.setItem(JUDGE_KEY, JSON.stringify(st)); } catch (e) { /* 覚えられなくても動く */ } };
+  const triageOff = () => { try { return localStorage.getItem("ball.triage.off") === "1"; } catch (e) { return false; } };
+  const judgeKey = (x) => x.id + "|" + (x.origTitle || x.title) + "|" + x.sub;
+  const KIND_CHIP = { reply: ["返信が要る", "me"], todo: ["作業あり", "me"], fyi: ["読むだけ", "them"], done: ["片付き済み", "them"] };
+  function applyJudged(x) {
+    if (x.title !== x.aiTitle) x.origTitle = x.title; // 読み込み直しで件名が元に戻っていたら、そちらが元の件名
+    const j = judged()[judgeKey(x)];
+    if (!j) return false;
+    x.judged = j;
+    x.aiTitle = j.title || x.origTitle;
+    x.title = x.aiTitle;
+    if ((x.proj === "none" || !x.proj) && j.project && D.projects[j.project]) x.proj = j.project;
+    const target = j.mergeInto && items.find((y) => y.id === j.mergeInto);
+    const chips = (x.chips || []).filter((c) => !c.ai);
+    const kc = KIND_CHIP[j.kind]; if (kc) { const c = kc.slice(); c.ai = true; chips.unshift(c); }
+    if (target) { const c = [`続き: ${target.title.slice(0, 14)}`, "them"]; c.ai = true; chips.push(c); }
+    x.chips = chips;
+    if (j.kind === "fyi" || j.kind === "done") x.sec = "fyi";
+    x.ccWarn = j.ccWarning || "";
+    if (!x.judgedFeed && !x.claudeSid) {
+      x.judgedFeed = true;
+      x.feed.push(["prog", "巡回で判断（AI）"], ["ai", `${j.summary}${j.next ? `\n次にやること: ${j.next}` : ""}${j.ccWarning ? `\n⚠ ${j.ccWarning}` : ""}${target ? `\n（「${target.title}」の続きです）` : ""}`]);
+    }
+    return true;
+  }
+  function judgeText(x) {
+    const ai = (x.feed || []).find((f) => f[0] === "ai");
+    return cut((ai ? ai[1] : "").replace(/右にスレッド[\s\S]*$/, "").replace(/返信はここで頼めます[\s\S]*$/, ""), 600);
+  }
+  function queueJudge() {
+    let changed = false;
+    items.forEach((x) => { if (x.live && applyJudged(x)) changed = true; });
+    if (changed) left();
+    if (!IS_APP || !window.ball.claudeJudge || triageOff() || (claudeState && !claudeState.ok)) return;
+    clearTimeout(judgeTimer);
+    judgeTimer = setTimeout(runJudge, 6000);
+  }
+  async function runJudge() {
+    if (judging) return;
+    items.forEach((x) => { if (x.title !== x.aiTitle) x.origTitle = x.title; });
+    const todo = items.filter((x) => x.live && ["gmail", "slack", "msgr"].includes(x.src) && !x.done && !x.hidden && !judged()[judgeKey(x)]).slice(0, 12);
+    if (!todo.length) return;
+    judging = true;
+    setFt("ft-claude", `Claude 巡回の判断中…（${todo.length}件）`, "");
+    const batch = todo.map((x) => ({ key: judgeKey(x), source: { gmail: "Gmail", slack: "Slack", msgr: "Messenger" }[x.src], title: x.origTitle || x.title, from: x.sub, text: judgeText(x), notes: !!x.notes }));
+    const balls = items.filter((x) => !x.done && !x.hidden && !todo.includes(x) && x.id !== "home").slice(0, 80).map((x) => ({ id: x.id, title: x.title, project: x.proj }));
+    const r = await window.ball.claudeJudge({ items: batch, balls, model: MODEL_KEYS[$("model").value] || "opus" });
+    judging = false;
+    if (!r.ok) { judgeStat.err = r.error; setFt("ft-claude", "Claude: 巡回の判断でエラー（押して詳細）", "ng"); return; }
+    const st = judged();
+    for (const j of r.items) if (j && j.key && batch.some((b) => b.key === j.key)) st[j.key] = { ...j, at: Date.now() };
+    // 答えが返ってこなかったものも、同じものを何度も聞かないように印を付ける
+    for (const b of batch) if (!st[b.key]) st[b.key] = { key: b.key, kind: "reply", project: "none", title: "", summary: "", next: "", mergeInto: "", ccWarning: "", at: Date.now(), missing: true };
+    saveJudged();
+    judgeStat = { n: judgeStat.n + batch.length, at: Date.now(), err: "" };
+    todo.forEach((x) => applyJudged(x));
+    left(); if (todo.includes(curItem())) { center(); right(); }
+    setFt("ft-claude", `Claude つながっています · 判断 ${judgeStat.n}件`, "");
+    if (items.some((x) => x.live && ["gmail", "slack", "msgr"].includes(x.src) && !x.done && !x.hidden && !judged()[judgeKey(x)])) judgeTimer = setTimeout(runJudge, 3000);
+  }
 
   $("comp").onsubmit = (e) => {
     e.preventDefault();
@@ -1158,6 +1233,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       }
     });
     left();
+    queueJudge();
   }
   // エラーの中身などを出す小さな画面（コピーできる）
   function showInfo(title, text, actionLabel, action) {
@@ -1242,6 +1318,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     items.filter((x) => x.live && x.src === "slack" && !x.done && !ids.has(x.id)).forEach((x) => { x.done = true; D.closed.unshift(`Slack: ${x.title.slice(0, 30)} · 返信済み`); });
     const n = data.items.length, dm = data.items.filter((x) => x.kind === "dm").length;
     setFt("ft-slack", `Slack ${agoText(data.at)} · メンション${n - dm}・DM${dm}${data.warn ? "（DM 一覧は読めず・押して詳細）" : ""}`, data.warn ? "mock" : "");
+    queueJudge();
     left();
   }
   // ---------- Slack のスレッドを、本物の Slack に近い見た目で出す ----------
@@ -1633,6 +1710,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     items.filter((x) => x.live && x.src === "gmail" && !x.done && !ids.has(x.id)).forEach((x) => { x.done = true; D.closed.unshift(`Gmail: ${x.title.slice(0, 30)} · 返信済み`); });
     gmailAt = Date.now(); gmailCount = r.data.length;
     setFt("ft-gmail", `Gmail ${agoText(gmailAt)} · ${gmailCount}件`, "");
+    queueJudge();
     left();
     if (!curItem() || curItem().hidden) { const first = items.find((x) => !x.hidden && !x.done && x.sec === "me"); if (first) select(first.id); }
   }
