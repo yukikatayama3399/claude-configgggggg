@@ -297,13 +297,23 @@
     const t = i.thread;
     const saved = t.draftId ? `Gmail の下書きに保存済み` : kind === "msgr" ? "送るのは Messenger で Enter" : "まだ保存していません";
     const actions = kind === "gmail"
-      ? `<span class="hint">送るときは「Gmail で開く」から。下書きがそのスレッドに入っています</span><span class="sp"></span><button type="button" class="btn send" id="saveDraft">Gmail の下書きに保存</button>`
+      ? `<span class="hint">AI は下書きまで。送るのは「送信」を押して確認したときだけ</span><span class="sp"></span><button type="button" class="btn" id="saveDraft">下書きに保存</button><button type="button" class="btn send" id="sendMail">送信…</button>`
       : kind === "msgr"
         ? `<button type="button" class="btn" id="copyDraft">コピー</button><span class="sp"></span><button type="button" class="btn send" id="saveDraft">Messenger の入力欄に入れる</button>`
-        : `<span class="sp"></span><button type="button" class="btn send" id="saveDraft">送信</button>`;
+        : `<span class="hint">見本です（Slack は下書きまで。投稿は自分のボタンで）</span><span class="sp"></span><button type="button" class="btn send" id="saveDraft">送信</button>`;
     return `<div class="draft"><div class="dh"><span>下書き（送るまで送信されません）</span><span id="draftState">${saved}</span></div>
       <textarea id="draftText" aria-label="下書き" placeholder="真ん中で「下書き書いて」と言うとここに入ります。直接書いても OK。">${esc(t.draft || "")}</textarea>
-      <div class="df">${actions}</div></div>`;
+      <div class="df">${actions}</div>
+      <div class="confirm" id="sendConfirm" hidden></div></div>`;
+  }
+  // 返信の宛先を決める: 最後に相手から来たメールの差出人へ。CC は元の宛先と CC（自分と差出人を除く）
+  function replyFields(t, body) {
+    const msgs = t.data.messages, last = msgs[msgs.length - 1];
+    const me = /yuki\.katayama@fout\.jp/i;
+    const lastOther = [...msgs].reverse().find((m) => !me.test(m.from)) || last;
+    const cc = [lastOther.to, lastOther.cc].join(",").split(",").map((s) => s.trim()).filter((s) => s && !me.test(s) && emailOf(s) !== emailOf(lastOther.from)).join(", ");
+    const subject = /^re[:：]/i.test(last.subject) ? last.subject : "Re: " + last.subject;
+    return { draftId: t.draftId, replyToMessageId: lastOther.id, to: lastOther.from, cc, subject, body };
   }
   function bindDraft(i) {
     const t = i.thread, ta = $("draftText"), btn = $("saveDraft");
@@ -315,19 +325,40 @@
       btn.onclick = () => { if (!ta.value.trim()) return toast("下書きが空です"); insertIntoMessenger(i, ta.value); };
       return;
     }
+    const live = t.kind === "gmail" && t.live && IS_APP;
     btn.onclick = async () => {
-      if (t.kind !== "gmail" || !t.live || !IS_APP) return toast("見本なので保存・送信はしません");
-      const msgs = t.data.messages, last = msgs[msgs.length - 1];
-      // 返信先: 最後に相手から来たメール。宛先はその差出人、CC は元の宛先と CC（自分を除く）
-      const lastOther = [...msgs].reverse().find((m) => !/yuki\.katayama@fout\.jp/i.test(m.from)) || last;
-      const me = /yuki\.katayama@fout\.jp/i;
-      const cc = [lastOther.to, lastOther.cc].join(",").split(",").map((s) => s.trim()).filter((s) => s && !me.test(s) && emailOf(s) !== emailOf(lastOther.from)).join(", ");
-      const subject = /^re[:：]/i.test(last.subject) ? last.subject : "Re: " + last.subject;
+      if (!live) return toast("見本なので保存・送信はしません");
       btn.disabled = true; $("draftState").textContent = "保存中…";
-      const r = await window.ball.gmailDraft({ draftId: t.draftId, replyToMessageId: lastOther.id, to: lastOther.from, cc, subject, body: ta.value });
+      const r = await window.ball.gmailDraft(replyFields(t, ta.value));
       btn.disabled = false;
       if (r.ok) { t.draftId = r.data.draftId || t.draftId; $("draftState").textContent = "Gmail の下書きに保存済み"; toast("Gmail の下書きに保存しました（送信はしていません）"); }
       else { $("draftState").textContent = "保存できませんでした"; toast("保存できませんでした：" + r.error); }
+    };
+    // 送信は2段階: 「送信…」で宛先・件名を確認 →「この内容で送信」を本人が押したときだけ送る
+    const sendBtn = $("sendMail");
+    if (!sendBtn) return;
+    sendBtn.onclick = () => {
+      if (!live) return toast("見本なので送信しません");
+      if (!ta.value.trim()) return toast("下書きが空です");
+      const f = replyFields(t, ta.value), box = $("sendConfirm");
+      box.innerHTML = `<b>この内容で送信しますか？</b>
+        <dl class="kv"><dt>宛先</dt><dd>${esc(f.to)}</dd>${f.cc ? `<dt>CC</dt><dd>${esc(f.cc)}</dd>` : ""}<dt>件名</dt><dd>${esc(f.subject)}</dd></dl>
+        <div class="crow"><span class="sp"></span><button type="button" class="btn" id="sendCancel">やめる</button><button type="button" class="btn send" id="sendGo">この内容で送信</button></div>`;
+      box.hidden = false;
+      $("sendCancel").onclick = () => { box.hidden = true; };
+      $("sendGo").onclick = async () => {
+        $("sendGo").disabled = true; $("sendGo").textContent = "送信中…";
+        const r = await window.ball.gmailSend(replyFields(t, ta.value));
+        if (r.ok) {
+          box.hidden = true; t.draftId = null; t.draft = ""; ta.value = "";
+          $("draftState").textContent = "送信しました";
+          toast("送信しました");
+          i.done = true; D.closed.unshift(`Gmail: ${i.title.slice(0, 30)} · 送信済み`); left();
+        } else {
+          $("sendGo").disabled = false; $("sendGo").textContent = "この内容で送信";
+          toast("送信できませんでした：" + r.error);
+        }
+      };
     };
   }
 

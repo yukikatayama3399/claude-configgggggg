@@ -138,6 +138,12 @@ ipcMain.handle("gmail-status", () => gmail.status());
 ipcMain.handle("gmail-inbox", wrap(() => gmail.inbox()));
 ipcMain.handle("gmail-thread", wrap((id) => gmail.thread(id)));
 ipcMain.handle("gmail-draft", wrap((d) => gmail.saveDraft(d)));
+// 送信: BALL 本体の画面（片山さんが押す確認ボタン）からだけ受け付ける。
+// 右のブラウザのページや、将来つなぐ AI からは呼べない。AI に送信の手段は渡さない。
+ipcMain.handle("gmail-send", async (e, d) => {
+  if (!win || e.sender !== win.webContents) return { ok: false, error: "BALL 本体の画面からの送信だけ受け付けます" };
+  return wrap((x) => gmail.sendDraft(x))(e, d);
+});
 ipcMain.handle("gmail-attachment", wrap(async (a) => { const p = await gmail.openAttachment(a); await shell.openPath(p); return p; }));
 
 ipcMain.on("open-external", (_e, url) => {

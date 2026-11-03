@@ -23,9 +23,11 @@ function gogEnv() {
   return env;
 }
 
-function run(args, { input, timeout = 60000 } = {}) {
+// 送信を許すのは sendDraft の1か所だけ（allowSend）。それ以外は常に --gmail-no-send で送信を禁止する
+function run(args, { input, timeout = 60000, allowSend = false } = {}) {
   return new Promise((resolve, reject) => {
-    const child = execFile(GOG, ["--account", ACCOUNT, "--gmail-no-send", "--no-input", ...args],
+    const guard = allowSend ? [] : ["--gmail-no-send"];
+    const child = execFile(GOG, ["--account", ACCOUNT, ...guard, "--no-input", ...args],
       { timeout, maxBuffer: 64 * 1024 * 1024, env: gogEnv() }, (err, stdout, stderr) => {
         if (err) return reject(new Error((stderr || err.message).trim().split("\n").slice(-3).join(" ")));
         resolve(stdout);
@@ -128,4 +130,12 @@ async function saveDraft({ draftId, replyToMessageId, to, cc, subject, body }) {
   return { draftId: (r.draft && r.draft.id) || r.draftId || r.draft_id || r.id || null };
 }
 
-module.exports = { status, inbox, thread, openAttachment, saveDraft, ACCOUNT };
+// 片山さんが「この内容で送信」を押したときだけ呼ばれる。下書きを保存してから、その下書きを送る。
+async function sendDraft(d) {
+  const { draftId } = await saveDraft(d);
+  if (!draftId) throw new Error("下書きの ID が取れなかったので送信を止めました（Gmail の下書きには保存されています）");
+  await run(["gmail", "drafts", "send", draftId], { allowSend: true });
+  return { sent: true, draftId };
+}
+
+module.exports = { status, inbox, thread, openAttachment, saveDraft, sendDraft, ACCOUNT };

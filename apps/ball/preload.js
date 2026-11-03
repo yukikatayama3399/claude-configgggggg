@@ -17,5 +17,6 @@ contextBridge.exposeInMainWorld("ball", {
   gmailInbox: () => ipcRenderer.invoke("gmail-inbox"),
   gmailThread: (id) => ipcRenderer.invoke("gmail-thread", id),
   gmailDraft: (d) => ipcRenderer.invoke("gmail-draft", d),
+  gmailSend: (d) => ipcRenderer.invoke("gmail-send", d),
   gmailAttachment: (a) => ipcRenderer.invoke("gmail-attachment", a),
 });

@@ -286,3 +286,5 @@ td.new{background:var(--cell)}
 .bubrow.mine{justify-content:flex-end}
 .bb{max-width:78%;padding:7px 12px;border-radius:16px;background:var(--soft);font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
 .bubrow.mine .bb{background:#0866FF;color:#fff}
+.confirm{border-top:1px solid var(--line);padding:10px 12px;display:grid;gap:8px;background:var(--me-bg);font-size:12.5px}
+.df .btn+.btn{margin-left:6px}
