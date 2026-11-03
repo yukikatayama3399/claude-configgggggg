@@ -251,39 +251,81 @@ async function scan() {
 }
 
 // スレッド（またはスレッドの無い DM の直近）を読む
+// Slack のメッセージを BALL で出す形にする（名前・アイコン・本文・スタンプ・ファイル）
+async function toMsgs(cfg, list, ids) {
+  const messages = [];
+  for (const m of list) {
+    if (m.subtype && !/^(file_share|thread_broadcast|bot_message|me_message)$/.test(m.subtype)) continue; // 入退室などのお知らせは出さない
+    if (m.user && m.user !== cfg.userId) ids.add(m.user);
+    for (const x of String(m.text || "").matchAll(/<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g)) if (x[1] !== cfg.userId) ids.add(x[1]);
+    const nm = m.user === cfg.userId ? "自分" : (m.username || (m.user && (await userName(cfg, m.user))) || (m.bot_profile && m.bot_profile.name) || "bot");
+    if (m.user === cfg.userId) await userName(cfg, m.user);
+    messages.push({ user: m.user, name: nm, mine: m.user === cfg.userId, avatar: avatars.get(m.user) || (m.bot_profile && m.bot_profile.icons && (m.bot_profile.icons.image_72 || m.bot_profile.icons.image_48)) || "",
+      ts: m.ts, threadTs: m.thread_ts || "", edited: !!m.edited, text: await plain(cfg, m.text), reactions: (m.reactions || []).map((x) => ({ name: x.name, count: x.count, mine: (x.users || []).includes(cfg.userId) })),
+      replyCount: m.reply_count || 0, ctx: m._ctx || "",
+      files: (m.files || []).map((f) => ({
+        name: f.name || f.title || "ファイル", title: f.title || "", url: f.permalink || f.url_private || "", download: f.url_private || "", mimetype: f.mimetype || "",
+        filetype: f.filetype || "", pretty: f.pretty_type || "", size: f.size || 0, w: f.original_w || 0, h: f.original_h || 0,
+        thumb: f.thumb_720 || f.thumb_480 || f.thumb_360 || f.thumb_pdf || f.thumb_video || (/^image\//.test(f.mimetype || "") ? f.url_private : "") || "",
+      })) });
+  }
+  return messages;
+}
+async function extras(cfg, messages, ids) {
+  const people = [];
+  for (const id of ids) people.push({ id, name: await userName(cfg, id) });
+  const all = await customEmoji(cfg), emoji = {};
+  for (const m of messages) {
+    for (const x of String(m.text).matchAll(/:([a-z0-9_+'-]+):/gi)) { const u = emojiOf(all, x[1]); if (u) emoji[x[1]] = u; }
+    for (const r of m.reactions) { const u = emojiOf(all, r.name); if (u) emoji[r.name] = u; }
+  }
+  return { people, emoji };
+}
+// スレッド（またはスレッドの無い DM）を、本物の Slack と同じようにチャンネルの流れの中で読む:
+// そのメッセージより前 50 件（上へスクロールすると slack-history でさらに前）・スレッドの返信全部・そのあと今までのやり取り全部
 ipcRenderer.on("slack-thread", async (_e, { channel, threadTs, reqId }) => {
   const cfg = config();
   if (!cfg) return ipcRenderer.send("slack-thread-result", { reqId, ok: false, error: "Slack にログインしていません" });
   try {
-    const r = threadTs ? await api(cfg, "conversations.replies", { channel, ts: threadTs, limit: 200 })
-      : await api(cfg, "conversations.history", { channel, limit: 30 });
-    let list = r.messages || [];
-    if (!threadTs) list = list.slice().reverse();
-    const messages = [], ids = new Set();
-    for (const m of list) {
-      if (m.user && m.user !== cfg.userId) ids.add(m.user);
-      for (const x of String(m.text || "").matchAll(/<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g)) if (x[1] !== cfg.userId) ids.add(x[1]);
-      const nm = m.user === cfg.userId ? "自分" : (m.username || (m.user && (await userName(cfg, m.user))) || (m.bot_profile && m.bot_profile.name) || "bot");
-      if (m.user === cfg.userId) await userName(cfg, m.user);
-      messages.push({ user: m.user, name: nm, mine: m.user === cfg.userId, avatar: avatars.get(m.user) || (m.bot_profile && m.bot_profile.icons && (m.bot_profile.icons.image_72 || m.bot_profile.icons.image_48)) || "",
-        ts: m.ts, edited: !!m.edited, text: await plain(cfg, m.text), reactions: (m.reactions || []).map((x) => ({ name: x.name, count: x.count, mine: (x.users || []).includes(cfg.userId) })),
-        replyCount: m.reply_count || 0,
-        files: (m.files || []).map((f) => ({
-          name: f.name || f.title || "ファイル", title: f.title || "", url: f.permalink || f.url_private || "", download: f.url_private || "", mimetype: f.mimetype || "",
-          filetype: f.filetype || "", pretty: f.pretty_type || "", size: f.size || 0, w: f.original_w || 0, h: f.original_h || 0,
-          thumb: f.thumb_720 || f.thumb_480 || f.thumb_360 || f.thumb_pdf || f.thumb_video || (/^image\//.test(f.mimetype || "") ? f.url_private : "") || "",
-        })) });
+    let list = [], hasMore = false;
+    if (threadTs) {
+      const r = await api(cfg, "conversations.replies", { channel, ts: threadTs, limit: 1000 });
+      const thread = r.messages || [];
+      let before = [];
+      try { const h = await api(cfg, "conversations.history", { channel, latest: threadTs, inclusive: false, limit: 50 }); before = (h.messages || []).slice().reverse(); hasMore = !!h.has_more; } catch (e) { /* 読めなくてもスレッドは出す */ }
+      let after = [];
+      try {
+        let cursor = "";
+        for (let page = 0; page < 5; page++) {
+          const h = await api(cfg, "conversations.history", { channel, oldest: threadTs, inclusive: false, limit: 200, cursor });
+          after.push(...(h.messages || []));
+          cursor = h.response_metadata && h.response_metadata.next_cursor;
+          if (!cursor) break;
+        }
+        after.sort((x, y) => parseFloat(x.ts) - parseFloat(y.ts));
+      } catch (e) { /* 同上 */ }
+      list = before.map((m) => ({ ...m, _ctx: "before" })).concat(thread, after.map((m) => ({ ...m, _ctx: "after" })));
+    } else {
+      const h = await api(cfg, "conversations.history", { channel, limit: 100 });
+      list = (h.messages || []).slice().reverse(); hasMore = !!h.has_more;
     }
-    const people = [];
-    for (const id of ids) people.push({ id, name: await userName(cfg, id) });
-    // 使われているカスタム絵文字（本文の :name: とリアクション）だけ渡す
-    const all = await customEmoji(cfg), emoji = {};
-    for (const m of messages) {
-      for (const x of String(m.text).matchAll(/:([a-z0-9_+'-]+):/gi)) { const u = emojiOf(all, x[1]); if (u) emoji[x[1]] = u; }
-      for (const r of m.reactions) { const u = emojiOf(all, r.name); if (u) emoji[r.name] = u; }
-    }
-    ipcRenderer.send("slack-thread-result", { reqId, ok: true, messages, people, emoji, selfName: users.get(cfg.userId) || "", teamUrl: cfg.url });
+    const ids = new Set();
+    const messages = await toMsgs(cfg, list, ids);
+    const { people, emoji } = await extras(cfg, messages, ids);
+    ipcRenderer.send("slack-thread-result", { reqId, ok: true, messages, hasMore, people, emoji, selfName: users.get(cfg.userId) || "", teamUrl: cfg.url, teamId: cfg.teamId, enterpriseId: cfg.enterprise || "" });
   } catch (err) { ipcRenderer.send("slack-thread-result", { reqId, ok: false, error: String(err.message || err) }); }
+});
+// さらに前のやり取り（上へスクロールしたとき）
+ipcRenderer.on("slack-history", async (_e, { channel, latest, reqId }) => {
+  const cfg = config();
+  if (!cfg) return ipcRenderer.send("slack-history-result", { reqId, ok: false, error: "Slack にログインしていません" });
+  try {
+    const h = await api(cfg, "conversations.history", { channel, latest, inclusive: false, limit: 100 });
+    const ids = new Set();
+    const messages = await toMsgs(cfg, (h.messages || []).slice().reverse().map((m) => ({ ...m, _ctx: "before" })), ids);
+    const { people, emoji } = await extras(cfg, messages, ids);
+    ipcRenderer.send("slack-history-result", { reqId, ok: true, messages, hasMore: !!h.has_more, people, emoji });
+  } catch (err) { ipcRenderer.send("slack-history-result", { reqId, ok: false, error: String(err.message || err) }); }
 });
 
 // ワークスペースのカスタム絵文字（名前 → 画像）。1回だけ読む。別名（alias:xxx）はたどる

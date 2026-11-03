@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("ball", {
   platform: process.platform,
   onOpenTab: (cb) => ipcRenderer.on("open-tab", (_e, url) => cb(url)),
   openExternal: (url) => ipcRenderer.send("open-external", url),
+  openSlackApp: (a) => ipcRenderer.invoke("open-slack-app", a),
   openPreview: (a) => ipcRenderer.send("open-preview", a),
   // Messenger の読み取り結果
   onMessenger: (cb) => ipcRenderer.on("msgr-update", (_e, data) => cb(data)),
@@ -30,6 +31,7 @@ contextBridge.exposeInMainWorld("ball", {
   slackScan: () => ipcRenderer.send("slack-scan"),
   slackThread: (a) => ipcRenderer.invoke("slack-thread", a),
   slackPeople: (a) => ipcRenderer.invoke("slack-people", a),
+  slackHistory: (a) => ipcRenderer.invoke("slack-history", a),
   slackImage: (url) => ipcRenderer.invoke("slack-image", url),
   slackReact: (a) => ipcRenderer.invoke("slack-react", a),
   slackEmojiAll: () => ipcRenderer.invoke("slack-emoji-all"),

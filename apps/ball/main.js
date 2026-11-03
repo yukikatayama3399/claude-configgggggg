@@ -189,6 +189,7 @@ ipcMain.handle("msgr-image", async (e, url) => {
     return { ok: true, data };
   } catch (err) { return { ok: false, error: String(err.message || err) }; }
 });
+ipcMain.handle("slack-history", (_e, a) => askSlack("slack-history", { channel: a.channel, latest: a.latest }, "slack-history-result", 60000));
 ipcMain.handle("slack-people", (_e, a) => askSlack("slack-people", { channel: a.channel }, "slack-people-result", 60000));
 // 送信: BALL 本体の画面（片山さんが押す確認ボタン）からだけ受け付ける。AI や右のブラウザのページからは呼べない
 ipcMain.handle("slack-send", async (e, a) => {
@@ -290,6 +291,16 @@ ipcMain.on("open-preview", (e, a) => {
   openPreview(a && a.url, a && a.title);
 });
 
+// Slack で開く: Mac の Slack アプリをそのチャンネル（・メッセージ）で開く。アプリが無ければ false を返す（画面側でブラウザに回す）
+ipcMain.handle("open-slack-app", async (e, a) => {
+  if (!win || e.sender !== win.webContents) return { ok: false };
+  const ok = (x) => /^[A-Z0-9]+$/.test(String(x || ""));
+  if (!a || !ok(a.team) || !ok(a.channel)) return { ok: false, error: "チャンネルが分かりません" };
+  const msg = /^\d+\.\d+$/.test(String(a.ts || "")) ? `&message=${a.ts}` : "";
+  const thr = /^\d+\.\d+$/.test(String(a.threadTs || "")) && a.threadTs !== a.ts ? `&thread_ts=${a.threadTs}` : "";
+  try { await shell.openExternal(`slack://channel?team=${a.team}&id=${a.channel}${msg}${thr}`); return { ok: true }; }
+  catch (err) { return { ok: false, error: String(err.message || err) }; }
+});
 ipcMain.on("open-external", (_e, url) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url);
 });

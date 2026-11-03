@@ -911,7 +911,7 @@
       if (t.live) {
         if (!t.data) return t.error ? `（読めませんでした: ${t.error}）` : "（未読み込み）";
         const ppl = slackPeople(t).map((p) => p.name);
-        return `Slack ${t.where}${t.threadTs ? " のスレッド" : ""}（古い順）\n` + (ppl.length ? `メンションできる人（下書きに「@名前」と書けば、送るときに本物のメンションになります）: ${ppl.map((n) => "@" + n).join(" ")}\n` : "") + t.data.messages.map((m) => `--- ${new Date(parseFloat(m.ts) * 1000).toLocaleString("ja-JP")} ${m.name}${m.mine ? "（片山）" : ""}\n${m.text}${m.files.length ? "\n添付: " + m.files.map((f) => f.name).join(", ") : ""}${m.reactions.length ? "\nリアクション: " + m.reactions.map((r) => `:${r.name}:${r.mine ? "(自分)" : ""}`).join(" ") : ""}`).join("\n");
+        return `Slack ${t.where}${t.threadTs ? " のスレッド" : ""}（古い順）\n` + (ppl.length ? `メンションできる人（下書きに「@名前」と書けば、送るときに本物のメンションになります）: ${ppl.map((n) => "@" + n).join(" ")}\n` : "") + t.data.messages.map((m) => `--- ${m.ctx === "before" ? "［スレッドの前のチャンネルのやり取り］" : m.ctx === "after" ? "［このあとのチャンネルのやり取り］" : ""}${new Date(parseFloat(m.ts) * 1000).toLocaleString("ja-JP")} ${m.name}${m.mine ? "（片山）" : ""}\n${m.text}${m.files.length ? "\n添付: " + m.files.map((f) => f.name).join(", ") : ""}${m.reactions.length ? "\nリアクション: " + m.reactions.map((r) => `:${r.name}:${r.mine ? "(自分)" : ""}`).join(" ") : ""}`).join("\n");
       }
       return `Slack ${t.ch}（見本）\n` + t.msgs.map((m) => `--- ${m[2]} ${m[1]}\n${m[3]}`).join("\n");
     }
@@ -1014,6 +1014,7 @@
         const msg = String(ev.error || "エラー");
         // 会話が見つからない（Claude Code 側で消えた）ときは、次は新しい会話で始める
         if (/No conversation found|session.*not found|--resume/i.test(msg)) { i.claudeSid = ""; i.ctxHash = ""; }
+        if (ev.auth) setFt("ft-claude", "Claude: ログインが切れています（押して直し方）", "ng");
         i.feed.push(["err", "Claude でエラーになりました：" + msg.slice(0, 600)]);
       } else i.ctxHash = run.hash;
       // 空の吹き出しは消す
@@ -1134,9 +1135,10 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     judging = false;
     if (!r.ok) {
       judgeStat.err = r.error; judgeStat.fails = (judgeStat.fails || 0) + 1;
-      setFt("ft-claude", "Claude: 巡回の判断でエラー（押して詳細）", "ng");
+      setFt("ft-claude", r.auth ? "Claude: ログインが切れています（押して直し方）" : "Claude: 巡回の判断でエラー（押して詳細）", "ng");
       // 3回続けて失敗するまでは、少し待って取り直す
-      if (judgeStat.fails < 3) judgeTimer = setTimeout(runJudge, 60000);
+      if (r.auth) judgeTimer = setTimeout(runJudge, 120000); // ログインし直したら、そのまま続きから判断する
+      else if (judgeStat.fails < 3) judgeTimer = setTimeout(runJudge, 60000);
       return;
     }
     judgeStat.fails = 0;
@@ -1314,7 +1316,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
   let slackData = null;
   const slackAgo = (ms) => { const h = (Date.now() - ms) / 3600e3; return h < 1 ? Math.max(1, Math.round(h * 60)) + "分前" : h < 24 ? Math.round(h) + "時間前" : Math.round(h / 24) + "日前"; };
   // 一覧の件名や引用用に、リンクの書式（[名前](URL)）と *太字* の記号を落とす
-  const flat = (s) => String(s || "").replace(/\[([^\]\n]+)\]\((https?:[^)\s]+)\)/g, "$1").replace(/(^|\s)\*([^*\n]+)\*/g, "$1$2");
+  const flat = (s) => String(s || "").replace(/\[([^\]\n]+)\]\((https?:[^)\s]+)\)/g, "$1").replace(/```/g, "").replace(/(^|[\s(（「])([*_~])([^*_~\n]+)\2(?=$|[\s)）」。、！!?？.,])/g, "$1$3").replace(/`([^`\n]+)`/g, "$1");
   function applySlack(data) {
     slackData = data;
     if (data.status === "login") return setFt("ft-slack", "Slack: 読み取り画面でログインが必要（押す）", "ng");
@@ -1410,11 +1412,24 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
   const sizeText = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : n > 1024 ? Math.round(n / 1024) + " KB" : n ? n + " B" : "");
   function slackMsgsHtml(t) {
     const d = t.data, ctx = { emoji: d.emoji || {}, people: slackPeople(t), selfName: d.selfName || "" };
-    let prev = null;
-    return d.messages.map((m, k) => {
+    const dayOf = (ts) => { const x = new Date(parseFloat(ts) * 1000); return `${x.getMonth() + 1}月${x.getDate()}日（${"日月火水木金土"[x.getDay()]}）`; };
+    let prev = null, prevDay = "", html = "", inThread = false;
+    const replies = d.messages.filter((m) => !m.ctx && m.threadTs && m.ts !== m.threadTs).length;
+    html += d.hasMore ? `<div class="smore"><button type="button" class="btn" id="slackOlder">さらに前のやり取りを読む</button><span class="hint">上へスクロールしても読み込みます</span></div>` : `<div class="smore hint">${t.threadTs ? "チャンネルの最初まで読みました" : "最初のメッセージまで読みました"}</div>`;
+    d.messages.forEach((m, k) => {
+      const main = !m.ctx;
+      if (main && !inThread && t.threadTs) { html += `<div class="sthread"><div class="sthl">スレッド${replies ? `（返信 ${replies}件）` : ""}</div>`; inThread = true; prev = null; }
+      if (!main && inThread) { html += `</div>`; inThread = false; prev = null; }
+      const day = dayOf(m.ts);
+      if (day !== prevDay && !(main && inThread && prev)) { html += `<div class="sday"><span>${esc(day)}</span></div>`; prevDay = day; prev = null; }
+      html += one(m, k, prev);
+      prev = m;
+    });
+    if (inThread) html += `</div>`;
+    return html;
+    function one(m, k, prev) {
       const at = parseFloat(m.ts) * 1000;
       const cont = prev && prev.user === m.user && m.user && at - parseFloat(prev.ts) * 1000 < 5 * 60e3 && !m.files.length === !prev.files.length;
-      prev = m;
       const when = new Date(at), hm = when.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
       const av = m.avatar ? `<img class="sav" src="${esc(m.avatar)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : `<span class="sav ini" style="background:${m.mine ? "#1E7B4E" : "#4A154B"}">${esc((m.name || "?")[0])}</span>`;
       const files = m.files.map((f, j) => (f.thumb && /^image\/|pdf|video/.test(f.mimetype + f.filetype)
@@ -1427,9 +1442,9 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
           ${m.text ? `<div class="sx">${slackHtml(m.text, ctx)}${m.edited ? `<span class="sedit">（編集済み）</span>` : ""}</div>` : ""}
           ${files ? `<div class="sfiles">${files}</div>` : ""}
           <div class="sreacts">${reacts}<button type="button" class="sadd" title="スタンプを付ける（自分で押したときだけ付きます）">😀＋</button></div>
-          ${m.replyCount && !t.threadTs ? `<div class="sreply">${m.replyCount} 件の返信</div>` : ""}
+          ${m.replyCount && (m.ctx || !t.threadTs) ? `<div class="sreply">${m.replyCount} 件の返信</div>` : ""}
         </div></div>`;
-    }).join("");
+    }
   }
   // 画像は BALL の中の Slack のログインで取ってきて差し込む（取れなければファイルの札にする）
   function loadSlackImages(root, t) {
@@ -1603,6 +1618,27 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     });
   }
 
+  // 上へスクロールしたら、さらに前のやり取りを読み込む（チャンネルの最初まで遡れる）
+  async function slackOlder(i) {
+    const t = i.thread;
+    if (!t.data || !t.data.hasMore || t.loadingOlder || !IS_APP || !window.ball.slackHistory) return;
+    t.loadingOlder = true;
+    const btn = $("slackOlder"); if (btn) { btn.disabled = true; btn.textContent = "読み込み中…"; }
+    const oldest = t.data.messages[0] && t.data.messages[0].ts;
+    const r = await window.ball.slackHistory({ channel: t.channel, latest: oldest });
+    t.loadingOlder = false;
+    if (!r.ok) { toast("前のやり取りを読めませんでした：" + r.error); if (btn) { btn.disabled = false; btn.textContent = "さらに前のやり取りを読む"; } return; }
+    const seen = new Set(t.data.messages.map((m) => m.ts));
+    t.data.messages = r.messages.filter((m) => !seen.has(m.ts)).concat(t.data.messages);
+    t.data.hasMore = r.hasMore;
+    const ps = new Set((t.data.people || []).map((p) => p.id));
+    t.data.people = (t.data.people || []).concat((r.people || []).filter((p) => !ps.has(p.id)));
+    t.data.emoji = Object.assign({}, r.emoji || {}, t.data.emoji || {});
+    if (curItem() !== i || S.rmode !== "thread") return;
+    const sc = $("thr"); t.keepFromBottom = sc.scrollHeight - sc.scrollTop; // 読み込んだあとも、見ていた位置のまま
+    const draft = $("draftText") ? $("draftText").value : null; if (draft != null) t.draft = draft;
+    renderSlackThread(i);
+  }
   function renderSlackThread(i) {
     const t = i.thread;
     if (!t.data && !t.error) {
@@ -1622,10 +1658,26 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       ${t.error ? `<div class="empty">読めませんでした：${esc(t.error)}</div>` : `<div class="smsgs">${slackMsgsHtml(t)}</div>`}
       ${draftBox(i, "slacklive")}
     </div>`;
-    $("slackReload").onclick = () => { t.data = null; t.error = null; renderSlackThread(i); };
+    $("slackReload").onclick = () => { t.data = null; t.error = null; t.scrolled = false; renderSlackThread(i); };
     mountDocsBar(i, ".thd");
-    if ($("slackOpen")) $("slackOpen").onclick = () => openTab(t.permalink, "Slack");
-    if (t.data) { const box = $("thr").querySelector(".smsgs"); bindSlackFiles(box, t); loadSlackImages(box, t); bindSlackReactions(i, box); }
+    // Slack で開く: Slack のアプリで開く。アプリで開けなければ右のブラウザで
+    if ($("slackOpen")) $("slackOpen").onclick = async () => {
+      const d = t.data || {};
+      if (IS_APP && window.ball.openSlackApp && d.teamId) {
+        const r = await window.ball.openSlackApp({ team: d.teamId, channel: t.channel, ts: t.ts, threadTs: t.threadTs });
+        if (r && r.ok) return toast("Slack のアプリで開きました");
+      }
+      openTab(t.permalink, "Slack");
+    };
+    if (t.data) {
+      const box = $("thr").querySelector(".smsgs"); bindSlackFiles(box, t); loadSlackImages(box, t); bindSlackReactions(i, box);
+      const sc = $("thr");
+      // 開いたときは、本物の Slack と同じく、そのメッセージの位置まで移動する
+      if (!t.scrolled) { t.scrolled = true; const hl = box.querySelector(".smsg.hl"); if (hl) requestAnimationFrame(() => hl.scrollIntoView({ block: "center" })); }
+      else if (t.keepFromBottom != null) { sc.scrollTop = sc.scrollHeight - t.keepFromBottom; t.keepFromBottom = null; }
+      if ($("slackOlder")) $("slackOlder").onclick = () => slackOlder(i);
+      sc.onscroll = () => { if (sc.scrollTop < 60 && t.data && t.data.hasMore && curItem() === i) slackOlder(i); };
+    }
     bindDraft(i);
   }
   $("ft-slack").onclick = () => {

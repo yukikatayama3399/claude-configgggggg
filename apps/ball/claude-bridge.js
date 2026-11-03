@@ -204,7 +204,8 @@ async function ask({ reqId, ballId, sessionId, prompt, model, perm, gog }, emit,
         for (const b of m.message.content || []) if (b.type === "tool_result" && b.is_error) emit({ type: "toolError", text: Array.isArray(b.content) ? b.content.map((x) => x.text || "").join("") : String(b.content || "") });
       } else if (m.type === "result") {
         const denied = [...new Set((m.permission_denials || []).map((d) => String(d.tool_name || "") + (d.tool_input && d.tool_input.command ? `（${String(d.tool_input.command).slice(0, 80)}）` : "")))];
-        finish({ type: "done", sessionId: sid, isError: !!m.is_error, error: m.is_error ? String(m.result || m.subtype || "エラー") : "", cost: m.total_cost_usd || 0, denied });
+        const em = m.is_error ? String(m.result || m.subtype || "エラー") : "";
+        finish({ type: "done", sessionId: sid, isError: !!m.is_error, auth: AUTH_RE.test(em), error: withHint(em), cost: m.total_cost_usd || 0, denied });
       }
     }
   });
@@ -213,10 +214,16 @@ async function ask({ reqId, ballId, sessionId, prompt, model, perm, gog }, emit,
   child.on("error", (e) => finish({ type: "error", error: "claude を起動できませんでした: " + e.message }));
   child.on("close", (code, signal) => {
     if (signal) return finish({ type: "done", sessionId: sid, stopped: true });
-    finish({ type: "error", sessionId: sid, error: (err.trim().split("\n").slice(-4).join("\n") || `claude が止まりました（${code}）`) });
+    const em = err.trim().split("\n").slice(-4).join("\n") || `claude が止まりました（${code}）`;
+    finish({ type: "error", sessionId: sid, auth: AUTH_RE.test(em), error: withHint(em) });
   });
   child.stdin.end(prompt);
 }
+// ログインが切れているときは、直し方を添える
+const AUTH_RE = /Failed to authenticate|OAuth session expired|could not be refreshed|Invalid API key|not logged in|Please run \/login|authentication_error|\b401\b/i;
+const AUTH_HINT = "Claude Code のログインが切れています。ターミナルで claude を起動して /login を実行し、終わったら /exit で抜けてください（BALL は立ち上げ直さなくて大丈夫です）";
+const withHint = (msg) => (AUTH_RE.test(String(msg || "")) ? `${AUTH_HINT}（元のエラー: ${String(msg).slice(0, 160)}）` : msg);
+
 // ---------- 巡回の判断（新しく来たものだけ） ----------
 // 巡回（読み込み）は BALL のプログラムがやり、判断だけ Claude に頼む: 返信が要るか・どの案件か・どのボールの続きか。
 // 道具は使わせない（読むだけの判断）。作業フォルダはいつもどおりなので、CLAUDE.md とメモリーの知識で振り分ける
@@ -266,11 +273,11 @@ async function judge({ items, balls, model }) {
         const why = timedOut ? `時間切れ（${secs}秒）` : `結果を読めませんでした（終了コード ${code}${signal ? " / " + signal : ""}・${secs}秒）`;
         keepLog(why);
         const head = (err.trim().split("\n").filter(Boolean).slice(-2).join(" ") || out.trim().slice(0, 160)).slice(0, 200);
-        return resolve({ ok: false, error: `${why}${head ? "：" + head : ""}（詳しくは ~/.ball/logs/judge-last.txt）` });
+        return resolve({ ok: false, auth: AUTH_RE.test(head + out), error: withHint(`${why}${head ? "：" + head : ""}（詳しくは ~/.ball/logs/judge-last.txt）`) });
       }
       let so = d.structured_output;
       if (!so && typeof d.result === "string") { try { so = JSON.parse(d.result); } catch (e) { /* 形が違う */ } }
-      if (d.is_error || !so) { keepLog("判断できませんでした"); return resolve({ ok: false, error: String(d.result || d.subtype || "判断できませんでした").slice(0, 300) }); }
+      if (d.is_error || !so) { keepLog("判断できませんでした"); const m = String(d.result || d.subtype || "判断できませんでした").slice(0, 300); return resolve({ ok: false, auth: AUTH_RE.test(m), error: withHint(m) }); }
       resolve({ ok: true, items: so.items || [], cost: d.total_cost_usd || 0, secs });
     });
     child.stdin.end(prompt);
