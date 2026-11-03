@@ -74,20 +74,22 @@ ipcMain.on("msgr-result", (_e, data) => {
     data = { ...data, note: `別の URL を試しています（${msgrUrls[msgrIdx]}）` };
     if (msgrWin && !msgrWin.isDestroyed()) msgrWin.loadURL(msgrUrls[msgrIdx]);
   } else if (data.status === "nolist") {
-    data = { ...data, note: `読み込み待ち（${msgrMiss}/3）` };
+    const last = msgrIdx >= msgrUrls.length - 1;
+    data = { ...data, note: last ? `一覧が読めません（${msgrMiss}回目・押して診断）` : `読み込み待ち（${msgrMiss}/3）` };
   }
   lastMsgr = data;
   if (win && !win.isDestroyed()) win.webContents.send("msgr-update", data);
 });
 // 1つの会話の直近メッセージを、裏ウィンドウで読んで返す
 let threadReq = 0;
-ipcMain.handle("msgr-thread", (_e, href) => new Promise((resolve) => {
+ipcMain.handle("msgr-thread", (_e, arg) => new Promise((resolve) => {
+  const { href, name } = typeof arg === "string" ? { href: arg, name: "" } : arg;
   if (!msgrWin || msgrWin.isDestroyed()) return resolve({ ok: false, error: "Messenger の読み取り画面がありません" });
   const reqId = ++threadReq;
   const timer = setTimeout(() => { ipcMain.removeListener("thread-result", onRes); resolve({ ok: false, error: "時間内に読めませんでした" }); }, 20000);
   function onRes(_ev, data) { if (data.reqId !== reqId) return; clearTimeout(timer); ipcMain.removeListener("thread-result", onRes); resolve(data); }
   ipcMain.on("thread-result", onRes);
-  msgrWin.webContents.send("read-thread", { href, reqId });
+  msgrWin.webContents.send("read-thread", { href, name, reqId });
 }));
 // 右のブラウザで開いている Messenger のページを、読み取りに使う
 ipcMain.on("msgr-use-url", (_e, url) => {

@@ -251,7 +251,7 @@
       $("thr").innerHTML = `<div class="thr"><div class="empty">${esc(t.name)}さんとのやり取りを読み込み中…</div></div>`;
       if (!t.loading && IS_APP) {
         t.loading = true;
-        window.ball.messengerThread(t.href).then((r) => {
+        window.ball.messengerThread({ href: t.href, name: t.name }).then((r) => {
           t.loading = false;
           if (r.ok && r.messages && r.messages.length) t.data = r;
           else t.error = r.ok ? `メッセージを読み取れませんでした（行 ${r.rows || 0} 個）。「Messenger で開く」で見てください` : r.error;

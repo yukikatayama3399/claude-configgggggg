@@ -10,18 +10,25 @@ function isLoginPage() {
     !!document.querySelector('input[name="email"], input[name="pass"], form[action*="login"]');
 }
 
-function readRow(a) {
-  const href = a.getAttribute("href") || "";
-  const m = href.match(/\/t\/([^/?#]+)/);
-  if (!m) return null;
-  let lines = (a.innerText || "").split("\n").map((s) => s.trim()).filter((s) => s && s !== "·");
+// 一覧の1行（リンクでも、リンクでない行でもよい）から、名前・最後のメッセージ・時刻・未読を読む
+function linesOf(el) {
+  let lines = (el.innerText || "").split("\n").map((s) => s.trim()).filter((s) => s && s !== "·");
   if (lines.length < 2) {
     // 1行に詰まっている作りのときは、文字の入った末端の要素を順に拾う
-    lines = [...a.querySelectorAll("*")].filter((el) => el.childElementCount === 0)
-      .map((el) => el.textContent.trim()).filter((s) => s && s !== "·");
+    lines = [...el.querySelectorAll("*")].filter((x) => x.childElementCount === 0)
+      .map((x) => x.textContent.trim()).filter((s) => s && s !== "·");
   }
+  return lines;
+}
+function absUrl(href) {
+  try { return new URL(href, location.href.startsWith("http") ? location.origin : "https://www.facebook.com").href; }
+  catch (e) { return "https://www.facebook.com" + href; }
+}
+function readItem(el, href) {
+  const lines = linesOf(el);
   if (lines.length < 2) return null;
   const name = lines[0];
+  if (name.length > 60) return null;
   let rest = lines.slice(1);
   let time = "";
   if (rest.length && TIME_RE.test(rest[rest.length - 1])) time = rest.pop();
@@ -29,41 +36,46 @@ function readRow(a) {
   const mt = snippet.match(/\s·\s([^·]+)$/);
   if (!time && mt && TIME_RE.test(mt[1].trim())) { time = mt[1].trim(); snippet = snippet.slice(0, mt.index); }
   const mine = /^(あなた|You)\s*[:：]/.test(snippet);
-
   // 未読の判定: aria-label に「未読」、または名前が太字
-  const row = a.closest('[role="row"], [role="listitem"], [role="gridcell"]');
-  const label = (a.getAttribute("aria-label") || "") + " " + ((row && row.getAttribute("aria-label")) || "");
-  let unread = /未読|unread/i.test(label) || !!a.querySelector('[aria-label*="未読"], [aria-label*="nread"]');
+  const row = el.closest('[role="row"], [role="listitem"], [role="gridcell"]') || el;
+  const label = (el.getAttribute("aria-label") || "") + " " + (row.getAttribute("aria-label") || "");
+  let unread = /未読|unread/i.test(label) || !!el.querySelector('[aria-label*="未読"], [aria-label*="nread"]');
   if (!unread) {
-    const nameSpan = [...a.querySelectorAll("span")].find((s) => s.childElementCount === 0 && s.textContent.trim() === name);
+    const nameSpan = [...el.querySelectorAll("*")].find((x) => x.childElementCount === 0 && x.textContent.trim() === name);
     if (nameSpan && parseInt(getComputedStyle(nameSpan).fontWeight, 10) >= 600) unread = true;
   }
-  let abs;
-  try { abs = new URL(href, location.href.startsWith("http") ? location.origin : "https://www.facebook.com").href; }
-  catch (e) { abs = "https://www.facebook.com" + href; }
-  return { id: m[1], name, snippet, time, unread, mine, href: abs };
+  const m = (href || "").match(/\/t\/([^/?#]+)/);
+  return { id: m ? m[1] : "n:" + name, name, snippet, time, unread, mine, href: m ? absUrl(href) : location.href, byRow: !m };
+}
+// リンクの無い作りのための候補: 画面の左側にある、会話一覧らしい高さの行
+function listRows() {
+  const w = window.innerWidth || 1200;
+  return [...document.querySelectorAll('[role="row"], [role="listitem"], [role="gridcell"] > div')].filter((r) => {
+    const b = r.getBoundingClientRect();
+    return b.height >= 36 && b.height <= 160 && b.left < w * 0.45 && b.width > 120;
+  });
 }
 
 // 診断: 名前やメッセージの中身は入れず、画面の作りだけを数える
 function diagnose(anchors) {
   const shape = (s) => String(s).replace(/\d+/g, "#");
-  const roles = {};
-  const samples = anchors.slice(0, 8).map((a) => {
-    const lines = (a.innerText || "").split("\n").map((s) => s.trim()).filter(Boolean);
-    const leaves = [...a.querySelectorAll("*")].filter((el) => el.childElementCount === 0 && el.textContent.trim()).length;
-    const row = a.closest("[role]");
-    const role = row ? row.getAttribute("role") : "-";
-    roles[role] = (roles[role] || 0) + 1;
-    return { href: shape(a.getAttribute("href") || ""), lines: lines.length, leaves, role, aria: !!a.getAttribute("aria-label"), visible: a.getBoundingClientRect().height > 0 };
-  });
+  const w = window.innerWidth || 1;
+  const sample = (el) => {
+    const b = el.getBoundingClientRect();
+    return { lines: linesOf(el).length, h: Math.round(b.height), left: Math.round((b.left / w) * 100) + "%", width: Math.round(b.width), role: el.getAttribute("role") || (el.closest("[role]") || { getAttribute: () => "-" }).getAttribute("role"),
+      link: !!el.querySelector("a[href]") || el.tagName === "A", href: shape((el.getAttribute("href") || (el.querySelector("a[href]") || { getAttribute: () => "" }).getAttribute("href") || "").slice(0, 40)),
+      aria: !!el.getAttribute("aria-label"), img: el.querySelectorAll("img, svg image").length };
+  };
+  const rows = [...document.querySelectorAll('[role="row"], [role="listitem"]')];
   return {
     path: shape(location.pathname), title: document.title.replace(/\(\d+\)/, "(#)").slice(0, 40),
-    visibility: document.visibilityState, secondsSinceLoad: Math.round(performance.now() / 1000),
+    visibility: document.visibilityState, secondsSinceLoad: Math.round(performance.now() / 1000), width: w,
     anchorsT: document.querySelectorAll('a[href*="/t/"]').length,
     anchorsMessages: document.querySelectorAll('a[href*="/messages/"]').length,
+    links: document.querySelectorAll("a[href]").length, iframes: document.querySelectorAll("iframe").length,
     grids: document.querySelectorAll('[role="grid"], [role="list"], [role="navigation"]').length,
-    rows: document.querySelectorAll('[role="row"], [role="listitem"]').length,
-    samples, roles,
+    rows: rows.length, listRows: listRows().length,
+    anchorSamples: anchors.slice(0, 4).map(sample), rowSamples: rows.slice(0, 8).map(sample),
   };
 }
 
@@ -72,12 +84,10 @@ function scrape() {
   if (isLoginPage()) return ipcRenderer.send("msgr-result", { at, status: "login", url: location.href, convos: [] });
   const anchors = [...document.querySelectorAll('a[href*="/t/"]')];
   const seen = new Set(), convos = [];
-  for (const a of anchors) {
-    const r = readRow(a);
-    if (!r || seen.has(r.id)) continue;
-    seen.add(r.id); convos.push(r);
-    if (convos.length >= 30) break;
-  }
+  const push = (r) => { if (r && !seen.has(r.id) && convos.length < 30) { seen.add(r.id); convos.push(r); } };
+  anchors.forEach((a) => push(readItem(a, a.getAttribute("href"))));
+  // リンクで1件も取れないときは、一覧の行から読む
+  if (!convos.length) listRows().forEach((r) => { const a = r.querySelector('a[href*="/t/"]'); push(readItem(r, a ? a.getAttribute("href") : "")); });
   ipcRenderer.send("msgr-result", { at, status: convos.length ? "ok" : "nolist", url: location.href, convos, diag: diagnose(anchors) });
 }
 
@@ -110,14 +120,19 @@ function readConversation() {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let readingThread = false;
-ipcRenderer.on("read-thread", async (_e, { href, reqId }) => {
+ipcRenderer.on("read-thread", async (_e, { href, name, reqId }) => {
   readingThread = true;
   const back = location.href;
   try {
     // 会話のリンクを押して開く（ページを読み込み直すより速く、ログイン状態も崩れない）
     const path = new URL(href).pathname;
-    const link = [...document.querySelectorAll('a[href*="/t/"]')].find((a) => (a.getAttribute("href") || "").startsWith(path) || href.includes(a.getAttribute("href")));
-    if (link) link.click(); else { history.pushState({}, "", path); window.dispatchEvent(new PopStateEvent("popstate")); }
+    const link = /\/t\//.test(path) && [...document.querySelectorAll('a[href*="/t/"]')].find((a) => (a.getAttribute("href") || "").startsWith(path) || href.includes(a.getAttribute("href")));
+    // リンクの無い作りでは、名前が一致する一覧の行を押す
+    const row = !link && name && listRows().find((r) => linesOf(r)[0] === name);
+    const target = link || (row && (row.querySelector('[role="link"], [role="button"], [tabindex="0"]') || row));
+    if (target) target.click();
+    else if (/\/t\//.test(path)) { history.pushState({}, "", path); window.dispatchEvent(new PopStateEvent("popstate")); }
+    else throw new Error("一覧に " + (name ? "その名前の" : "") + "会話が見つかりませんでした");
     let res = { messages: [] };
     for (let i = 0; i < 12; i++) { await sleep(700); res = readConversation(); if (res.messages.length) break; }
     ipcRenderer.send("thread-result", { reqId, ok: true, ...res });
