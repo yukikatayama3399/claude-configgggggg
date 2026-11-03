@@ -161,7 +161,7 @@ ul.tight{margin:0;padding-left:1.2em;display:grid;gap:6px}
   <h2>入口 <span class="tag">SOURCES &amp; INPUT</span></h2>
   <div class="facts">
     <div class="fact"><div class="num" style="font-size:15px">今すぐ</div><div class="body"><b>Slack・Gmail・カレンダー・Drive/Sheets</b><span class="small">公式の連携がすでに動いている（gog / gws / Slack コネクタ）。追加の認証は不要。</span></div></div>
-    <div class="fact"><div class="num" style="font-size:15px">Phase 1</div><div class="body"><b>FB メッセンジャー（仕事）・LINE（個人）</b><span class="small">どちらも個人アカウント向けの公式 API がない。現実的なのは Beeper（複数のメッセンジャーを1つにまとめる Mac アプリ）を経由して読む方法。Beeper のデスクトップ版が手元の Mac から AI に読ませる口を持っている。LINE に対応しているかは最初に試して確かめる。読み取り専用で使い、返信は下書きまで。LINE は「個人」の枠に分けて、仕事のボールと混ぜない。第三者アプリを経由するので、どこまで渡すかは片山さんが決める。</span></div></div>
+    <div class="fact"><div class="num" style="font-size:15px">Phase 1</div><div class="body"><b>FB メッセンジャー（全部読む）</b><span class="small">個人アカウント向けの公式 API はない。デスクトップアプリの中にログインしたままの messenger.com を開き、未読と「相手の発言で止まっている」会話を AI が読み取ってボールにする。画面の作りが変わると読み取りが壊れることがあるので、壊れたら同期状況に赤で出す。代わりに Beeper を経由する手もある。LINE は対象外（11/4 決定）。</span></div></div>
     <div class="fact"><div class="num" style="font-size:15px">常に</div><div class="body"><b>Aqua Voice（声）と貼り付け</b><span class="small">「岩田さんに提案ステータス明日までに返すって入れといて」「朝日コネクト、木曜に確認メール」と話すだけでボールになる。誰宛て・いつまで・どのスレッドかは AI が読み取る。入力欄は特別な部品を使わず、どのアプリでも Aqua Voice が入る普通のテキスト欄にする。</span></div></div>
     <div class="fact"><div class="num" style="font-size:15px">夕方</div><div class="body"><b>手書きノートの写真</b><span class="small">ノートを1枚撮って送ると、✅ が付いた項目を読み取ってカレンダーに書き戻す。残った項目は明日の候補に回す。夕方に10件をボタンで片付ける作業がなくなる。</span></div></div>
   </div>
@@ -254,7 +254,7 @@ ul.tight{margin:0;padding-left:1.2em;display:grid;gap:6px}
   <h2>作らないもの <span class="tag">OUT OF SCOPE</span></h2>
   <div class="cols">
     <ul class="tight">
-      <li><b>アプリ内ブラウザで Gmail や Slack を開くこと。</b>どちらも埋め込みを禁止しているので、中身を読み込んで表示し、必要な時だけ元のアプリで開くリンクにします。</li>
+      <li><b>LINE。</b>個人の連絡なので今回は対象外（11/4 決定）。</li>
       <li><b>カレンダーの代わりの予定画面。</b>予定は Google カレンダーのまま。</li>
       <li><b>メモアプリ。</b>メモは顧客フォルダの Doc に書き、ハブはそれを表示するだけ。</li>
     </ul>
@@ -271,6 +271,7 @@ ul.tight{margin:0;padding-left:1.2em;display:grid;gap:6px}
   <div class="qs" id="qs"></div>
 </section>
 
+<p class="prose"><b>11/4 更新:</b> 完成画面のイメージは <a href="https://claude.ai/artifact/6L1yncjvEcb3XX5YbpoX1n" id="uiLink">BALL 完成イメージ</a> にあります。Mac mini は使わず、会社 Mac で動くデスクトップアプリにします。デスクトップアプリなら中にブラウザを持てるので、Gmail・Slack・Messenger をログインしたまま右ペインに表示できます（前回の「埋め込めない」は Web ページの場合の話でした）。</p>
 <p class="small">データ: Google カレンダー 2026-09-29〜11-14（364件）、Gmail 直近30日（受信1,009スレッド・送信73・下書き140）、Slack 2026-09-22〜11-03、Drive 9/20以降の更新ファイル。すべて読み取りのみで集計。</p>
 </div>
 

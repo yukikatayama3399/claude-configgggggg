@@ -1,0 +1,446 @@
+<title>BALL 完成イメージ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: Mac アプリのウィンドウ1枚。上=プロジェクトタブ、左=ボール一覧、中=タスクごとのAI、右=スレッド/ブラウザ、下=同期状況 */
+:root{
+  --page:#E4E8EE; --win:#FFFFFF; --side:#F5F7FA; --ink:#18212B; --muted:#637083; --line:#DEE3EA; --soft:#EEF1F5;
+  --chrome:#1C2632; --chrome-ink:#E6ECF3; --chrome-muted:#93A1B2;
+  --me:#B86200; --me-bg:#FFF0DB; --them:#3C5E93; --them-bg:#E6EEFA; --ai:#0D7B6C; --ai-bg:#DDF3EE;
+  --warn:#B42318; --warn-bg:#FDE8E6; --send:#1E7B4E; --cell:#FFF4CC;
+  --p-hawk:#2F6FDE; --p-uuum:#D6336C; --p-alpaka:#7A5AF8; --p-in:#64748B; --p-me:#12A594;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --page:#080C11; --win:#131A22; --side:#0F151C; --ink:#E6EBF1; --muted:#95A2B3; --line:#25303C; --soft:#1A232D;
+  --chrome:#0A0F14; --chrome-ink:#E6ECF3; --chrome-muted:#8291A3;
+  --me:#F2A14A; --me-bg:#38280F; --them:#8EB2EA; --them-bg:#1A2940; --ai:#4CC9B6; --ai-bg:#0F2E29;
+  --warn:#F3877D; --warn-bg:#3B1B19; --send:#2E9E66; --cell:#3A3112; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --page:#080C11; --win:#131A22; --side:#0F151C; --ink:#E6EBF1; --muted:#95A2B3; --line:#25303C; --soft:#1A232D;
+  --chrome:#0A0F14; --chrome-ink:#E6ECF3; --chrome-muted:#8291A3;
+  --me:#F2A14A; --me-bg:#38280F; --them:#8EB2EA; --them-bg:#1A2940; --ai:#4CC9B6; --ai-bg:#0F2E29;
+  --warn:#F3877D; --warn-bg:#3B1B19; --send:#2E9E66; --cell:#3A3112; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--page);color:var(--ink);font-family:var(--f-body);font-size:13.5px;line-height:1.65;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 16px;
+  display:grid;grid-template-rows:auto 1fr;gap:10px}
+button,textarea,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--me);outline-offset:2px}
+.cap{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;font-size:12px;color:var(--muted)}
+.cap b{color:var(--ink);font-size:13px}
+.app{background:var(--win);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:grid;grid-template-rows:auto 1fr auto;min-height:0;box-shadow:0 18px 50px -20px rgba(10,20,30,.35)}
+/* title bar */
+.tb{background:var(--chrome);color:var(--chrome-ink);display:flex;align-items:center;gap:14px;padding:8px 14px;min-width:0;overflow-x:auto}
+.dots{display:flex;gap:7px;flex:none}.dots i{width:11px;height:11px;border-radius:50%;background:#FF5F57}.dots i:nth-child(2){background:#FEBC2E}.dots i:nth-child(3){background:#28C840}
+.logo{font-weight:900;letter-spacing:.08em;font-size:15px;display:flex;align-items:center;gap:7px;flex:none}
+.logo .b{width:14px;height:14px;border-radius:50%;background:var(--me);box-shadow:inset -3px -3px 0 rgba(0,0,0,.18)}
+.today{font-family:var(--f-mono);font-size:11px;color:var(--chrome-muted);flex:none}
+.ptabs{display:flex;gap:2px;flex:none}
+.ptabs button{background:transparent;border:0;color:var(--chrome-muted);padding:3px 10px;border-radius:6px;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.ptabs button[aria-pressed="true"]{background:rgba(255,255,255,.12);color:var(--chrome-ink)}
+.pd{width:7px;height:7px;border-radius:50%;display:inline-block;flex:none}
+.tb .sp{flex:1}
+.sync{font-size:11px;color:var(--chrome-muted);display:flex;align-items:center;gap:6px;white-space:nowrap;flex:none}
+.sync i{width:7px;height:7px;border-radius:50%;background:#3CCB7F}
+/* columns */
+.cols{display:grid;grid-template-columns:300px minmax(0,1fr) minmax(0,1.08fr);min-height:0}
+.col{min-width:0;min-height:0;display:grid}
+.left{background:var(--side);border-right:1px solid var(--line);overflow-y:auto;padding:12px;align-content:start;gap:12px}
+.center{grid-template-rows:auto auto 1fr auto;border-right:1px solid var(--line)}
+.right{grid-template-rows:auto 1fr}
+.date{font-family:var(--f-mono);font-size:11px;color:var(--muted);display:flex;justify-content:space-between}
+.add{display:flex;gap:6px;background:var(--win);border:1px solid var(--line);border-radius:9px;padding:5px 5px 5px 10px;align-items:center}
+.add input{flex:1;min-width:0;border:0;background:transparent;outline:0;font-size:13px}
+.btn{border:1px solid var(--line);background:var(--win);border-radius:7px;padding:4px 11px;font-size:12px;font-weight:700;white-space:nowrap}
+.btn.dark{background:var(--ink);color:var(--win);border-color:var(--ink)}
+.btn.send{background:var(--send);color:#fff;border-color:var(--send)}
+.banto{background:var(--win);border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:8px}
+.banto h3{margin:0;font-size:13.5px;font-weight:900;display:flex;justify-content:space-between;align-items:baseline}
+.banto h3 span{font-weight:400;font-size:11px;color:var(--muted)}
+.jobs{display:grid;gap:4px;font-size:11.5px}
+.job{display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:baseline;color:var(--muted)}
+.job b{font-family:var(--f-mono);font-size:10px;font-weight:600;padding:0 5px;border-radius:4px}
+.job b.run{background:var(--ai-bg);color:var(--ai)} .job b.ok{background:var(--soft);color:var(--muted)}
+.sec{display:grid;gap:5px}
+.sech{font-size:11.5px;font-weight:700;color:var(--muted);display:flex;justify-content:space-between;align-items:center;padding:0 2px}
+.sech .n{font-family:var(--f-mono);font-weight:600}
+.card{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:30px 1fr;gap:9px;padding:9px;border-radius:9px;border:1px solid transparent;background:transparent}
+.card:hover{background:var(--win)}
+.card.me{background:var(--me-bg)}
+.card[aria-current="true"]{border-color:var(--ink);background:var(--win)}
+.card:focus-visible{outline:2px solid var(--me)}
+.ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-family:var(--f-mono);font-size:10.5px;font-weight:600;color:#fff}
+.ic.s-slack{background:#4A154B}.ic.s-gmail{background:#C5221F}.ic.s-msgr{background:#0866FF}.ic.s-cal{background:#1A73E8}.ic.s-form{background:#5B6B7F}.ic.s-doc{background:#1F7A4D}
+.ct{min-width:0;display:grid;gap:2px}
+.ct .t{font-weight:700;font-size:13px;line-height:1.45}
+.ct .m{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:11px;color:var(--muted)}
+.chip{font-size:10.5px;font-weight:700;padding:0 7px;border-radius:999px;white-space:nowrap}
+.c-warn{background:var(--warn-bg);color:var(--warn)} .c-me{background:var(--win);color:var(--me);border:1px solid currentColor} .c-ai{background:var(--ai-bg);color:var(--ai)} .c-them{background:var(--them-bg);color:var(--them)}
+.proj{display:inline-flex;align-items:center;gap:4px;font-weight:700;color:var(--ink)}
+.ev{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:6px 9px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid transparent;background:transparent;text-align:left}
+.ev:hover{background:var(--win)} .ev[aria-current="true"]{border-color:var(--ink);background:var(--win)}
+.ev time{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.closed{font-size:11.5px;color:var(--muted);display:grid;gap:3px;padding:0 4px}
+.closed s{color:var(--muted)}
+/* center */
+.ch{display:flex;align-items:center;gap:10px;padding:12px 16px 8px;min-width:0;flex-wrap:wrap}
+.ch h2{margin:0;font-size:16px;font-weight:900;line-height:1.4;text-wrap:balance;min-width:0}
+.ctabs{display:flex;gap:4px;padding:0 16px 8px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ctabs button{border:1px solid var(--line);background:transparent;border-radius:999px;padding:2px 12px;font-size:12px;font-weight:700;color:var(--muted)}
+.ctabs button[aria-pressed="true"]{background:var(--ink);color:var(--win);border-color:var(--ink)}
+.feed{overflow-y:auto;padding:14px 16px;display:grid;gap:12px;align-content:start;min-height:0}
+.prog{font-family:var(--f-mono);font-size:11px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
+.prog b{color:var(--ink);font-weight:600}
+.bub{white-space:pre-wrap;font-size:13.5px;line-height:1.8}
+.bub.ai{border-left:3px solid var(--ai);padding:2px 0 2px 12px}
+.bub.me{justify-self:end;background:var(--soft);border-radius:12px;padding:7px 12px;max-width:80%}
+.memo{white-space:pre-wrap;background:var(--soft);border-radius:10px;padding:14px;font-size:13.5px;line-height:1.9;min-height:200px}
+.st{font-size:11.5px;color:var(--muted);padding:6px 16px;border-top:1px solid var(--line);display:flex;gap:8px}
+.st b{color:var(--ink)}
+.comp{padding:0 16px 12px;display:grid;gap:8px}
+.comp textarea{width:100%;min-height:74px;resize:vertical;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--win);font-size:13.5px;line-height:1.7}
+.crow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.crow select{border:1px solid var(--line);border-radius:7px;background:var(--win);padding:3px 8px;font-size:12px}
+.crow .sp{flex:1}
+.hint{font-size:11px;color:var(--muted)}
+/* right */
+.rtabs{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line);align-items:center}
+.rtabs button{border:0;background:transparent;border-radius:6px;padding:3px 10px;font-size:12px;font-weight:700;color:var(--muted)}
+.rtabs button[aria-pressed="true"]{background:var(--soft);color:var(--ink)}
+.rbody{overflow-y:auto;min-height:0;display:grid;align-content:start}
+.thr{padding:14px 16px;display:grid;gap:12px}
+.thr h4{margin:0;font-size:14.5px;font-weight:900;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.thr h4 span{font-size:11px;font-weight:400;color:var(--muted)}
+.sm{display:grid;grid-template-columns:34px 1fr;gap:9px}
+.av{width:34px;height:34px;border-radius:7px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px}
+.sm .n{font-weight:900;font-size:13px}.sm .n time{font-weight:400;color:var(--muted);font-size:11px;margin-left:6px}
+.sm .x{white-space:pre-wrap;font-size:13px;line-height:1.75}
+.react{display:inline-flex;gap:4px;font-size:11px;border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-top:4px}
+.draft{border:1px solid var(--line);border-radius:10px;overflow:hidden;display:grid}
+.dh{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;background:var(--ai-bg);color:var(--ai);padding:6px 10px;font-weight:700}
+.dh a{color:var(--ai);font-weight:400}
+.tool{display:flex;gap:2px;padding:5px 8px;border-bottom:1px solid var(--line);font-family:var(--f-mono);font-size:12px;color:var(--muted);flex-wrap:wrap}
+.tool span{padding:0 6px}
+.draft textarea{border:0;outline:0;resize:vertical;min-height:150px;padding:10px 12px;background:var(--win);font-size:13px;line-height:1.8;width:100%}
+.df{display:flex;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);flex-wrap:wrap}
+.df .sp{flex:1}
+.mail{display:grid;gap:10px}
+.mh{display:grid;gap:2px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:10px}
+.mh .s{font-size:15px;font-weight:900;color:var(--ink)}
+.mb{white-space:pre-wrap;font-size:13px;line-height:1.85}
+/* browser */
+.brw{display:grid;grid-template-rows:auto auto 1fr;min-height:100%}
+.btabs{display:flex;gap:2px;background:var(--soft);padding:6px 8px 0;overflow-x:auto}
+.btab{display:flex;align-items:center;gap:6px;font-size:11.5px;padding:5px 10px;border-radius:7px 7px 0 0;background:transparent;border:0;white-space:nowrap;color:var(--muted);max-width:220px}
+.btab span{overflow:hidden;text-overflow:ellipsis}
+.btab[aria-pressed="true"]{background:var(--win);color:var(--ink);font-weight:700}
+.fav{width:12px;height:12px;border-radius:3px;flex:none}
+.url{display:flex;gap:10px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line);font-family:var(--f-mono);font-size:11.5px;color:var(--muted);min-width:0}
+.url .u{flex:1;min-width:0;background:var(--soft);border-radius:999px;padding:3px 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.page{padding:14px 16px;display:grid;gap:12px;align-content:start;min-width:0}
+.gridwrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;font-size:12px;width:100%;min-width:560px}
+th,td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
+th{background:var(--soft);font-weight:700;font-size:11px;color:var(--muted)}
+td.new{background:var(--cell)}
+.sheettitle{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:700}
+.sheettitle i{width:16px;height:16px;border-radius:3px;background:#1E8E3E;display:inline-block}
+.legend{font-size:11px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.legend i{width:12px;height:12px;background:var(--cell);border:1px solid var(--line);display:inline-block}
+.ms{display:grid;grid-template-columns:200px 1fr;border:1px solid var(--line);border-radius:10px;overflow:hidden;min-height:380px}
+.ml{border-right:1px solid var(--line);display:grid;align-content:start}
+.mc{display:grid;grid-template-columns:36px 1fr auto;gap:8px;padding:9px 10px;font-size:12px;align-items:center}
+.mc.on{background:var(--soft)}
+.mc .av{width:36px;height:36px;border-radius:50%}
+.mc .p{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mc .u{width:9px;height:9px;border-radius:50%;background:#0866FF}
+.mv{display:grid;grid-template-rows:auto 1fr auto;min-width:0}
+.mvh{padding:9px 12px;border-bottom:1px solid var(--line);font-weight:900;font-size:13px}
+.mvb{padding:12px;display:grid;gap:8px;align-content:end}
+.mm{max-width:80%;padding:7px 12px;border-radius:18px;font-size:13px;background:var(--soft);white-space:pre-wrap}
+.mm.out{justify-self:end;background:#0866FF;color:#fff}
+.mm.dr{justify-self:end;background:transparent;border:1px dashed #0866FF;color:var(--ink)}
+.mvi{border-top:1px solid var(--line);padding:8px 12px;font-size:12px;color:var(--muted)}
+.doc{background:var(--win);border:1px solid var(--line);border-radius:6px;padding:22px 26px;display:grid;gap:10px;font-size:13px;line-height:1.85}
+.doc h5{margin:0;font-size:17px;font-weight:900}
+.doc h6{margin:6px 0 0;font-size:13.5px;font-weight:900}
+.doc ul{margin:0;padding-left:1.2em}
+.calv{border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:8px}
+.calv .tt{font-size:16px;font-weight:900;display:flex;gap:8px;align-items:center}
+.calv .tt i{width:12px;height:12px;border-radius:3px;background:#1A73E8}
+.kv{display:grid;grid-template-columns:5em 1fr;gap:4px 10px;font-size:12.5px}
+.kv dt{color:var(--muted)} .kv dd{margin:0}
+.empty{padding:30px 16px;color:var(--muted);font-size:12.5px}
+/* footer */
+.ft{display:flex;gap:16px;align-items:center;padding:5px 14px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);background:var(--side);overflow-x:auto;white-space:nowrap}
+.ft .ok{display:inline-flex;gap:5px;align-items:center}.ft .ok i{width:6px;height:6px;border-radius:50%;background:#3CCB7F}
+.bar{display:inline-block;width:70px;height:5px;background:var(--line);border-radius:3px;overflow:hidden;vertical-align:middle;margin:0 4px}
+.bar i{display:block;height:100%;background:var(--ai)}
+.ft .sp{flex:1}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--win);padding:8px 16px;border-radius:999px;font-size:12.5px;max-width:calc(100% - 32px)}
+@media (max-width:1100px){.cols{grid-template-columns:260px minmax(0,1fr)}.right{grid-column:1/-1;border-top:1px solid var(--line);min-height:520px}}
+@media (max-width:720px){html,body{height:auto}.cols{display:block}.left{max-height:none}.center{border-right:0;border-top:1px solid var(--line);min-height:520px}.ms{grid-template-columns:1fr}.ml{border-right:0;border-bottom:1px solid var(--line)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="cap"><b>BALL 完成イメージ</b><span>Mac のデスクトップアプリとして動く想定。左のボールを押すと中と右が切り替わります。中身は実データ（11/3 時点）をもとにした例で、細部は事実と違うことがあります。送信・書き込みはどこにもしません。</span></div>
+
+<div class="app">
+  <div class="tb">
+    <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="logo"><span class="b" aria-hidden="true"></span>BALL</div>
+    <span class="today">11/4（火）在宅 · 稼働 2.1h</span>
+    <div class="ptabs" id="ptabs" role="group" aria-label="プロジェクト"></div>
+    <span class="sp"></span>
+    <span class="sync"><i></i>同期 1分前</span>
+  </div>
+
+  <div class="cols">
+    <aside class="col left" aria-label="ボール一覧">
+      <div class="date"><span>TUE, NOV 4</span><span id="meCount"></span></div>
+      <form class="add" id="addForm"><input id="addInput" aria-label="ボールを追加" placeholder="ボールを追加（話してもOK）"><button class="btn dark" type="submit">追加</button></form>
+      <div class="banto">
+        <h3>番頭 <span>まとめ役の AI · 3分前</span></h3>
+        <form class="add" id="bantoForm" style="padding:4px 4px 4px 9px"><input id="bantoInput" aria-label="番頭に頼む" placeholder="ざっくり頼む（誰に振るかは番頭が決める）"><button class="btn dark" type="submit">送信</button></form>
+        <div class="jobs" id="jobs"></div>
+      </div>
+      <div id="sections"></div>
+    </aside>
+
+    <section class="col center" aria-label="このボールの AI">
+      <div class="ch" id="chHead"></div>
+      <div class="ctabs" role="group" aria-label="表示切替">
+        <button type="button" id="ct-chat" aria-pressed="true">チャット</button>
+        <button type="button" id="ct-memo" aria-pressed="false">メモ</button>
+      </div>
+      <div class="feed" id="feed"></div>
+      <div>
+        <div class="st" id="state"></div>
+        <form class="comp" id="comp">
+          <textarea id="compText" aria-label="メッセージ" placeholder="メッセージ（Aqua Voice の音声入力もそのまま入ります · ⌘Enter で送信）"></textarea>
+          <div class="crow">
+            <select id="perm" aria-label="AI の権限"><option>下書きまで</option><option>シート記入まで</option><option>読むだけ</option></select>
+            <select id="model" aria-label="モデル"><option>Opus 5.5</option><option>Sonnet 5.5</option></select>
+            <span class="sp"></span><span class="hint">送信はしません</span>
+            <button class="btn dark" type="submit">送信</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="col right" aria-label="元のやり取り">
+      <div class="rtabs" role="group" aria-label="右ペイン">
+        <button type="button" id="rt-thread" aria-pressed="true">スレッド</button>
+        <button type="button" id="rt-browser" aria-pressed="false">ブラウザ</button>
+      </div>
+      <div class="rbody" id="rbody"></div>
+    </section>
+  </div>
+
+  <div class="ft">
+    <span class="ok"><i></i>Gmail 1分前</span><span class="ok"><i></i>Slack 1分前</span><span class="ok"><i></i>Messenger 2分前</span><span class="ok"><i></i>カレンダー 1分前</span>
+    <span>8:45 カレンダーに「今日の5件」を書き出し済み</span>
+    <span class="sp"></span>
+    <span>Claude 5h<span class="bar"><i style="width:18%"></i></span>18% · 週<span class="bar"><i style="width:41%"></i></span>41%</span>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+const P={hawk:["HAWK","var(--p-hawk)"],uuum:["UUUM・ビルコム","var(--p-uuum)"],alpaka:["alpaka","var(--p-alpaka)"],in:["社内","var(--p-in)"],me:["個人","var(--p-me)"]};
+const IC={slack:"SL",gmail:"GM",msgr:"MS",cal:"CA",form:"FM",doc:"DC"};
+const COL={iwata:"#8E44AD",hide:"#2E86C1",haru:"#D6336C",sato:"#C0392B",msgrA:"#E67E22",msgrB:"#16A085",msgrC:"#7F8C8D",sugi:"#27AE60"};
+const items=[
+{id:"iwata",sec:"me",proj:"hawk",src:"slack",title:"提案ステータス記入・過去案件の状態確認（岩田さん）",sub:"#hawk-sales-private",chips:[["定例 11/5 15:00 まで","warn"]],ago:"2日前",
+ feed:[["prog","3 tools · シート読込: 過去_提案ステータス / Gmail 検索 / Gemini メモ 6件"],
+  ["ai","岩田さんの依頼は2つです。定例前の提案ステータス記入と、過去の全案件の状態確認。\n\n10月に動いた12社のうち、シートが古いままの7社を、送ったメールと Gemini メモから埋める案を作りました。黄色のセルが更新案です（まだ書き込んでいません）。\n\n・ビジョン様：トライアル延長 → 11/2 OK\n・朝日コネクト様：10/30 商談。11/5 に確認メール\n・リックコミュニケーションズ様：コンペ結果待ち\n・viviON様：オンボーディング延期。再設定が必要\n・gaaboo様：トライアル終了。振り返り未実施\n\n右のブラウザにシートを開いています。これで記入して、スレッドに返信の下書きを入れますか。"],
+  ["me","それで。viviONは11月中に再設定って書いといて"],
+  ["prog","1 tool · シート記入の準備（7セル）"],
+  ["ai","viviON様は「11月中に再設定」にしました。スレッドに返信の下書きを入れています。右の緑のボタンで送れます。"]],
+ memo:"定例で話すこと\n・viviON 再設定日を決める\n・gaaboo 振り返りを今週中に\n・ビジョン 継続の条件",
+ thread:{kind:"slack",ch:"#hawk-sales-private",ws:"FreakOut",msgs:[["iwata","岩田 美和","11/2 10:12","@片山 定例前に、提案ステータスへの記入と、過去全案件のコンディション確認をお願いします！",""]],
+  draft:"岩田さん\n遅くなりました、提案ステータス更新しました。\n・10月に動いた12社のうち7社を更新\n・viviON様は11月中に再設定予定\n・gaaboo様は振り返り未実施のため今週中に設定します\n定例でご確認お願いします。"},
+ browser:{tabs:[["sheet","HAWKアタックリスト - 過去_提案ステータス","#1E8E3E","docs.google.com/spreadsheets/d/1iyh…/edit#gid=過去_提案ステータス"],["gemini","朝日コネクト・HAWK - Gemini によるメモ","#1F7A4D","docs.google.com/document/d/…"]],on:0}},
+{id:"leads",sec:"me",proj:"hawk",src:"slack",title:"ウェビナー後リード65件の振り分け（中西さん）",sub:"#hawk-marketing",chips:[["cc 4人","them"]],ago:"6日前",
+ feed:[["prog","2 tools · シート読込: 共催ウェビナー_参加者 / HAWK企業マスタ"],["ai","65件を、HAWK企業マスタの業態と規模で3つに分けました。\n\nA：今週アポ打診　9件\nB：お礼＋資料　31件\nC：ナーチャリング　25件\n\nA の9件には個別のお礼メール下書きを作れます。作りますか。"]],
+ memo:"A の9件は FO 指名の4社を含む。指名分は送付済み。",
+ thread:{kind:"slack",ch:"#hawk-marketing",ws:"FreakOut",msgs:[["hide","中西 秀之","10/28 18:40","@片山 @座安 @小瀬 @木伏\nウェビナー後のリード65件、振り分けて休み明けに対応お願いします 🙏","👀 3"]],
+  draft:"中西さん\n振り分けました。\nA 9件（片山で打診）/ B 31件（お礼＋資料）/ C 25件（ナーチャリング）\nシートの担当列を更新しています。"},
+ browser:{tabs:[["leads","共催ウェビナー_参加者（10/27）","#1E8E3E","docs.google.com/spreadsheets/d/…/edit#gid=参加者"]],on:0}},
+{id:"msgr",sec:"me",proj:"uuum",src:"msgr",title:"メッセンジャー：紹介したい会社の件（例）",sub:"Facebook メッセンジャー",chips:[["2日 未返信","warn"]],ago:"2日前",
+ feed:[["prog","1 tool · Messenger 未読を確認（3件）"],["ai","メッセンジャーの未読は3件で、返事が必要なのは1件です。\n来週お茶しながら紹介したい会社がある、という連絡なので、日程の候補を3つ入れた返信を下書きしました。\n\n候補はカレンダーの空きから取っています。\n・11/10（月）16:00〜\n・11/12（水）17:00〜\n・11/13（木）11:00〜\n\nメッセンジャーは右で開いているので、そのまま送れます。"]],
+ memo:"",
+ thread:null,
+ browser:{tabs:[["messenger","Messenger","#0866FF","www.messenger.com/t/…"]],on:0}},
+{id:"haru",sec:"me",proj:"uuum",src:"slack",title:"春さん：rawデータ活用と媒体の縛りへの回答",sub:"DM · 相手の発言で止まっている",chips:[["18日","warn"]],ago:"10/16",
+ feed:[["ai","10/16 の春さんの質問に返していません。媒体ごとの規約を確認してから答える必要があります。\n\nまず「確認して金曜までに返します」と一次返信だけ入れますか。調べる方は、このボールのまま私が進めます。"]],
+ memo:"確認すること\n・Meta / TikTok のrawデータ持ち出し条件\n・UUUM 側で使いたい粒度",
+ thread:{kind:"slack",ch:"春 大介",ws:"DM",msgs:[["haru","春 大介","10/16 19:22","片山さん、rawデータって二次活用できます？媒体側の縛りがあるなら先に知っておきたくて",""]],
+  draft:"春さん\n返信が遅くなってすみません！\n媒体ごとに条件が違うので、確認して今週金曜までにまとめて返します。"},
+ browser:{tabs:[["doc","Meta 広告データ利用規約（メモ）","#1F7A4D","docs.google.com/document/d/…"]],on:0}},
+{id:"clabel",sec:"me",proj:"hawk",src:"gmail",title:"シーラベル様 打合せのお礼と登壇の段取り",sub:"11/2 12:00 の Gemini メモから",chips:[["お礼メール","me"]],ago:"昨日",
+ feed:[["prog","2 tools · Gemini メモ読込 / Gmail スレッド読込"],["ai","11/2 の打合せメモから、次の2点を拾いました。\n・2027年1月の共催オンライン選定会に、HAWK として登壇する方向\n・登壇者と概要を11月中に連絡する\n\nお礼メールを下書きしました。概要の叩き台はメモに入れています。"]],
+ memo:"登壇概要（叩き台）\n・テーマ：SNS広告の運用を AI エージェントに任せる\n・事例：共催ウェビナーで出した3社\n・時間：20分想定",
+ thread:{kind:"gmail",subject:"Re: 【お伺い】広告サービス・営業×AIエージェント選定会へのご登壇について",from:"佐藤 亜弥 <aya.sato@clabel.co.jp>",to:"片山 優希",date:"10/28 11:35",
+  body:"片山様\n\nお世話になっております。シーラベルの佐藤です。\n2027年1月に予定している選定会について、ご登壇をご検討いただけますと幸いです。\n詳細は打合せの場でご説明いたします。",
+  draft:"佐藤様、松山様\n\n本日はお時間をいただきありがとうございました。フリークアウトの片山です。\n1月の選定会、ぜひ登壇させていただければと思います。\n登壇者と概要は、11月中にあらためてご連絡いたします。\n\n引き続きよろしくお願いいたします。"},
+ browser:{tabs:[["gemini2","シーラベル様 × HAWK - Gemini によるメモ","#1F7A4D","docs.google.com/document/d/…"],["gmailweb","Gmail","#C5221F","mail.google.com/mail/u/0/#inbox"]],on:0}},
+{id:"timerex",sec:"me",proj:"hawk",src:"slack",title:"TimeRex 登録とカレンダー修正（中西さん）",sub:"#hawk-marketing",chips:[["来週月曜まで","me"]],ago:"5日前",
+ feed:[["ai","ウェビナーのフォロー用に TimeRex の予約ページを作り、カレンダーの【仮】枠を整理する依頼です。\n【仮】のまま残っている枠が今週3件あります。確定していない枠を外して、TimeRex の空きに戻しますか。"]],memo:"",
+ thread:{kind:"slack",ch:"#hawk-marketing",ws:"FreakOut",msgs:[["hide","中西 秀之","10/30 17:05","@片山 TimeRex 登録とカレンダー修正お願いします。来週月曜まででOKです",""]],draft:"中西さん\nTimeRex 登録しました。カレンダーの仮枠も整理済みです。"},
+ browser:{tabs:[["cal","Google カレンダー","#1A73E8","calendar.google.com/calendar/r/week"]],on:0}},
+{id:"shizu",sec:"ai",proj:"hawk",src:"form",title:"静鉄アド・パートナーズ 紹介申込の初動",sub:"#hawk_紹介受付 · 担当: 片山",chips:[["3/4 完了","ai"]],ago:"今",
+ feed:[["prog","hawk-inbound-lead · 4工程中3工程"],["ai","会社概要の Doc 作成、アタックリストへの行追加、カレンダーの仮押さえまで終わりました。いま初回メールを下書きしています。終わったら自分ボールに戻します。"]],memo:"",
+ thread:{kind:"slack",ch:"#hawk_紹介受付",ws:"FreakOut",msgs:[["sugi","申込フォーム（bot）","11/3 10:41","HAWK紹介申込：株式会社静鉄アド・パートナーズ\n担当: @片山",""]],draft:null},
+ browser:{tabs:[["doc2","静鉄アド・パートナーズ 会社概要","#1F7A4D","docs.google.com/document/d/…"]],on:0}},
+{id:"drafts",sec:"ai",proj:"in",src:"gmail",title:"Gmail 下書き140件の棚卸し",sub:"テンプレ営業文 52件を含む",chips:[["仕分け中","ai"]],ago:"今",
+ feed:[["ai","下書きを「送る / 捨てる / テンプレにする」の3つに仕分けています。30日以上前のテンプレ営業文52件は「捨てる」を提案する予定です。仕分けが終わったら、まとめて確認してもらいます。"]],memo:"",thread:null,
+ browser:{tabs:[["gmailweb","Gmail - 下書き","#C5221F","mail.google.com/mail/u/0/#drafts"]],on:0}},
+{id:"asahi",sec:"them",proj:"hawk",src:"gmail",title:"朝日コネクト 秦様：検討状況",sub:"10/30 商談 · お礼送付済み",chips:[["待ち 4日","them"]],ago:"",
+ feed:[["ai","10/30 にお礼を送って返事を待っています。11/5 17:30 に確認メールの下書きを作って、自分ボールに戻します。"]],memo:"",thread:null,browser:{tabs:[["gemini","朝日コネクト・HAWK - Gemini によるメモ","#1F7A4D","docs.google.com/document/d/…"]],on:0}},
+{id:"rick",sec:"them",proj:"uuum",src:"gmail",title:"リックコミュニケーションズ 樋口様：コンペ結果",sub:"インフルエンサーコンペ",chips:[["11/5 確認","them"]],ago:"",
+ feed:[["ai","コンペの結果待ちです。11/5 に結果を確認するリマインドを入れています。"]],memo:"",thread:null,browser:{tabs:[["gmailweb","Gmail","#C5221F","mail.google.com/mail/u/0/#inbox"]],on:0}},
+{id:"realtech",sec:"cal",proj:"hawk",src:"cal",time:"13:00",title:"【仮】リアルテックジャパン様 HAWKご説明",sub:"10/27 ウェビナー FO 指名",chips:[],
+ feed:[["prog","hawk-shodan-prep · 予習ブリーフ"],["ai","13:00 の予習です。\n\n経緯：10/27 の共催ウェビナーで FO を指名。楳田様。\n状態：まだ【仮】のままで、先方からの確定連絡は来ていません。\n当日のゴール：トライアルのつなぎ込み日程を決める\n想定される質問：Meta 以外の媒体、料金の決まり方\n\n確定していないので、10時にリマインドを送りますか。下書きはできています。"]],memo:"",thread:null,
+ browser:{tabs:[["calev","予定の詳細","#1A73E8","calendar.google.com/calendar/event?eid=…"]],on:0}}
+];
+const todayCal=[["11:00","【仮】小瀬さん紹介4社 HAWKご説明",null],["13:00","【仮】リアルテックジャパン様",'realtech'],["14:00","【仮】CARTA KNOT 鈴木様",null],["17:00","カクヤス杉田、平井連絡",null]];
+const jobs=[["run","進行中","リード65件の振り分け案 → 中西さん返信の下書き"],["ok","完了","フォームの自動返信12件を既読に（人からの返信 0件）"],["ok","完了","2段階認証の告知は送信済みと確認 → ボールを閉じました"]];
+const closed=["2段階認証の告知（杉浦さん）· 送信済み","PAC×UUUM 明日のリマインド · 予定が終了"];
+let proj="all",cur="iwata",ctab="chat",rtab="thread";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,2600);}
+function ptabs(){
+  const tabs=[["all","すべて","var(--chrome-muted)"],...Object.entries(P).map(([k,v])=>[k,v[0],v[1]])];
+  $("ptabs").innerHTML=tabs.map(([k,n,c])=>`<button type="button" data-p="${k}" aria-pressed="${proj===k}"><span class="pd" style="background:${c}"></span>${n}</button>`).join("");
+  $("ptabs").querySelectorAll("button").forEach(b=>b.onclick=()=>{proj=b.dataset.p;ptabs();left();});
+}
+function card(i){
+  const pj=P[i.proj];
+  return `<button type="button" class="card${i.sec==="me"?" me":""}" data-id="${i.id}" aria-current="${cur===i.id}">
+   <span class="ic s-${i.src}">${IC[i.src]}</span>
+   <span class="ct"><span class="t">${esc(i.title)}</span>
+   <span class="m"><span class="proj"><span class="pd" style="background:${pj[1]}"></span>${pj[0]}</span>${esc(i.sub)}${i.ago?` · ${esc(i.ago)}`:""}</span>
+   ${i.chips.length?`<span class="m">${i.chips.map(c=>`<span class="chip c-${c[1]}">${esc(c[0])}</span>`).join("")}</span>`:""}</span></button>`;
+}
+function left(){
+  const vis=items.filter(i=>proj==="all"||i.proj===proj);
+  const by=s=>vis.filter(i=>i.sec===s);
+  $("meCount").textContent=`自分ボール ${items.filter(i=>i.sec==="me").length}`;
+  $("jobs").innerHTML=jobs.map(j=>`<div class="job"><b class="${j[0]}">${j[1]}</b><span>${esc(j[2])}</span></div>`).join("");
+  const sec=(t,list,extra="")=>`<div class="sec"><div class="sech"><span>${t}</span><span class="n">${list.length}</span></div>${list.map(card).join("")}${extra}</div>`;
+  let html="";
+  html+=`<div class="sec"><div class="sech"><span>ピン留め</span></div><button type="button" class="card" data-id="leads" aria-current="false"><span class="ic s-doc">PN</span><span class="ct"><span class="t">10/27 共催ウェビナーのフォロー</span><span class="m"><span class="proj"><span class="pd" style="background:var(--p-hawk)"></span>HAWK</span>ほか 3（未完了）</span></span></button></div>`;
+  html+=sec("自分ボール",by("me"));
+  html+=sec("AI 作業中",by("ai"));
+  html+=sec("返事待ち（相手ボール）",by("them"));
+  html+=`<div class="sec"><div class="sech"><span>今日の予定</span><span class="n">${todayCal.length}</span></div>${todayCal.map(e=>`<button type="button" class="ev" ${e[2]?`data-id="${e[2]}"`:"data-none='1'"} aria-current="${cur===e[2]}"><time>${e[0]}</time><span>${esc(e[1])}</span></button>`).join("")}</div>`;
+  html+=`<div class="sec"><div class="sech"><span>自動で閉じた</span><span class="n">${closed.length}</span></div><div class="closed">${closed.map(c=>`<s>${esc(c)}</s>`).join("")}</div></div>`;
+  $("sections").innerHTML=html;
+  $("sections").querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>select(b.dataset.id));
+  $("sections").querySelectorAll("[data-none]").forEach(b=>b.onclick=()=>toast("この予定は予習ブリーフ作成前です（モック）"));
+}
+function select(id){cur=id;const i=items.find(x=>x.id===id);rtab=i.thread?"thread":"browser";left();center();right();}
+function center(){
+  const i=items.find(x=>x.id===cur),pj=P[i.proj];
+  const ball={me:["自分ボール","c-me"],ai:["AI 作業中","c-ai"],them:["相手ボール","c-them"],cal:["今日の予定","c-them"]}[i.sec];
+  $("chHead").innerHTML=`<span class="proj"><span class="pd" style="background:${pj[1]}"></span>${pj[0]}</span><h2>${esc(i.title)}</h2><span class="chip ${ball[1]}">${ball[0]}</span>`;
+  $("ct-chat").setAttribute("aria-pressed",ctab==="chat");$("ct-memo").setAttribute("aria-pressed",ctab==="memo");
+  if(ctab==="chat"){
+    $("feed").innerHTML=i.feed.map(([k,t])=>k==="prog"?`<div class="prog"><b>Progress</b>${esc(t)}</div>`:`<div class="bub ${k}">${esc(t)}</div>`).join("");
+  }else{
+    $("feed").innerHTML=`<div class="memo" contenteditable="false">${esc(i.memo||"メモはまだありません。チャットで「メモに入れといて」と言うと AI が書きます。")}</div>`;
+  }
+  $("feed").scrollTop=$("feed").scrollHeight;
+  $("state").innerHTML=i.sec==="ai"?`<b>作業中</b> 終わったら自分ボールに戻します`:`<b>待機中</b> あなたの番`;
+}
+function right(){
+  const i=items.find(x=>x.id===cur);
+  $("rt-thread").setAttribute("aria-pressed",rtab==="thread");$("rt-browser").setAttribute("aria-pressed",rtab==="browser");
+  $("rt-thread").textContent=i.thread?"スレッド 1":"スレッド";
+  if(rtab==="thread"){$("rbody").innerHTML=i.thread?thread(i.thread):`<div class="empty">このボールのやり取りはブラウザのタブで開いています。</div>`;}
+  else{$("rbody").innerHTML=browser(i);}
+  $("rbody").querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{i.browser.on=+b.dataset.tab;right();});
+  $("rbody").querySelectorAll("[data-send]").forEach(b=>b.onclick=()=>toast("モックなので送信しません。本番ではここで初めて送られます"));
+}
+function thread(t){
+  if(t.kind==="slack"){
+    return `<div class="thr"><h4>${t.ws==="DM"?"DM: ":""}${esc(t.ch)} ${t.ws==="DM"?"":"のスレッド"}<span>${esc(t.ws)} ワークスペース</span></h4>
+    ${t.msgs.map(m=>`<div class="sm"><span class="av" style="background:${COL[m[0]]||"#555"}">${esc(m[1][0])}</span><div><div class="n">${esc(m[1])}<time>${esc(m[2])}</time></div><div class="x">${esc(m[3])}</div>${m[4]?`<span class="react">${esc(m[4])}</span>`:""}</div></div>`).join("")}
+    ${t.draft?draftBox(t.draft,"slack"):""}</div>`;
+  }
+  return `<div class="thr"><div class="mail"><div class="mh"><span class="s">${esc(t.subject)}</span><span>${esc(t.from)} → ${esc(t.to)} · ${esc(t.date)}</span></div><div class="mb">${esc(t.body)}</div></div>${draftBox(t.draft,"gmail")}</div>`;
+}
+function draftBox(d,kind){
+  return `<div class="draft"><div class="dh"><span>AI 下書き（送るまで送信されません）</span><a href="#" onclick="return false">破棄</a></div>
+  <div class="tool"><span>B</span><span>I</span><span>S</span><span>🔗</span><span>•</span><span>1.</span></div>
+  <textarea aria-label="下書き">${esc(d)}</textarea>
+  <div class="df">${kind==="gmail"?`<button type="button" class="btn" data-send>Gmail の下書きに保存</button>`:`<span>＋ ☺ @</span>`}<span class="sp"></span><span>下書きを保存しています</span><button type="button" class="btn send" data-send>${kind==="gmail"?"送信":"送信 ➤"}</button></div></div>`;
+}
+function browser(i){
+  const b=i.browser,t=b.tabs[b.on];
+  return `<div class="brw"><div class="btabs">${b.tabs.map((x,k)=>`<button type="button" class="btab" data-tab="${k}" aria-pressed="${k===b.on}"><i class="fav" style="background:${x[2]}"></i><span>${esc(x[1])}</span></button>`).join("")}<button type="button" class="btab" aria-label="新しいタブ">＋</button></div>
+  <div class="url"><span>‹ › ↻</span><span class="u">${esc(t[3])}</span></div><div class="page">${pageOf(t[0],i)}</div></div>`;
+}
+function pageOf(k,i){
+  if(k==="sheet"){
+    const rows=[["ビジョン","トライアル","10/27","延長の可否","延長 OK（11/2）→ 継続見込み",1],["朝日コネクト","商談済み","10/30","検討状況の確認","11/5 確認メール",1],["リックコミュニケーションズ","提案中","10/30","コンペ結果待ち","結果待ち（11/5 確認）",1],["viviON","オンボーディング","10/14","日程再設定","11月中に再設定",1],["gaaboo","トライアル終了","10/22","振り返り","振り返り未実施 → 今週設定",1],["PAC","紹介済み","10/28","UUUM・alpaka 紹介","紹介済み",1],["AJIMA","振り返り済み","10/19","本申込","判断待ち",1],["LIVEDGE","商談予定","11/2","11/11 商談","",0]];
+    return `<div class="sheettitle"><i></i>HAWKアタックリスト <span class="hint">/ 過去_提案ステータス</span></div><div class="legend"><i></i>AI の更新案（まだ書き込んでいません）</div>
+    <div class="gridwrap"><table><thead><tr><th>会社</th><th>ステージ</th><th>最終接点</th><th>次のアクション</th><th>状態（11/4 更新案）</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td class="${r[5]?"new":""}">${r[4]}</td></tr>`).join("")}</tbody></table></div>`;
+  }
+  if(k==="leads"){
+    const rows=[["A","FO 指名","4","送付済み"],["A","業態一致・中規模以上","5","今週アポ打診"],["B","業態一致・小規模","31","お礼＋資料"],["C","業態外","25","ナーチャリング"]];
+    return `<div class="sheettitle"><i></i>共催ウェビナー_参加者（10/27）</div><div class="gridwrap"><table><thead><tr><th>区分</th><th>条件</th><th>件数</th><th>対応</th></tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,j)=>`<td class="${j===3?"new":""}">${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  }
+  if(k==="messenger"){
+    return `<div class="ms"><div class="ml">
+      <div class="mc on"><span class="av" style="background:${COL.msgrA}">K</span><div style="min-width:0"><b>K さん（例）</b><div class="p">来週どこかでお茶しませんか？</div></div><i class="u"></i></div>
+      <div class="mc"><span class="av" style="background:${COL.msgrB}">T</span><div style="min-width:0"><b>T さん（例）</b><div class="p">了解です！ありがとうございます</div></div><span></span></div>
+      <div class="mc"><span class="av" style="background:${COL.msgrC}">M</span><div style="min-width:0"><b>M さん（例）</b><div class="p">資料見ました👍</div></div><span></span></div>
+    </div><div class="mv"><div class="mvh">K さん（例）</div><div class="mvb">
+      <div class="mm">片山さん、来週どこかでお茶しませんか？紹介したい会社があって</div>
+      <div class="mm">SNS 広告まわりで困ってるところです</div>
+      <div class="mm dr">ありがとうございます！ぜひ。\n11/10（月）16時〜、11/12（水）17時〜、11/13（木）11時〜あたりどうでしょう？\n（AI 下書き · 未送信）</div>
+    </div><div class="mvi">Aa　メッセージを入力</div></div></div>`;
+  }
+  if(k==="gemini"||k==="gemini2"){
+    const a=k==="gemini";
+    return `<div class="doc"><h5>${a?"朝日コネクト・HAWK":"シーラベル様 × HAWK"} - Gemini によるメモ</h5><span class="hint">${a?"2026/10/30 14:00":"2026/11/02 12:00"} · 自動生成</span>
+    <h6>概要</h6><p>${a?"HAWK の機能と2週間トライアルの流れを説明。秦様から運用体制についての質問あり。":"2027年1月の共催オンライン選定会について、登壇の方向性と進め方を相談。"}</p>
+    <h6>次のステップ</h6><ul><li>[片山] ${a?"検討状況を11/5に確認する":"登壇者と概要を11月中に連絡する"}</li><li>[${a?"秦":"佐藤"}] ${a?"社内で体制を確認する":"当日の進行案を共有する"}</li></ul></div>`;
+  }
+  if(k==="doc"||k==="doc2"){
+    return k==="doc"?`<div class="doc"><h5>Meta 広告データ利用規約（メモ）</h5><h6>確認ポイント</h6><ul><li>レポートデータの第三者提供の条件</li><li>rawデータの保持期間</li><li>TikTok 側の同等条項</li></ul><p class="hint">AI が調べて書き足します</p></div>`
+    :`<div class="doc"><h5>株式会社静鉄アド・パートナーズ 会社概要</h5><span class="hint">hawk-inbound-lead が作成中</span><h6>基本情報</h6><p>所在地・事業内容・主要取引先を整理中</p><h6>HAWK との接点</h6><p>紹介パートナー申込（11/3）</p></div>`;
+  }
+  if(k==="calev"){
+    return `<div class="calv"><div class="tt"><i></i>[オンライン社外]【仮】リアルテックジャパン様（楳田様）／HAWKご説明</div>
+    <dl class="kv"><dt>日時</dt><dd>11/4（火）13:00〜14:00</dd><dt>経緯</dt><dd>10/27 共催ウェビナー FO 指名</dd><dt>状態</dt><dd><span class="chip c-warn">先方未確定</span></dd><dt>参加者</dt><dd>片山（先方の参加登録なし）</dd><dt>資料</dt><dd>HAWK_共催ウェビナー_20261027.pdf</dd></dl></div>`;
+  }
+  if(k==="cal"){
+    return `<div class="calv"><div class="tt"><i></i>今週の【仮】枠</div><dl class="kv"><dt>11/4 11:00</dt><dd>小瀬さん紹介4社 HAWKご説明（候補3）</dd><dt>11/4 14:00</dt><dd>CARTA KNOT 鈴木様（候補3）</dd><dt>11/6 13:30</dt><dd>小瀬さん紹介4社（候補4）</dd></dl></div>`;
+  }
+  return `<div class="doc"><h5>${i.src==="gmail"?"Gmail":"ページ"}</h5><p class="hint">ログインしたままの本物の画面がここに表示されます（モックでは省略）。</p></div>`;
+}
+$("ct-chat").onclick=()=>{ctab="chat";center();};
+$("ct-memo").onclick=()=>{ctab="memo";center();};
+$("rt-thread").onclick=()=>{rtab="thread";right();};
+$("rt-browser").onclick=()=>{rtab="browser";right();};
+$("comp").onsubmit=e=>{e.preventDefault();const t=$("compText").value.trim();if(!t)return;const i=items.find(x=>x.id===cur);
+  i.feed.push(["me",t],["ai","了解です。（モックなので、ここでは返事の例だけ出しています。本番ではこのボールの文脈を持った Claude が作業します）"]);$("compText").value="";ctab="chat";center();};
+$("compText").addEventListener("keydown",e=>{if(e.key==="Enter"&&(e.metaKey||e.ctrlKey)){e.preventDefault();$("comp").requestSubmit();}});
+$("addForm").onsubmit=e=>{e.preventDefault();const t=$("addInput").value.trim();if(!t)return;
+  items.unshift({id:"n"+Date.now(),sec:"me",proj:"in",src:"doc",title:t,sub:"手入力",chips:[["新規","me"]],ago:"今",feed:[["ai","ボールにしました。関係するスレッドや予定があれば紐づけます。"]],memo:"",thread:null,browser:{tabs:[["x","新しいタブ","#999","about:blank"]],on:0}});
+  $("addInput").value="";select(items[0].id);};
+$("bantoForm").onsubmit=e=>{e.preventDefault();const t=$("bantoInput").value.trim();if(!t)return;jobs.unshift(["run","進行中",t+" → 振り先を判断中"]);$("bantoInput").value="";left();};
+ptabs();select("iwata");
+})();
+</script>
