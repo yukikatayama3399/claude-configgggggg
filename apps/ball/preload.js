@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("ball", {
   messengerLast: () => ipcRenderer.invoke("msgr-last"),
   messengerShow: () => ipcRenderer.send("msgr-show"),
   messengerRefresh: () => ipcRenderer.send("msgr-refresh"),
+  messengerUseUrl: (url) => ipcRenderer.send("msgr-use-url", url),
   // Gmail（gog 経由）
   gmailStatus: () => ipcRenderer.invoke("gmail-status"),
   gmailInbox: () => ipcRenderer.invoke("gmail-inbox"),

@@ -30,9 +30,18 @@ function createWindow() {
 }
 
 // ---------- Messenger の読み取り（見えない裏ウィンドウ） ----------
-const MSGR_URL = process.env.BALL_MSGR_URL || "https://www.facebook.com/messages/";
+// 読みに行く候補。会話一覧が読めなければ次を試す。片山さんが選んだ URL があれば最優先。
+const fs = require("fs");
+const MSGR_CANDIDATES = ["https://www.facebook.com/messages/t/", "https://www.messenger.com/t/", "https://www.facebook.com/messages/"];
+const msgrPrefFile = () => path.join(app.getPath("userData"), "messenger.json");
+function loadMsgrPref() { try { return JSON.parse(fs.readFileSync(msgrPrefFile(), "utf8")).url || null; } catch (e) { return null; } }
+function saveMsgrPref(url) { try { fs.writeFileSync(msgrPrefFile(), JSON.stringify({ url })); } catch (e) { /* 保存できなくても動く */ } }
+let msgrUrls = [], msgrIdx = 0;
 let msgrWin = null, lastMsgr = null;
 function startMessenger() {
+  const pref = process.env.BALL_MSGR_URL || loadMsgrPref();
+  msgrUrls = pref ? [pref, ...MSGR_CANDIDATES.filter((u) => u !== pref)] : MSGR_CANDIDATES.slice();
+  const MSGR_URL = msgrUrls[0];
   msgrWin = new BrowserWindow({
     show: false, width: 1200, height: 900, title: "BALL - Messenger 読み取り",
     webPreferences: {
@@ -47,7 +56,24 @@ function startMessenger() {
   // 15分ごとに読み込み直して、一覧を新しくする
   setInterval(() => { if (msgrWin && !msgrWin.isDestroyed()) msgrWin.reload(); }, 15 * 60 * 1000);
 }
-ipcMain.on("msgr-result", (_e, data) => { lastMsgr = data; if (win && !win.isDestroyed()) win.webContents.send("msgr-update", data); });
+ipcMain.on("msgr-result", (_e, data) => {
+  // 一覧が読めないときは、次の候補 URL に切り替えてみる（ログイン画面のときは切り替えない）
+  if (data.status === "nolist" && msgrIdx < msgrUrls.length - 1 && !process.env.BALL_MSGR_URL) {
+    msgrIdx += 1;
+    data = { ...data, note: `別の URL を試しています（${msgrUrls[msgrIdx]}）` };
+    if (msgrWin && !msgrWin.isDestroyed()) msgrWin.loadURL(msgrUrls[msgrIdx]);
+  }
+  if (data.status === "ok") msgrIdx = Math.max(0, msgrUrls.indexOf(data.url) >= 0 ? msgrUrls.indexOf(data.url) : msgrIdx);
+  lastMsgr = data;
+  if (win && !win.isDestroyed()) win.webContents.send("msgr-update", data);
+});
+// 右のブラウザで開いている Messenger のページを、読み取りに使う
+ipcMain.on("msgr-use-url", (_e, url) => {
+  if (!/^https:\/\/(www\.)?(facebook\.com\/messages|messenger\.com)/.test(url)) return;
+  saveMsgrPref(url);
+  msgrUrls = [url, ...MSGR_CANDIDATES.filter((u) => u !== url)]; msgrIdx = 0;
+  if (msgrWin && !msgrWin.isDestroyed()) msgrWin.loadURL(url);
+});
 ipcMain.handle("msgr-last", () => lastMsgr);
 ipcMain.on("msgr-show", () => { if (msgrWin) { msgrWin.show(); msgrWin.focus(); } });
 ipcMain.on("msgr-refresh", () => { if (msgrWin) msgrWin.reload(); });

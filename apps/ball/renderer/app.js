@@ -384,7 +384,7 @@
     let text;
     if (!data) { text = "Messenger 読み取り準備中"; el.classList.add("mock"); }
     else if (data.status === "login") { text = "Messenger: ログインが必要（押して開く）"; el.classList.add("ng"); }
-    else if (data.status === "nolist") { text = "Messenger: 会話一覧が読めません（押して確認）"; el.classList.add("ng"); }
+    else if (data.status === "nolist") { text = data.note ? "Messenger: " + data.note : "Messenger: 会話一覧が読めません（右で Messenger を開いて押す）"; el.classList.add("ng"); }
     else text = `Messenger ${agoText(data.at)} · 会話${data.convos.length}件・未読${data.convos.filter((c) => c.unread).length}`;
     el.querySelector("span").textContent = text;
   }
@@ -468,7 +468,7 @@
     if (!IS_APP) return toast("Gmail の取り込みはデスクトップアプリ版で動きます");
     if (!gmailErr) { toast("Gmail を読み込み直しています…"); return loadGmail(); }
     if (gmailErr.reason === "nogog") toast("この Mac に gog が入っていないか、場所が分かりません。ターミナルで gog --version を試してください");
-    else toast("Gmail を読めませんでした：" + (gmailErr.message || "").slice(0, 120));
+    else toast("Gmail を読めませんでした：" + (gmailErr.message || "").slice(0, 300));
   };
   if (IS_APP && window.ball.gmailStatus) {
     loadGmail();
@@ -478,6 +478,16 @@
 
   $("ft-msgr").onclick = () => {
     if (!IS_APP) { toast("Messenger の読み取りはデスクトップアプリ版で動きます"); return; }
+    // 右のブラウザで Messenger の会話を開いていれば、そのページを読み取りに使う
+    const t = S.rmode === "browser" && activeTab();
+    if (t && /^https:\/\/(www\.)?(facebook\.com\/messages|messenger\.com)/.test(t.url)) {
+      window.ball.messengerUseUrl(t.url);
+      $("ft-msgr").querySelector("span").textContent = "Messenger: このページで読み直しています…";
+      toast("右に開いている Messenger のページを読むように切り替えました");
+      return;
+    }
+    if (lastMsgrData && lastMsgrData.status === "ok") { toast("読めています。右のブラウザで Messenger を開いた状態で押すと、そのページを読むように切り替えます"); return; }
+    toast("右のブラウザで Messenger の会話一覧を開いてから、もう一度ここを押してください");
     window.ball.messengerShow();
   };
   if (IS_APP && window.ball.onMessenger) {

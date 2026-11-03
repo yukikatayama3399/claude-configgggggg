@@ -57,7 +57,7 @@ window.BALL_DATA = (function () {
         ["ai", "メッセンジャーの未読は3件で、返事が必要なのは1件です。\n来週お茶しながら紹介したい会社がある、という連絡なので、日程の候補を3つ入れた返信を下書きしました。\n\n候補はカレンダーの空きから取っています。\n・11/10（月）16:00〜\n・11/12（水）17:00〜\n・11/13（木）11:00〜\n\nメッセンジャーは右で開いているので、そのまま送れます。"],
       ],
       memo: "", thread: null,
-      tabs: [t("Messenger", "https://www.messenger.com/", "messenger")],
+      tabs: [t("Messenger", "https://www.facebook.com/messages/t/", "messenger")],
     },
     {
       id: "haru", sec: "me", proj: "uuum", src: "slack", ago: "10/16",
