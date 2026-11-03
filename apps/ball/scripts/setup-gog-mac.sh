@@ -36,15 +36,21 @@ read_val() {
     on { out = out $0 }
     END { gsub(/[[:space:]"\047]/, "", out); printf "%s", out }' "$ENV_FILE"
 }
-CRED="$(read_val GOG_CREDENTIALS_B64)"
-TOKEN="$(read_val GOG_TOKEN_EXPORT_B64)"
+# base64 で使わない文字（見えない記号・全角文字など）を取り除き、末尾の = が欠けていたら補う
+clean_b64() { local s; s="$(printf '%s' "$1" | LC_ALL=C tr -cd 'A-Za-z0-9+/=')"; s="${s%%=*}"; while [ $(( ${#s} % 4 )) -ne 0 ]; do s="$s="; done; printf '%s' "$s"; }
+fp() { printf '%s' "$1" | shasum -a 256 | cut -c1-8; }
+CRED="$(clean_b64 "$(read_val GOG_CREDENTIALS_B64)")"
+TOKEN="$(clean_b64 "$(read_val GOG_TOKEN_EXPORT_B64)")"
 PASS="$(read_val GOG_KEYRING_PASSWORD)"
-log "読み取った長さ: GOG_CREDENTIALS_B64=${#CRED} / GOG_TOKEN_EXPORT_B64=${#TOKEN} / GOG_KEYRING_PASSWORD=${#PASS}（正しくは 412 / 4336 / 29）"
+# 指紋（ハッシュの先頭8文字）。元の値は復元できない。クラウドで動いている値と同じかの確認用
+log "読み取った長さ: ${#CRED} / ${#TOKEN} / ${#PASS}（正しくは 412 / 4336 / 29）"
+log "指紋: $(fp "$CRED") / $(fp "$TOKEN") / $(fp "$PASS")（正しくは 737668b8 / 58ebf73d / eb4adaa9。値を作り直した後は変わります）"
 [ -n "$CRED" ]  || fail "GOG_CREDENTIALS_B64 が空です"
 [ -n "$TOKEN" ] || fail "GOG_TOKEN_EXPORT_B64 が空です"
 [ -n "$PASS" ]  || fail "GOG_KEYRING_PASSWORD が空です"
-[ "${#CRED}" -eq 412 ]  || echo "!! GOG_CREDENTIALS_B64 の長さが 412 ではありません。最後までコピーできているか確認してください" >&2
-[ "${#TOKEN}" -eq 4336 ] || echo "!! GOG_TOKEN_EXPORT_B64 の長さが 4336 ではありません。最後までコピーできているか確認してください" >&2
+[ "$(fp "$CRED")" = "737668b8" ]  || echo "!! GOG_CREDENTIALS_B64 がクラウドの値と一致しません。貼り直してください" >&2
+[ "$(fp "$TOKEN")" = "58ebf73d" ] || echo "!! GOG_TOKEN_EXPORT_B64 がクラウドの値と一致しません。貼り直してください" >&2
+[ "$(fp "$PASS")" = "eb4adaa9" ]  || echo "!! GOG_KEYRING_PASSWORD がクラウドの値と一致しません。貼り直してください" >&2
 
 export GOG_KEYRING_BACKEND=file
 export GOG_KEYRING_PASSWORD="$PASS"
