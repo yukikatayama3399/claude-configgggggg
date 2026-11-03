@@ -8,24 +8,40 @@ const DONE_RE = /^(white_check_mark|heavy_check_mark|ballot_box_with_check|done|
 const ACK_RE = /^(\+1|thumbsup|ok|ok_hand|pray|eyes|bow|raised_hands|ryoukai|shouchi|kakunin|roger|承知|了解|確認)/i;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function config() {
+// ログイン情報（Slack ウェブ版が localStorage に置いているもの）から、試す候補を作る。
+// Enterprise Grid（FreakOut Group など）だと、組織全体とワークスペースの両方が入っているので、全部を順に試す
+function configs() {
   try {
     const c = JSON.parse(localStorage.getItem("localConfig_v2") || "null");
-    if (!c || !c.teams) return null;
-    const id = c.lastActiveTeamId && c.teams[c.lastActiveTeamId] ? c.lastActiveTeamId : Object.keys(c.teams)[0];
-    const t = c.teams[id];
-    if (!t || !t.token) return null;
-    return { teamId: id, token: t.token, url: (t.url || "https://slack.com/").replace(/\/?$/, "/"), userId: t.user_id, name: t.name || "" };
-  } catch (e) { return null; }
+    if (!c || !c.teams) return [];
+    const ids = Object.keys(c.teams);
+    ids.sort((x, y) => (x === c.lastActiveTeamId ? -1 : y === c.lastActiveTeamId ? 1 : 0));
+    return ids.map((id) => ({ teamId: id, t: c.teams[id] })).filter((x) => x.t && x.t.token).map(({ teamId, t }) => ({
+      teamId, token: t.token, url: (t.url || "https://slack.com/").replace(/\/?$/, "/"), userId: t.user_id, name: t.name || "", enterprise: t.enterprise_id || "",
+    }));
+  } catch (e) { return []; }
 }
+let chosen = null; // 読めた組み合わせ（ワークスペースと取り先）を覚えておく
+function config() { return chosen || configs()[0] || null; }
+// 取り先のアドレスは、ワークスペースのアドレス → app.slack.com → slack.com の順に試す
+function hostsOf(cfg) { return [...new Set([cfg.host, cfg.url, location.origin + "/", "https://app.slack.com/", "https://slack.com/"].filter((h) => h && /^https?:/.test(h)))]; }
 async function api(cfg, method, params = {}) {
-  const fd = new FormData();
-  fd.append("token", cfg.token);
-  Object.entries(params).forEach(([k, v]) => v != null && fd.append(k, String(v)));
-  const r = await fetch(cfg.url + "api/" + method, { method: "POST", body: fd, credentials: "include" });
-  const j = await r.json();
-  if (!j.ok) throw new Error(method + ": " + (j.error || "error"));
-  return j;
+  let lastErr = null;
+  for (const host of hostsOf(cfg)) {
+    const fd = new FormData();
+    fd.append("token", cfg.token);
+    Object.entries(params).forEach(([k, v]) => v != null && fd.append(k, String(v)));
+    let j;
+    try {
+      const r = await fetch(host + "api/" + method, { method: "POST", body: fd, credentials: "include" });
+      j = await r.json();
+    } catch (e) { lastErr = new Error(`${method}: 通信できませんでした（${host.replace(/^https?:\/\//, "").replace(/\/$/, "")}）`); continue; }
+    if (j.ok) { cfg.host = host; return j; }
+    lastErr = new Error(method + ": " + (j.error || "error"));
+    // 認証まわりのエラーは別の取り先なら通ることがあるので次を試す。それ以外はその場で止める
+    if (!/invalid_auth|not_authed|not_allowed_token_type|team_access_not_granted|enterprise_is_restricted|account_inactive/.test(j.error || "")) throw lastErr;
+  }
+  throw lastErr || new Error(method + ": error");
 }
 
 const users = new Map();
@@ -56,10 +72,28 @@ function stateOf(cfg, msg, laterMine) {
   return { state: "open", emoji: "" };
 }
 
+async function pickConfig() {
+  if (chosen) return chosen;
+  const tried = [];
+  for (const cfg of configs()) {
+    try {
+      const a = await api(cfg, "auth.test");
+      cfg.userId = a.user_id || cfg.userId;
+      // 検索が使えるかも確かめる（Enterprise Grid では使えないワークスペースがある）
+      await api(cfg, "search.messages", { query: "a", count: 1 });
+      chosen = cfg; return cfg;
+    } catch (e) { tried.push(`${cfg.name || cfg.teamId}: ${e.message}`); }
+  }
+  const err = new Error(tried.length ? tried.join(" / ") : "ログイン情報が見つかりません");
+  err.tried = tried; throw err;
+}
+
 async function scan() {
   const at = Date.now();
-  const cfg = config();
-  if (!cfg) return ipcRenderer.send("slack-result", { at, status: "login", items: [] });
+  if (!configs().length) return ipcRenderer.send("slack-result", { at, status: "login", items: [] });
+  let cfg;
+  try { cfg = await pickConfig(); }
+  catch (err) { return ipcRenderer.send("slack-result", { at, status: /invalid_auth|not_authed|token_revoked|見つかりません/.test(err.message) ? "login" : "error", error: err.message.slice(0, 400), items: [] }); }
   try {
     const since = new Date(Date.now() - 7 * 86400e3 + 9 * 3600e3).toISOString().slice(0, 10);
     const out = [];
@@ -113,7 +147,8 @@ async function scan() {
     ipcRenderer.send("slack-result", { at, status: "ok", team: cfg.name, items: out });
   } catch (err) {
     const msg = String(err && err.message || err);
-    ipcRenderer.send("slack-result", { at, status: /invalid_auth|not_authed|token_revoked/.test(msg) ? "login" : "error", error: msg, items: [] });
+    if (/invalid_auth|not_authed|token_revoked/.test(msg)) chosen = null; // ログインし直したときに選び直す
+    ipcRenderer.send("slack-result", { at, status: /invalid_auth|not_authed|token_revoked/.test(msg) ? "login" : "error", error: msg.slice(0, 400), items: [] });
   }
 }
 

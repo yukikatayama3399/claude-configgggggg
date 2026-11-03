@@ -598,6 +598,19 @@
     });
     left();
   }
+  // エラーの中身などを出す小さな画面（コピーできる）
+  function showInfo(title, text, actionLabel, action) {
+    let el = $("infoDlg");
+    if (!el) { el = document.createElement("div"); el.id = "infoDlg"; el.className = "ov"; document.body.appendChild(el); el.onclick = (e) => { if (e.target === el) el.hidden = true; }; }
+    el.innerHTML = `<div class="ovc" role="dialog" aria-modal="true" style="max-width:720px"><h2>${esc(title)}</h2>
+      <pre id="infoText" style="white-space:pre-wrap;font-family:var(--f-mono);font-size:11.5px;background:var(--soft);border-radius:8px;padding:12px;max-height:50vh;overflow:auto;margin:0">${esc(text)}</pre>
+      <div class="ovf"><span class="hint">ログイン情報（トークン）は含まれていません。このままコピーして Claude に送ってください</span><span>${actionLabel ? `<button type="button" class="btn" id="infoAct">${esc(actionLabel)}</button> ` : ""}<button type="button" class="btn" id="infoCopy">コピー</button> <button type="button" class="btn dark" id="infoClose">閉じる</button></span></div></div>`;
+    el.hidden = false;
+    $("infoClose").onclick = () => (el.hidden = true);
+    $("infoCopy").onclick = () => navigator.clipboard.writeText(text).then(() => toast("コピーしました"), () => toast("選択して ⌘C でコピーしてください"));
+    if (actionLabel) $("infoAct").onclick = () => { el.hidden = true; action(); };
+  }
+
   // Messenger 読み取りの診断（名前・本文は含まない）。コピーして送ってもらう用
   function showMsgrDiag(data) {
     const info = { status: data.status, convos: (data.convos || []).length, unread: (data.convos || []).filter((c) => c.unread).length, mine: (data.convos || []).filter((c) => c.mine).length, note: data.note || "", diag: data.diag || null };
@@ -639,7 +652,7 @@
   function applySlack(data) {
     slackData = data;
     if (data.status === "login") return setFt("ft-slack", "Slack: 読み取り画面でログインが必要（押す）", "ng");
-    if (data.status !== "ok") return setFt("ft-slack", "Slack: 読み込みエラー（押して確認）", "ng");
+    if (data.status !== "ok") return setFt("ft-slack", "Slack: エラー（" + String(data.error || "").replace(/^[\w.]+:\s*/, "").slice(0, 60) + "）押して詳細", "ng");
     items.filter((x) => x.src === "slack" && !x.live).forEach((x) => (x.hidden = true));
     const ids = new Set();
     data.items.forEach((m) => {
@@ -697,7 +710,8 @@
   }
   $("ft-slack").onclick = () => {
     if (!IS_APP) return toast("Slack の取り込みはデスクトップアプリ版で動きます");
-    if (!slackData || slackData.status !== "ok") { toast(slackData && slackData.error ? "Slack：" + slackData.error.slice(0, 120) : "読み取り画面を開きます。Slack にログインしてから閉じてください"); window.ball.slackShow(); return; }
+    if (slackData && slackData.status === "error") { showInfo("Slack 読み取りのエラー", slackData.error || "", "読み取り画面を見る", () => window.ball.slackShow()); return; }
+    if (!slackData || slackData.status !== "ok") { toast("読み取り画面を開きます。Slack にログインしてから閉じてください"); window.ball.slackShow(); return; }
     toast("Slack を読み込み直しています…"); window.ball.slackScan();
   };
   if (IS_APP && window.ball.onSlack) {
