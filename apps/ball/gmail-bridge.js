@@ -144,9 +144,22 @@ async function openAttachment({ messageId, attachmentId, filename }) {
 }
 
 // 返信の下書きを保存。draftId があれば更新、無ければ作成。送信はしない。
-async function saveDraft({ draftId, replyToMessageId, to, cc, subject, body }) {
+// 添付は一時フォルダにファイルとして書いてから gog に渡す（保存のたびに今の添付をまとめて付け直す）
+function writeAttachments(files) {
+  if (!files || !files.length) return [];
+  const dir = path.join(os.tmpdir(), "ball-attach-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+  fs.mkdirSync(dir, { recursive: true });
+  return files.slice(0, 20).map((f, k) => {
+    const name = String(f.name || `file${k}`).replace(/[\/\\:*?"<>|]/g, "_").slice(0, 120);
+    const p = path.join(dir, name);
+    fs.writeFileSync(p, Buffer.from(f.data));
+    return p;
+  });
+}
+async function saveDraft({ draftId, replyToMessageId, to, cc, subject, body, files }) {
   const args = ["--to", to, "--subject", subject, "--body-file", "-"];
   if (cc) args.push("--cc", cc);
+  for (const p of writeAttachments(files)) args.push("--attach", p);
   if (draftId) {
     const r = await runJson(["gmail", "drafts", "update", draftId, ...args], { input: body });
     return { draftId: (r.draft && r.draft.id) || r.id || draftId };

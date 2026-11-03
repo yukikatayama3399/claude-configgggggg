@@ -330,3 +330,73 @@ td.new{background:var(--cell)}
 .mention button{all:unset;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:13px;color:var(--ink)}
 .mention button[aria-selected="true"],.mention button:hover{background:var(--soft)}
 .mention .hint{padding:6px 10px}
+/* ---------- Slack 風のスレッド ---------- */
+.smsgs{display:flex;flex-direction:column}
+.smsg{display:grid;grid-template-columns:40px 1fr;gap:10px;padding:6px 10px;margin:0 -10px;border-radius:8px;position:relative}
+.smsg:hover{background:var(--soft)}
+.smsg.cont{padding-top:1px;padding-bottom:1px}
+.smsg.hl{background:var(--me-bg)}
+.smsg .sl{display:flex;justify-content:center}
+.sav{width:36px;height:36px;border-radius:8px;object-fit:cover;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:14px;margin-top:2px}
+.st2{visibility:hidden;font-size:10px;color:var(--muted);padding-top:4px}
+.smsg.cont:hover .st2{visibility:visible}
+.sb{min-width:0}
+.sn{display:flex;align-items:baseline;gap:8px;font-size:14px}.sn b{font-weight:900}.sn time{font-size:11px;color:var(--muted)}
+.sx{font-size:14px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.sx b{font-weight:800}
+.scode{white-space:pre-wrap;background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:4px 0;font:12px/1.5 var(--f-mono)}
+code.sc{background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:0 4px;font:12px var(--f-mono);color:#C2410C}
+.squote{display:block;border-left:4px solid var(--line);padding-left:10px;color:var(--muted)}
+.smen{background:rgba(29,155,209,.14);color:#1D9BD1;border-radius:4px;padding:0 3px;font-weight:600}
+.smen.me{background:rgba(242,199,68,.3);color:inherit}
+.slink{all:unset;cursor:pointer;color:#1D9BD1;text-decoration:none;overflow-wrap:anywhere}
+.slink:hover{text-decoration:underline}
+.semoji{display:inline-block;vertical-align:-3px}
+img.semoji{width:20px;height:20px;object-fit:contain}
+.semoji.u{font-size:17px;line-height:1}
+.semoji.t{color:var(--muted);font-size:12px}
+.sedit{color:var(--muted);font-size:11px;margin-left:4px}
+.sfiles{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.simg{all:unset;cursor:zoom-in;display:block;border:1px solid var(--line);border-radius:8px;overflow:hidden;max-width:360px;background:var(--soft);position:relative}
+.simg img{display:block;max-width:360px;max-height:260px;width:auto;min-width:80px;min-height:60px;object-fit:contain}
+.simg-cap{position:absolute;left:0;right:0;bottom:0;padding:4px 8px;font-size:11px;background:rgba(0,0,0,.55);color:#fff}
+.sfile{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-width:220px;max-width:360px;background:var(--win)}
+.sfile:hover{border-color:var(--them)}
+.sfile .fi,.schip .fi{font-size:22px}
+.sfile .fn,.schip .fn{display:flex;flex-direction:column;min-width:0}
+.sfile .fn b,.schip .fn b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sfile .fn span,.schip .fn span{font-size:11px;color:var(--muted)}
+.sreacts{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;align-items:center}
+.sreact{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--soft);border-radius:999px;padding:1px 8px;font-size:12px;cursor:pointer}
+.sreact b{font-weight:700}
+.sreact.mine{border-color:#1D9BD1;background:rgba(29,155,209,.14);color:#1D9BD1}
+.sadd{all:unset;cursor:pointer;font-size:12px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;opacity:0;color:var(--muted)}
+.smsg:hover .sadd,.sadd:focus{opacity:1}
+.sreply{font-size:12px;color:#1D9BD1;margin-top:4px}
+/* ---------- 入力欄（Slack・メール） ---------- */
+.scomp .stool{display:flex;gap:2px;padding:4px 8px;border-bottom:1px solid var(--line)}
+.scomp .stool button{all:unset;cursor:pointer;min-width:28px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:5px;color:var(--muted);font-size:13px}
+.scomp .stool button:hover{background:var(--soft);color:var(--ink)}
+.ssep{width:1px;background:var(--line);margin:4px 4px}
+.sbt{all:unset;cursor:pointer;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:15px;color:var(--muted)}
+.sbt:hover,.sbt[aria-pressed="true"]{background:var(--soft);color:var(--ink)}
+.sprev{border-top:1px dashed var(--line);padding:8px 14px;font-size:14px;line-height:1.6;white-space:pre-wrap}
+.satt{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px}
+.satt:empty{display:none}
+.satt{padding-bottom:8px}
+.schip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:4px 6px 4px 4px;max-width:260px;background:var(--win)}
+.schip img{width:40px;height:40px;object-fit:cover;border-radius:5px}
+.schip button{all:unset;cursor:pointer;color:var(--muted);padding:0 4px;font-size:14px}
+.draft.drop{outline:2px dashed #1D9BD1;outline-offset:-4px}
+.lnkbtn{all:unset;cursor:pointer;text-decoration:underline;margin-left:6px}
+.mhead{display:flex;flex-direction:column;gap:6px;padding:8px 12px 0}
+.mhead label{display:grid;grid-template-columns:34px 1fr;align-items:center;font-size:12px;color:var(--muted);gap:6px}
+.mhead input{font:inherit;font-size:13px;color:var(--ink);background:var(--win);border:1px solid var(--line);border-radius:6px;padding:5px 8px;min-width:0}
+.msub{font-size:12px;color:var(--muted)}
+/* 絵文字を選ぶ小窓 */
+.epick{position:fixed;z-index:50;width:330px;background:var(--win);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.3);padding:8px;display:flex;flex-direction:column;gap:6px}
+.epick input{font:inherit;font-size:13px;color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+.epick .eg{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;max-height:240px;overflow:auto}
+.epick .eg button{all:unset;cursor:pointer;height:34px;display:flex;align-items:center;justify-content:center;border-radius:6px}
+.epick .eg button:hover{background:var(--soft)}
+.epick .eg img.semoji{width:24px;height:24px}.epick .eg .semoji.u{font-size:21px}

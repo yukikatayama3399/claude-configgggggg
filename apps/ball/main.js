@@ -150,13 +150,54 @@ function askSlack(channel, payload, resultChannel, timeoutMs) {
   });
 }
 ipcMain.handle("slack-thread", (_e, a) => askSlack("slack-thread", { channel: a.channel, threadTs: a.threadTs }, "slack-thread-result", 30000));
+// Slack の画像（ファイルのサムネイルなど）: BALL の中でログインした Slack（persist:ball）のクッキーで取ってきて、画面に渡す。
+// 取りに行くのは Slack のファイルの置き場だけ
+const slackImgCache = new Map();
+ipcMain.handle("slack-image", async (e, url) => {
+  if (!win || e.sender !== win.webContents) return { ok: false };
+  url = String(url || "");
+  const testHost = /^http:\/\/127\.0\.0\.1:\d+\//.test(SLACK_URL) && url.startsWith(new URL(SLACK_URL).origin + "/"); // 手元のテスト用 Slack だけ
+  if (!testHost && !/^https:\/\/(files\.slack\.com|[\w-]+\.slack\.com\/files|[\w.-]*slack-edge\.com)\//.test(url)) return { ok: false, error: "Slack のファイル以外は取りません" };
+  if (slackImgCache.has(url)) return { ok: true, data: slackImgCache.get(url) };
+  try {
+    const r = await session.fromPartition("persist:ball").fetch(url);
+    const type = r.headers.get("content-type") || "";
+    if (!r.ok || !/^image\//.test(type)) return { ok: false, error: `取れませんでした（${r.status} ${type.split(";")[0]}）` };
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 8 * 1024 * 1024) return { ok: false, error: "大きすぎます" };
+    const data = `data:${type.split(";")[0]};base64,${buf.toString("base64")}`;
+    slackImgCache.set(url, data);
+    if (slackImgCache.size > 300) slackImgCache.delete(slackImgCache.keys().next().value);
+    return { ok: true, data };
+  } catch (err) { return { ok: false, error: String(err.message || err) }; }
+});
 ipcMain.handle("slack-people", (_e, a) => askSlack("slack-people", { channel: a.channel }, "slack-people-result", 60000));
 // 送信: BALL 本体の画面（片山さんが押す確認ボタン）からだけ受け付ける。AI や右のブラウザのページからは呼べない
-ipcMain.handle("slack-send", (e, a) => {
+ipcMain.handle("slack-send", async (e, a) => {
   if (!win || e.sender !== win.webContents) return { ok: false, error: "BALL 本体の画面からの送信だけ受け付けます" };
-  if (!a || !a.channel || !String(a.text || "").trim()) return { ok: false, error: "送り先か本文が空です" };
-  return askSlack("slack-send", { channel: a.channel, threadTs: a.threadTs || "", text: a.text }, "slack-send-result", 30000);
+  const files = (a && Array.isArray(a.files) ? a.files : []).slice(0, 10);
+  if (!a || !a.channel || (!String(a.text || "").trim() && !files.length)) return { ok: false, error: "送り先か本文が空です" };
+  // 添付: Slack に上げる先を聞いて、BALL の中の Slack のログイン（persist:ball）でここから上げる
+  const fileIds = [];
+  for (const f of files) {
+    const buf = Buffer.from(f.data);
+    const u = await askSlack("slack-upload-url", { filename: f.name, length: buf.length }, "slack-upload-url-result", 30000);
+    if (!u.ok) return { ok: false, error: `${f.name} を上げられませんでした: ${u.error}` };
+    const form = new FormData();
+    form.append("file", new Blob([buf], { type: f.type || "application/octet-stream" }), f.name);
+    const r = await session.fromPartition("persist:ball").fetch(u.uploadUrl, { method: "POST", body: form, headers: { Authorization: "Bearer " + u.token } }).catch((err) => ({ ok: false, status: String(err.message || err) }));
+    if (!r.ok) return { ok: false, error: `${f.name} を上げられませんでした（${r.status}）` };
+    fileIds.push({ id: u.fileId, title: f.name });
+  }
+  return askSlack("slack-send", { channel: a.channel, threadTs: a.threadTs || "", text: a.text || "", fileIds }, "slack-send-result", 60000);
 });
+// スタンプ: BALL 本体の画面（片山さんのクリック）からだけ
+ipcMain.handle("slack-react", (e, a) => {
+  if (!win || e.sender !== win.webContents) return { ok: false, error: "BALL 本体の画面からだけ受け付けます" };
+  if (!a || !a.channel || !a.ts || !/^[a-z0-9_+'-]+(::skin-tone-\d)?$/i.test(String(a.name || ""))) return { ok: false, error: "スタンプの指定がおかしいです" };
+  return askSlack("slack-react", { channel: a.channel, ts: a.ts, name: a.name, remove: !!a.remove }, "slack-react-result", 20000);
+});
+ipcMain.handle("slack-emoji-all", () => askSlack("slack-emoji-all", {}, "slack-emoji-all-result", 30000));
 
 app.whenReady().then(() => {
   session.fromPartition("persist:ball").setUserAgent(CHROME_UA);

@@ -61,6 +61,10 @@
     $("sync").hidden = true; $("usage").hidden = true; $("banto").hidden = true;
   }
 
+  // ファイルを落としたときに、画面がそのファイルに移ってしまわないようにする（受け付けるのは下書き欄だけ）
+  document.addEventListener("dragover", (e) => e.preventDefault());
+  document.addEventListener("drop", (e) => e.preventDefault());
+
   // ---------- 上のバー ----------
   function ptabs() {
     const tabs = [["all", "すべて", "var(--chrome-muted)"], ...Object.entries(D.projects).map(([k, v]) => [k, v.name, v.color])];
@@ -578,16 +582,23 @@
   }
   function draftBox(i, kind) {
     const t = i.thread;
-    const saved = t.aiDraft ? "AI が書きました（未保存・未送信）" : t.draftId ? `Gmail の下書きに保存済み` : kind === "msgr" ? "送るのは Messenger で Enter" : "まだ保存していません";
+    if (kind === "slacklive") return slackComposerHtml(t);
+    const saved = t.aiDraft ? `AI が入れた下書きです（未保存・未送信） <button type="button" class="lnkbtn" id="discardDraft">破棄</button>` : t.draftId ? `Gmail の下書きに保存済み` : kind === "msgr" ? "送るのは Messenger で Enter" : "まだ保存していません";
     const actions = kind === "gmail"
-      ? `<span class="hint">AI は下書きまで。送るのは「送信」を押して確認したときだけ</span><span class="sp"></span><button type="button" class="btn" id="saveDraft">下書きに保存</button><button type="button" class="btn send" id="sendMail">送信…</button>`
+      ? `<button type="button" class="sbt" id="gAdd" title="ファイルを添付（ドラッグ＆ドロップ・⌘V の貼り付けも可）">📎</button><input type="file" id="gFile" multiple hidden><span class="hint">送るのは「送信…」で確認したときだけ</span><span class="sp"></span><button type="button" class="btn" id="saveDraft">下書きに保存</button><button type="button" class="btn send" id="sendMail">送信…</button>`
       : kind === "msgr"
         ? `<button type="button" class="btn" id="copyDraft">コピー</button><span class="sp"></span><button type="button" class="btn" id="saveDraft">入力欄に入れる</button><button type="button" class="btn send" id="sendMsgr">送信…</button>`
       : kind === "slacklive"
         ? `<button type="button" class="btn" id="copyDraft">コピー</button><span class="hint">AI は下書きまで。送るのは「送信…」で確認したときだけ</span><span class="sp"></span><button type="button" class="btn send" id="saveDraft">送信…</button>`
         : `<span class="hint">見本です（Slack は下書きまで。投稿は自分のボタンで）</span><span class="sp"></span><button type="button" class="btn send" id="saveDraft">送信</button>`;
-    return `<div class="draft"><div class="dh"><span>下書き（送るまで送信されません）</span><span id="draftState">${saved}</span></div>
+    let head = "";
+    if (kind === "gmail" && t.live && t.data) {
+      const f = replyFields(t, "");
+      head = `<div class="mhead"><label>To<input id="dTo" value="${esc(f.to)}" spellcheck="false"></label><label>Cc<input id="dCc" value="${esc(f.cc)}" placeholder="Cc（カンマ区切り）" spellcheck="false"></label><div class="msub">件名 ${esc(f.subject)}</div></div>`;
+    }
+    return `<div class="draft${kind === "gmail" ? " gcomp" : ""}" id="${kind === "gmail" ? "gcomp" : "dbox"}"><div class="dh"><span>下書き（送るまで送信されません）</span><span id="draftState">${saved}</span></div>${head}
       <textarea id="draftText" aria-label="下書き" placeholder="真ん中で「下書き書いて」と言うとここに入ります。直接書いても OK。">${esc(t.draft || "")}</textarea>
+      ${kind === "gmail" ? `<div class="satt" id="gAtt"></div>` : ""}
       <div class="df">${actions}</div>
       <div class="confirm" id="sendConfirm" hidden></div></div>`;
   }
@@ -598,8 +609,37 @@
     const lastOther = [...msgs].reverse().find((m) => !me.test(m.from)) || last;
     const cc = [lastOther.to, lastOther.cc].join(",").split(",").map((s) => s.trim()).filter((s) => s && !me.test(s) && emailOf(s) !== emailOf(lastOther.from)).join(", ");
     const subject = /^re[:：]/i.test(last.subject) ? last.subject : "Re: " + last.subject;
-    return { draftId: t.draftId, replyToMessageId: lastOther.id, to: lastOther.from, cc, subject, body };
+    return { draftId: t.draftId, replyToMessageId: lastOther.id, to: t.to != null ? t.to : lastOther.from, cc: t.cc != null ? t.cc : cc, subject, body,
+      files: (t.files || []).map((f) => ({ name: f.name, data: f.data })) };
   }
+  // ---------- メールの下書き欄: 宛先・CC を直せる、ファイルを付けられる ----------
+  function bindGmailComposer(i, ta) {
+    const t = i.thread; t.files = t.files || [];
+    const box = $("gcomp"), att = $("gAtt");
+    if (!box || !att) return;
+    const dirty = () => { if ($("draftState")) $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
+    if ($("dTo")) $("dTo").oninput = (e) => { t.to = e.target.value; dirty(); };
+    if ($("dCc")) $("dCc").oninput = (e) => { t.cc = e.target.value; dirty(); };
+    const draw = () => {
+      att.innerHTML = t.files.map((f, k) => `<span class="schip">${f.preview ? `<img src="${f.preview}" alt="">` : `<span class="fi">${fileIcon({ filetype: f.name.split(".").pop(), mimetype: f.type })}</span>`}<span class="fn"><b>${esc(f.name)}</b><span>${esc(sizeText(f.size))}</span></span><button type="button" data-rm="${k}" aria-label="外す">×</button></span>`).join("");
+      att.querySelectorAll("[data-rm]").forEach((b) => (b.onclick = () => { const f = t.files.splice(+b.dataset.rm, 1)[0]; if (f && f.preview) URL.revokeObjectURL(f.preview); draw(); dirty(); }));
+    };
+    const add = async (list) => {
+      for (const f of list) {
+        if (f.size > 25 * 1024 * 1024) { toast(`${f.name} は大きすぎます（Gmail は 25MB まで）`); continue; }
+        t.files.push({ name: f.name || "image.png", type: f.type || "application/octet-stream", size: f.size, data: await f.arrayBuffer(), preview: /^image\//.test(f.type) ? URL.createObjectURL(f) : "" });
+      }
+      draw(); dirty();
+    };
+    draw();
+    $("gAdd").onclick = () => $("gFile").click();
+    $("gFile").onchange = () => { add([...$("gFile").files]); $("gFile").value = ""; };
+    ta.addEventListener("paste", (e) => { const fs = [...((e.clipboardData && e.clipboardData.files) || [])]; if (fs.length) { e.preventDefault(); add(fs); } });
+    box.addEventListener("dragover", (e) => { e.preventDefault(); box.classList.add("drop"); });
+    box.addEventListener("dragleave", (e) => { if (!box.contains(e.relatedTarget)) box.classList.remove("drop"); });
+    box.addEventListener("drop", (e) => { e.preventDefault(); e.stopPropagation(); box.classList.remove("drop"); add([...((e.dataTransfer && e.dataTransfer.files) || [])]); });
+  }
+
   // ---------- Slack のメンション ----------
   // 下書きでは「@名前」で見せ、送る直前に Slack の本物のメンション（<@ID>）に直す。
   // 候補はスレッドの発言者・メンションされている人 → チャンネルのメンバー（最初の @ で読み込む）
@@ -654,26 +694,30 @@
   function bindDraft(i) {
     const t = i.thread, ta = $("draftText"), btn = $("saveDraft");
     if (!ta || !btn) return;
+    if ($("discardDraft")) $("discardDraft").onclick = () => { t.draft = ""; t.aiDraft = false; saveChat(i); renderThread(i); toast("AI の下書きを消しました"); };
     ta.oninput = () => { t.draft = ta.value; t.aiDraft = false; saveChat(i); if (t.kind === "gmail") $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
     if (t.kind === "slack" && t.live) {
       bindMention(i, ta);
+      bindSlackComposer(i, ta);
       const cp = $("copyDraft");
       if (cp) cp.onclick = () => navigator.clipboard.writeText(ta.value).then(() => toast("コピーしました"), () => { ta.select(); toast("選択しました。⌘C でコピーしてください"); });
       // 送信は2段階: 「送信…」→ 送り先と本文を確認 →「この内容で送信」を本人が押したときだけ。送り先はチャンネルとスレッドで決まるので取り違えない
       btn.onclick = () => {
         if (!IS_APP) return toast("見本なので送信しません");
-        if (!ta.value.trim()) return toast("下書きが空です");
+        if (!ta.value.trim() && !(t.files || []).length) return toast("下書きが空です");
         const where = t.threadTs ? `${t.where} のスレッド` : t.where;
         const box = $("sendConfirm");
         const ments = slackPeople(t).filter((p) => ta.value.includes("@" + p.name)).map((p) => p.name);
-        box.innerHTML = `<b>${esc(where)}に、この内容で送信しますか？</b>${ments.length ? `<div class="hint">メンション（通知が届きます）: ${esc(ments.join("、"))}</div>` : ""}<div class="mb" style="max-height:120px;overflow:auto">${esc(ta.value)}</div>
+        const nf = (t.files || []).length;
+        box.innerHTML = `<b>${esc(where)}に、この内容で送信しますか？</b>${ments.length ? `<div class="hint">メンション（通知が届きます）: ${esc(ments.join("、"))}</div>` : ""}${nf ? `<div class="hint">添付 ${nf} 件: ${esc(t.files.map((f) => f.name).join("、"))}</div>` : ""}<div class="mb sx" style="max-height:160px;overflow:auto">${slackHtml(ta.value, { emoji: (t.data && t.data.emoji) || {}, people: slackPeople(t), selfName: (t.data && t.data.selfName) || "" })}</div>
           <div class="crow"><span class="sp"></span><button type="button" class="btn" id="sendCancel">やめる</button><button type="button" class="btn send" id="sendGo">この内容で送信</button></div>`;
         box.hidden = false;
         $("sendCancel").onclick = () => { box.hidden = true; };
         $("sendGo").onclick = async () => {
           $("sendGo").disabled = true; $("sendGo").textContent = "送信中…";
-          const r = await window.ball.slackSend({ channel: t.channel, threadTs: t.threadTs, text: toSlackMentions(t, ta.value) });
-          if (r.ok) { box.hidden = true; t.draft = ""; ta.value = ""; toast("送信しました"); i.done = true; D.closed.unshift(`Slack: ${i.title.slice(0, 30)} · 返信済み`); left(); }
+          $("sendGo").textContent = (t.files || []).length ? "ファイルを送っています…" : "送信中…";
+          const r = await window.ball.slackSend({ channel: t.channel, threadTs: t.threadTs, text: toSlackText(t, ta.value), files: (t.files || []).map((f) => ({ name: f.name, type: f.type, data: f.data })) });
+          if (r.ok) { box.hidden = true; t.draft = ""; ta.value = ""; (t.files || []).forEach((f) => f.preview && URL.revokeObjectURL(f.preview)); t.files = []; t.aiDraft = false; toast("送信しました"); i.done = true; D.closed.unshift(`Slack: ${i.title.slice(0, 30)} · 返信済み`); left(); }
           else { $("sendGo").disabled = false; $("sendGo").textContent = "この内容で送信"; toast("送信できませんでした：" + r.error); }
         };
       };
@@ -701,6 +745,7 @@
       };
       return;
     }
+    if (t.kind === "gmail") bindGmailComposer(i, ta);
     const live = t.kind === "gmail" && t.live && IS_APP;
     btn.onclick = async () => {
       if (!live) return toast("見本なので保存・送信はしません");
@@ -718,7 +763,7 @@
       if (!ta.value.trim()) return toast("下書きが空です");
       const f = replyFields(t, ta.value), box = $("sendConfirm");
       box.innerHTML = `<b>この内容で送信しますか？</b>
-        <dl class="kv"><dt>宛先</dt><dd>${esc(f.to)}</dd>${f.cc ? `<dt>CC</dt><dd>${esc(f.cc)}</dd>` : ""}<dt>件名</dt><dd>${esc(f.subject)}</dd></dl>
+        <dl class="kv"><dt>宛先</dt><dd>${esc(f.to)}</dd>${f.cc ? `<dt>CC</dt><dd>${esc(f.cc)}</dd>` : ""}<dt>件名</dt><dd>${esc(f.subject)}</dd>${f.files.length ? `<dt>添付</dt><dd>${esc((t.files || []).map((x) => x.name).join("、"))}</dd>` : ""}</dl>
         <div class="crow"><span class="sp"></span><button type="button" class="btn" id="sendCancel">やめる</button><button type="button" class="btn send" id="sendGo">この内容で送信</button></div>`;
       box.hidden = false;
       $("sendCancel").onclick = () => { box.hidden = true; };
@@ -967,7 +1012,9 @@
         if (curItem() === i && S.ctab === "memo") center();
         return reply({ ok: true, text: "このボールには返信先のスレッドが無いので、メモ欄に【下書き】として入れました（送信はしていません）" });
       }
-      t.draft = text; t.aiDraft = true; saveChat(i);
+      t.draft = text; t.aiDraft = true;
+      if (t.kind === "gmail") { if (a.to) t.to = String(a.to); if (a.cc != null && a.cc !== "") t.cc = String(a.cc); }
+      saveChat(i);
       if (curItem() === i) { S.rmode = "thread"; right(); }
       const where = t.kind === "gmail" ? "Gmail の返信" : t.kind === "msgr" ? "Messenger の返信" : "Slack の返信";
       return reply({ ok: true, text: `${where}の下書き欄に入れました。まだ送信していません（Gmail の下書きにも未保存）。送るのは片山さんが確認してからです。` });
@@ -1197,6 +1244,261 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     setFt("ft-slack", `Slack ${agoText(data.at)} · メンション${n - dm}・DM${dm}${data.warn ? "（DM 一覧は読めず・押して詳細）" : ""}`, data.warn ? "mock" : "");
     left();
   }
+  // ---------- Slack のスレッドを、本物の Slack に近い見た目で出す ----------
+  // 書式（*太字* _斜体_ ~取り消し~ `コード` ```ブロック``` > 引用）・絵文字（標準とカスタム）・メンション・画像のサムネイル・ファイル
+  const STD_EMOJI = {
+    "+1": "👍", thumbsup: "👍", "-1": "👎", thumbsdown: "👎", pray: "🙏", bow: "🙇", "man-bowing": "🙇‍♂️", "woman-bowing": "🙇‍♀️", "person_bowing": "🙇",
+    smile: "😄", smiley: "😃", grinning: "😀", laughing: "😆", satisfied: "😆", joy: "😂", rofl: "🤣", sweat_smile: "😅", blush: "😊", wink: "😉", relaxed: "☺️",
+    heart_eyes: "😍", kissing_heart: "😘", yum: "😋", sunglasses: "😎", thinking_face: "🤔", thinking: "🤔", neutral_face: "😐", expressionless: "😑", smirk: "😏",
+    unamused: "😒", sweat: "😓", pensive: "😔", confused: "😕", upside_down_face: "🙃", astonished: "😲", flushed: "😳", scream: "😱", cry: "😢", sob: "😭",
+    disappointed: "😞", worried: "😟", angry: "😠", rage: "😡", triumph: "😤", sleepy: "😪", sleeping: "😴", mask: "😷", innocent: "😇", partying_face: "🥳",
+    pleading_face: "🥺", hugging_face: "🤗", hugs: "🤗", face_with_rolling_eyes: "🙄", zany_face: "🤪", shushing_face: "🤫", exploding_head: "🤯", star_struck: "🤩",
+    eyes: "👀", eye: "👁️", white_check_mark: "✅", heavy_check_mark: "✔️", ballot_box_with_check: "☑️", x: "❌", o: "⭕", warning: "⚠️", no_entry: "⛔", question: "❓",
+    exclamation: "❗", bangbang: "‼️", ok_hand: "👌", ok: "🆗", clap: "👏", raised_hands: "🙌", muscle: "💪", wave: "👋", point_up: "☝️", point_right: "👉", point_left: "👈",
+    point_down: "👇", v: "✌️", handshake: "🤝", fist: "✊", punch: "👊", writing_hand: "✍️", tada: "🎉", confetti_ball: "🎊", sparkles: "✨", star: "⭐", star2: "🌟",
+    fire: "🔥", "100": "💯", heart: "❤️", hearts: "♥️", blue_heart: "💙", green_heart: "💚", yellow_heart: "💛", purple_heart: "💜", broken_heart: "💔", rocket: "🚀",
+    bulb: "💡", memo: "📝", pencil: "📝", pencil2: "✏️", calendar: "📆", date: "📅", clock: "🕐", hourglass: "⌛", alarm_clock: "⏰", mega: "📣", loudspeaker: "📢",
+    bell: "🔔", email: "📧", envelope: "✉️", phone: "☎️", iphone: "📱", computer: "💻", chart_with_upwards_trend: "📈", chart_with_downwards_trend: "📉", bar_chart: "📊",
+    moneybag: "💰", money_with_wings: "💸", yen: "💴", gift: "🎁", trophy: "🏆", medal: "🏅", crown: "👑", coffee: "☕", beer: "🍺", beers: "🍻", sushi: "🍣", ramen: "🍜",
+    sunny: "☀️", cloud: "☁️", umbrella: "☔", zap: "⚡", snowflake: "❄️", rainbow: "🌈", seedling: "🌱", cherry_blossom: "🌸", sweat_drops: "💦", dash: "💨", zzz: "💤",
+    boom: "💥", collision: "💥", speech_balloon: "💬", thought_balloon: "💭", arrow_right: "➡️", arrow_left: "⬅️", arrow_up: "⬆️", arrow_down: "⬇️", repeat: "🔁",
+    link: "🔗", paperclip: "📎", pushpin: "📌", round_pushpin: "📍", mag: "🔍", lock: "🔒", key: "🔑", hammer: "🔨", wrench: "🔧", gear: "⚙️", package: "📦",
+    car: "🚗", taxi: "🚕", train: "🚆", airplane: "✈️", house: "🏠", office: "🏢", japan: "🗾", jp: "🇯🇵", ghost: "👻", skull: "💀", robot_face: "🤖", see_no_evil: "🙈",
+    raising_hand: "🙋", man_raising_hand: "🙋‍♂️", woman_raising_hand: "🙋‍♀️", ok_woman: "🙆", ok_man: "🙆‍♂️", no_good: "🙅", information_desk_person: "💁",
+    dog: "🐶", cat: "🐱", pig: "🐷", panda_face: "🐼", bear: "🐻", hatching_chick: "🐣", tiger: "🐯", sob_cat: "😿", heavy_plus_sign: "➕", heavy_minus_sign: "➖",
+  };
+  function slackEmoji(name, ctx) {
+    const base = name.replace(/::skin-tone-\d$/, "");
+    const custom = ctx.emoji && ctx.emoji[base];
+    if (custom) return `<img class="semoji" src="${esc(custom)}" alt=":${esc(base)}:" title=":${esc(base)}:" referrerpolicy="no-referrer">`;
+    if (STD_EMOJI[base]) return `<span class="semoji u" title=":${esc(base)}:">${STD_EMOJI[base]}</span>`;
+    return `<span class="semoji t">:${esc(base)}:</span>`;
+  }
+  function slackHtml(raw, ctx) {
+    const out = [];
+    String(raw || "").split(/```/).forEach((seg, k) => {
+      if (k % 2) { out.push(`<pre class="scode">${esc(seg.replace(/^\n|\n$/g, ""))}</pre>`); return; }
+      const ph = [];
+      const keep = (h) => { ph.push(h); return "\u0001" + (ph.length - 1) + "\u0001"; };
+      let t = seg
+        .replace(/\[([^\]\n]{1,120})\]\((https?:\/\/[^)\s]+)\)/g, (m, l, u) => keep(`<button type="button" class="slink" data-url="${esc(u)}" data-label="${esc(l)}" title="${esc(u)}">${esc(l)}</button>`))
+        .replace(/https?:\/\/[^\s<>"」）)]+/g, (u) => { const v = u.replace(/[.,、。]+$/, ""); return keep(`<button type="button" class="slink" data-url="${esc(v)}" data-label="${esc(hostOf(v))}" title="${esc(v)}">${esc(v.length > 70 ? v.slice(0, 68) + "…" : v)}</button>`) + u.slice(v.length); })
+        .replace(/`([^`\n]+)`/g, (m, c) => keep(`<code class="sc">${esc(c)}</code>`));
+      t = esc(t);
+      // メンション（自分宛ては黄色）
+      const names = [...(ctx.people || []).map((p) => p.name), ctx.selfName].filter(Boolean).sort((a, b) => b.length - a.length);
+      for (const n of names) t = t.split(esc("@" + n)).join(keep(`<span class="smen${n === ctx.selfName ? " me" : ""}">@${esc(n)}</span>`));
+      t = t.replace(/@(here|channel|everyone)\b/g, (m) => keep(`<span class="smen me">${m}</span>`));
+      // 書式
+      const edge = "(^|[\\s(（「『、。!！?？:：])";
+      t = t.replace(new RegExp(edge + "\\*([^*\\n]+)\\*(?=$|[\\s)）」』、。!！?？.,:：])", "g"), "$1<b>$2</b>")
+        .replace(new RegExp(edge + "_([^_\\n]+)_(?=$|[\\s)）」』、。!！?？.,:：])", "g"), "$1<i>$2</i>")
+        .replace(new RegExp(edge + "~([^~\\n]+)~(?=$|[\\s)）」』、。!！?？.,:：])", "g"), "$1<s>$2</s>")
+        .replace(/:([a-z0-9_+'-]+(?:::skin-tone-\d)?):/gi, (m, n) => slackEmoji(n, ctx));
+      // 引用（> で始まる行）
+      t = t.split("\n").map((line) => (/^&gt;\s?/.test(line) ? `<span class="squote">${line.replace(/^&gt;\s?/, "")}</span>` : line)).join("\n");
+      t = t.replace(/\u0001(\d+)\u0001/g, (m, n) => ph[+n]);
+      out.push(`<span class="stext">${t}</span>`);
+    });
+    return out.join("");
+  }
+  const fileIcon = (f) => (/pdf/.test(f.filetype + f.mimetype) ? "📕" : /presentation|pptx?|key/.test(f.filetype + f.mimetype) ? "📽" : /sheet|xlsx?|csv/.test(f.filetype + f.mimetype) ? "📊" : /word|docx?|gdoc/.test(f.filetype + f.mimetype) ? "📄" : /video|mp4|mov/.test(f.filetype + f.mimetype) ? "🎬" : /zip/.test(f.filetype) ? "🗜" : "📎");
+  const sizeText = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : n > 1024 ? Math.round(n / 1024) + " KB" : n ? n + " B" : "");
+  function slackMsgsHtml(t) {
+    const d = t.data, ctx = { emoji: d.emoji || {}, people: slackPeople(t), selfName: d.selfName || "" };
+    let prev = null;
+    return d.messages.map((m, k) => {
+      const at = parseFloat(m.ts) * 1000;
+      const cont = prev && prev.user === m.user && m.user && at - parseFloat(prev.ts) * 1000 < 5 * 60e3 && !m.files.length === !prev.files.length;
+      prev = m;
+      const when = new Date(at), hm = when.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+      const av = m.avatar ? `<img class="sav" src="${esc(m.avatar)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : `<span class="sav ini" style="background:${m.mine ? "#1E7B4E" : "#4A154B"}">${esc((m.name || "?")[0])}</span>`;
+      const files = m.files.map((f, j) => (f.thumb && /^image\/|pdf|video/.test(f.mimetype + f.filetype)
+        ? `<button type="button" class="simg" data-msg="${k}" data-file="${j}" title="${esc(f.name)}（押すと大きく開く）"><img data-slack-src="${esc(f.thumb)}" alt="${esc(f.name)}"${f.w && f.h ? ` style="aspect-ratio:${f.w}/${f.h}"` : ""}>${/image\//.test(f.mimetype) ? "" : `<span class="simg-cap">${fileIcon(f)} ${esc(f.name)}</span>`}</button>`
+        : `<button type="button" class="sfile" data-msg="${k}" data-file="${j}" title="${esc(f.name)}"><span class="fi">${fileIcon(f)}</span><span class="fn"><b>${esc(f.title || f.name)}</b><span>${esc([f.pretty || f.filetype.toUpperCase(), sizeText(f.size)].filter(Boolean).join(" · "))}</span></span></button>`)).join("");
+      const reacts = m.reactions.map((r) => `<span class="sreact${r.mine ? " mine" : ""}" title=":${esc(r.name)}:">${slackEmoji(r.name, ctx)}<b>${r.count}</b></span>`).join("");
+      return `<div class="smsg${cont ? " cont" : ""}${m.ts === t.ts ? " hl" : ""}">
+        <div class="sl">${cont ? `<time class="st2">${esc(hm)}</time>` : av}</div>
+        <div class="sb">${cont ? "" : `<div class="sn"><b>${esc(m.name)}</b><time title="${esc(when.toLocaleString("ja-JP"))}">${esc(when.toLocaleString("ja-JP", { month: "numeric", day: "numeric" }))} ${esc(hm)}</time></div>`}
+          ${m.text ? `<div class="sx">${slackHtml(m.text, ctx)}${m.edited ? `<span class="sedit">（編集済み）</span>` : ""}</div>` : ""}
+          ${files ? `<div class="sfiles">${files}</div>` : ""}
+          <div class="sreacts">${reacts}<button type="button" class="sadd" title="スタンプを付ける（自分で押したときだけ付きます）">😀＋</button></div>
+          ${m.replyCount && !t.threadTs ? `<div class="sreply">${m.replyCount} 件の返信</div>` : ""}
+        </div></div>`;
+    }).join("");
+  }
+  // 画像は BALL の中の Slack のログインで取ってきて差し込む（取れなければファイルの札にする）
+  function loadSlackImages(root, t) {
+    root.querySelectorAll("img[data-slack-src]").forEach((im) => {
+      const url = im.dataset.slackSrc;
+      if (!IS_APP || !window.ball.slackImage) return;
+      window.ball.slackImage(url).then((r) => {
+        if (r && r.ok) { im.src = r.data; im.removeAttribute("data-slack-src"); return; }
+        const b = im.closest(".simg"); if (!b) return;
+        const f = t.data.messages[+b.dataset.msg].files[+b.dataset.file];
+        b.outerHTML = `<button type="button" class="sfile" data-msg="${b.dataset.msg}" data-file="${b.dataset.file}"><span class="fi">${fileIcon(f)}</span><span class="fn"><b>${esc(f.title || f.name)}</b><span>${esc([f.pretty, sizeText(f.size)].filter(Boolean).join(" · "))}</span></span></button>`;
+        bindSlackFiles(root, t);
+      });
+    });
+  }
+  function bindSlackFiles(root, t) {
+    root.querySelectorAll(".simg[data-file], .sfile[data-file]").forEach((b) => (b.onclick = (e) => {
+      const f = t.data.messages[+b.dataset.msg].files[+b.dataset.file];
+      const url = /^image\//.test(f.mimetype) ? (f.download || f.url) : (f.url || f.download);
+      if (url) openLink(url, f.name, e);
+    }));
+    root.querySelectorAll(".slink[data-url]").forEach((b) => (b.onclick = (e) => openLink(b.dataset.url, b.dataset.label, e)));
+  }
+
+  // ---------- 絵文字を選ぶ小窓（入力欄の 😀 と、スタンプを付ける 😀＋ で共通） ----------
+  let emojiAllCache = null;
+  const RECENT_KEY = "ball.emoji.recent";
+  const recentEmoji = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch (e) { return []; } };
+  const pushRecent = (n) => { try { localStorage.setItem(RECENT_KEY, JSON.stringify([n, ...recentEmoji().filter((x) => x !== n)].slice(0, 24))); } catch (e) { /* 覚えられなくても動く */ } };
+  function emojiPicker(anchor, ctx, onPick) {
+    document.querySelectorAll(".epick").forEach((x) => x.remove());
+    const box = document.createElement("div");
+    box.className = "epick";
+    box.innerHTML = `<input type="search" placeholder="絵文字を探す（例: ok, pray, ryoukai）" aria-label="絵文字を探す"><div class="eg" role="listbox"></div>`;
+    document.body.appendChild(box);
+    const r = anchor.getBoundingClientRect();
+    box.style.left = Math.max(8, Math.min(window.innerWidth - 340, r.left)) + "px";
+    box.style.top = (r.top > 340 ? r.top - 330 : r.bottom + 6) + "px";
+    const all = () => Object.assign({}, emojiAllCache || {}, ctx.emoji || {});
+    const draw = (q) => {
+      q = String(q || "").trim().toLowerCase();
+      const custom = Object.keys(all());
+      const names = q
+        ? [...new Set([...custom, ...Object.keys(STD_EMOJI)])].filter((n) => n.includes(q)).slice(0, 96)
+        : [...new Set([...recentEmoji(), ...Object.keys(ctx.emoji || {}), "white_check_mark", "+1", "pray", "bow", "eyes", "ok_hand", "raised_hands", "clap", "tada", "joy", "sob", "sweat_smile", "fire", "100", "muscle", "heart", "thinking_face", "memo", "rocket", "sparkles"])].slice(0, 48);
+      const c2 = { emoji: all() };
+      box.querySelector(".eg").innerHTML = names.map((n) => `<button type="button" data-n="${esc(n)}" title=":${esc(n)}:">${slackEmoji(n, c2)}</button>`).join("") || `<span class="hint">見つかりません</span>`;
+      box.querySelectorAll(".eg button").forEach((b) => (b.onmousedown = (e) => { e.preventDefault(); pushRecent(b.dataset.n); box.remove(); onPick(b.dataset.n); }));
+    };
+    const inp = box.querySelector("input");
+    inp.oninput = () => draw(inp.value);
+    inp.onkeydown = (e) => { if (e.key === "Escape") box.remove(); if (e.key === "Enter") { const b = box.querySelector(".eg button"); if (b) b.dispatchEvent(new MouseEvent("mousedown")); } };
+    draw("");
+    setTimeout(() => inp.focus(), 0);
+    const off = (e) => { if (!box.contains(e.target) && e.target !== anchor) { box.remove(); document.removeEventListener("mousedown", off, true); } };
+    document.addEventListener("mousedown", off, true);
+    if (!emojiAllCache && IS_APP && window.ball.slackEmojiAll) window.ball.slackEmojiAll().then((x) => { if (x && x.ok) { emojiAllCache = x.emoji; if (document.body.contains(box)) draw(inp.value); } });
+  }
+
+  // ---------- Slack の入力欄 ----------
+  function slackComposerHtml(t) {
+    const tool = [["b", "<b>B</b>", "太字（⌘B）"], ["i", "<i>I</i>", "斜体（⌘I）"], ["s", "<s>S</s>", "取り消し線（⌘⇧X）"], ["|"], ["link", "🔗", "リンク（⌘⇧U）"], ["ol", "1.", "番号付きリスト"], ["ul", "•", "箇条書き"], ["|"], ["quote", "❝", "引用"], ["code", "&lt;/&gt;", "コード"], ["block", "{ }", "コードブロック"]];
+    return `<div class="draft scomp" id="scomp">
+      <div class="dh"><span>下書き（送るまで送信されません）</span><span id="draftState">${t.aiDraft ? `AI が入れた下書きです（未送信） <button type="button" class="lnkbtn" id="discardDraft">破棄</button>` : "ファイルはドラッグ＆ドロップ・貼り付けでも付けられます"}</span></div>
+      <div class="stool" role="toolbar" aria-label="書式">${tool.map((x) => (x[0] === "|" ? `<i class="ssep"></i>` : `<button type="button" data-fmt="${x[0]}" title="${x[2]}">${x[1]}</button>`)).join("")}</div>
+      <textarea id="draftText" aria-label="下書き" placeholder="真ん中で「下書き書いて」と言うとここに入ります。直接書いても OK（@ でメンション）">${esc(t.draft || "")}</textarea>
+      <div class="sprev" id="sPrev" hidden></div>
+      <div class="satt" id="sAtt"></div>
+      <div class="df">
+        <button type="button" class="sbt" id="sAdd" title="ファイルを添付（ドラッグ＆ドロップ・⌘V の貼り付けも可）">＋</button><input type="file" id="sFile" multiple hidden>
+        <button type="button" class="sbt" id="sAa" title="送ったときの見え方" aria-pressed="false">Aa</button>
+        <button type="button" class="sbt" id="sEmo" title="絵文字">😀</button>
+        <button type="button" class="sbt" id="sAt" title="メンション">@</button>
+        <span class="hint">送るのは「送信…」で確認したときだけ</span><span class="sp"></span>
+        <button type="button" class="btn" id="copyDraft">コピー</button><button type="button" class="btn send" id="saveDraft">送信…</button>
+      </div>
+      <div class="confirm" id="sendConfirm" hidden></div></div>`;
+  }
+  // 選んだところを書式で囲む / 行の頭に付ける
+  function fmtWrap(ta, a, b, ph) {
+    const s0 = ta.selectionStart, s1 = ta.selectionEnd, v = ta.value, sel = v.slice(s0, s1) || ph;
+    ta.value = v.slice(0, s0) + a + sel + b + v.slice(s1);
+    ta.selectionStart = s0 + a.length; ta.selectionEnd = s0 + a.length + sel.length;
+  }
+  function fmtLines(ta, kind) {
+    const v = ta.value, s0 = v.lastIndexOf("\n", ta.selectionStart - 1) + 1, e = v.indexOf("\n", ta.selectionEnd), s1 = e < 0 ? v.length : e;
+    const lines = v.slice(s0, s1).split("\n").map((l, k) => (kind === "ol" ? `${k + 1}. ` : kind === "ul" ? "• " : "> ") + l.replace(/^(\d+\.\s|•\s|>\s?)/, ""));
+    const out = lines.join("\n");
+    ta.value = v.slice(0, s0) + out + v.slice(s1);
+    ta.selectionStart = s0; ta.selectionEnd = s0 + out.length;
+  }
+  function applyFmt(ta, k) {
+    if (k === "b") fmtWrap(ta, "*", "*", "太字");
+    else if (k === "i") fmtWrap(ta, "_", "_", "斜体");
+    else if (k === "s") fmtWrap(ta, "~", "~", "取り消し");
+    else if (k === "code") fmtWrap(ta, "`", "`", "コード");
+    else if (k === "block") fmtWrap(ta, "```\n", "\n```", "コード");
+    else if (k === "link") {
+      const s0 = ta.selectionStart, s1 = ta.selectionEnd, sel = ta.value.slice(s0, s1);
+      if (/^https?:\/\/\S+$/.test(sel)) return;
+      const label = sel || "リンクの文字", ins = `[${label}](https://)`;
+      ta.value = ta.value.slice(0, s0) + ins + ta.value.slice(s1);
+      ta.selectionStart = s0 + label.length + 3; ta.selectionEnd = s0 + ins.length - 1;   // https:// のところを選んだ状態にする
+    } else fmtLines(ta, k);
+    ta.dispatchEvent(new Event("input")); ta.focus();
+  }
+  // 送る前の本文: @名前 → 本物のメンション、[文字](URL) → Slack のリンク
+  function toSlackText(t, text) {
+    return toSlackMentions(t, text).replace(/\[([^\]\n]{1,120})\]\((https?:\/\/[^)\s]+)\)/g, (m, l, u) => `<${u}|${l.replace(/[|>]/g, " ")}>`);
+  }
+  function bindSlackComposer(i, ta) {
+    const t = i.thread;
+    t.files = t.files || [];
+    const box = $("scomp"), att = $("sAtt"), prev = $("sPrev");
+    const ctx = () => ({ emoji: (t.data && t.data.emoji) || {}, people: slackPeople(t), selfName: (t.data && t.data.selfName) || "" });
+    const drawAtt = () => {
+      att.innerHTML = t.files.map((f, k) => `<span class="schip">${f.preview ? `<img src="${f.preview}" alt="">` : `<span class="fi">${fileIcon({ filetype: f.name.split(".").pop(), mimetype: f.type })}</span>`}<span class="fn"><b>${esc(f.name)}</b><span>${esc(sizeText(f.size))}</span></span><button type="button" data-rm="${k}" aria-label="外す">×</button></span>`).join("");
+      att.querySelectorAll("[data-rm]").forEach((b) => (b.onclick = () => { const f = t.files.splice(+b.dataset.rm, 1)[0]; if (f && f.preview) URL.revokeObjectURL(f.preview); drawAtt(); }));
+    };
+    const addFiles = async (list) => {
+      for (const f of list) {
+        if (f.size > 100 * 1024 * 1024) { toast(`${f.name} は大きすぎます（100MB まで）`); continue; }
+        t.files.push({ name: f.name || "image.png", type: f.type || "application/octet-stream", size: f.size, data: await f.arrayBuffer(), preview: /^image\//.test(f.type) ? URL.createObjectURL(f) : "" });
+      }
+      drawAtt();
+    };
+    drawAtt();
+    box.querySelectorAll("[data-fmt]").forEach((b) => (b.onmousedown = (e) => { e.preventDefault(); applyFmt(ta, b.dataset.fmt); }));
+    ta.addEventListener("keydown", (e) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const k = e.key.toLowerCase();
+      if (k === "b") { e.preventDefault(); applyFmt(ta, "b"); }
+      else if (k === "i") { e.preventDefault(); applyFmt(ta, "i"); }
+      else if (k === "x" && e.shiftKey) { e.preventDefault(); applyFmt(ta, "s"); }
+      else if (k === "u" && e.shiftKey) { e.preventDefault(); applyFmt(ta, "link"); }
+    });
+    $("sAdd").onclick = () => $("sFile").click();
+    $("sFile").onchange = () => { addFiles([...$("sFile").files]); $("sFile").value = ""; };
+    ta.addEventListener("paste", (e) => { const fs = [...((e.clipboardData && e.clipboardData.files) || [])]; if (fs.length) { e.preventDefault(); addFiles(fs); } });
+    box.addEventListener("dragover", (e) => { e.preventDefault(); box.classList.add("drop"); });
+    box.addEventListener("dragleave", (e) => { if (!box.contains(e.relatedTarget)) box.classList.remove("drop"); });
+    box.addEventListener("drop", (e) => { e.preventDefault(); e.stopPropagation(); box.classList.remove("drop"); addFiles([...((e.dataTransfer && e.dataTransfer.files) || [])]); });
+    const showPrev = () => { prev.innerHTML = ta.value.trim() ? slackHtml(ta.value, ctx()) : `<span class="hint">（空です）</span>`; };
+    $("sAa").onclick = () => { const on = prev.hidden; prev.hidden = !on; $("sAa").setAttribute("aria-pressed", on); if (on) showPrev(); };
+    ta.addEventListener("input", () => { if (!prev.hidden) showPrev(); });
+    $("sEmo").onclick = () => emojiPicker($("sEmo"), ctx(), (n) => { fmtWrap(ta, "", "", ""); const p = ta.selectionStart; ta.value = ta.value.slice(0, p) + `:${n}: ` + ta.value.slice(p); ta.selectionStart = ta.selectionEnd = p + n.length + 3; ta.dispatchEvent(new Event("input")); ta.focus(); });
+    $("sAt").onclick = () => { const p = ta.selectionStart, pre = ta.value.slice(0, p); const ins = (pre && !/\s$/.test(pre) ? " " : "") + "@"; ta.value = pre + ins + ta.value.slice(p); ta.selectionStart = ta.selectionEnd = p + ins.length; ta.focus(); ta.dispatchEvent(new Event("input")); };
+  }
+
+  // ---------- スタンプ（リアクション）: 片山さんが押したときだけ付ける・外す ----------
+  function bindSlackReactions(i, root) {
+    const t = i.thread;
+    const ctx = () => ({ emoji: (t.data && t.data.emoji) || {} });
+    const apply = async (m, name, remove) => {
+      if (!IS_APP || !window.ball.slackReact) return toast("見本なので付けられません");
+      const r = await window.ball.slackReact({ channel: t.channel, ts: m.ts, name, remove });
+      if (!r.ok) return toast("スタンプを付けられませんでした：" + r.error);
+      const ex = m.reactions.find((x) => x.name === name);
+      if (remove) { if (ex) { ex.count--; ex.mine = false; if (ex.count <= 0) m.reactions.splice(m.reactions.indexOf(ex), 1); } }
+      else if (ex) { ex.count++; ex.mine = true; } else m.reactions.push({ name, count: 1, mine: true });
+      if (!remove && t.data.emoji && emojiAllCache && emojiAllCache[name]) t.data.emoji[name] = emojiAllCache[name];
+      toast(remove ? "スタンプを外しました" : `:${name}: を付けました`);
+      renderSlackThread(i);
+      window.ball.slackScan && window.ball.slackScan(); // ボールの状態（了解済み・完了）を付け直す
+    };
+    root.querySelectorAll(".smsg").forEach((el, k) => {
+      const m = t.data.messages[k];
+      const add = el.querySelector(".sadd");
+      if (add) add.onclick = () => emojiPicker(add, ctx(), (n) => apply(m, n, false));
+      el.querySelectorAll(".sreact").forEach((b, j) => (b.onclick = () => { const r = m.reactions[j]; apply(m, r.name, r.mine); }));
+    });
+  }
+
   function renderSlackThread(i) {
     const t = i.thread;
     if (!t.data && !t.error) {
@@ -1211,19 +1513,15 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       }
       return;
     }
-    const msgs = t.data ? t.data.messages : [];
     $("thr").innerHTML = `<div class="thr">
       <div class="thd"><h4>${esc(t.where)}${t.threadTs ? " のスレッド" : ""}</h4><span><button type="button" class="btn" id="slackReload">読み直す</button>${t.permalink ? ` <button type="button" class="btn" id="slackOpen">Slack で開く ↗</button>` : ""}</span></div>
-      ${t.error ? `<div class="empty">読めませんでした：${esc(t.error)}</div>` : msgs.map((m, k) => `<div class="sm${m.ts === t.ts ? " hl" : ""}"><span class="av" style="background:${m.mine ? "#1E7B4E" : "#4A154B"}">${esc((m.name || "?")[0])}</span><div style="min-width:0"><div class="n">${esc(m.name)}<time>${esc(new Date(parseFloat(m.ts) * 1000).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</time></div><div class="x rich">${richBody(m.text)}</div>${
-        m.files.length ? `<div class="atts">${m.files.map((f, j) => `<button type="button" class="att" data-msg="${k}" data-file="${j}">📎 ${esc(f.name)}</button>`).join("")}</div>` : ""}${
-        m.reactions.length ? `<div>${m.reactions.map((r) => `<span class="react${r.mine ? " mine" : ""}">:${esc(r.name)}: ${r.count}</span>`).join(" ")}</div>` : ""}</div></div>`).join("")}
+      ${t.error ? `<div class="empty">読めませんでした：${esc(t.error)}</div>` : `<div class="smsgs">${slackMsgsHtml(t)}</div>`}
       ${draftBox(i, "slacklive")}
     </div>`;
-    bindLinks($("thr"));
     $("slackReload").onclick = () => { t.data = null; t.error = null; renderSlackThread(i); };
     mountDocsBar(i, ".thd");
     if ($("slackOpen")) $("slackOpen").onclick = () => openTab(t.permalink, "Slack");
-    $("thr").querySelectorAll(".att[data-file]").forEach((b) => (b.onclick = () => { const f = msgs[+b.dataset.msg].files[+b.dataset.file]; if (f.url) openTab(f.url, f.name); }));
+    if (t.data) { const box = $("thr").querySelector(".smsgs"); bindSlackFiles(box, t); loadSlackImages(box, t); bindSlackReactions(i, box); }
     bindDraft(i);
   }
   $("ft-slack").onclick = () => {

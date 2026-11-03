@@ -71,39 +71,73 @@ async function listDMs(cfg) {
   throw new Error(errs.join(" / "));
 }
 
-// 検索で DM を拾う: 自分宛ての DM（to:me）と自分の発言（from:me）を直近 30 日で探し、
-// 相手の最後の発言のあとに自分が何も書いていない DM を返す
+// 相手の最後の一言が「締め」（お礼・了解・見てみます など）で、質問もお願いも無ければ、返事は要らないとみなす
+const CLOSING_RE = /(ありがと|有難|有り難|承知|了解|りょうかい|かしこまり|助かり|確認しました|見てみます|拝見します|おつかれ|お疲れ|thanks|thank you|\bthx\b|\bok\b|おけ|👍|🙏)/i;
+const ASKING_RE = /[?？]|お願い|ください|下さい|いただけ|頂け|もらえ|でしょうか|ますか|ませんか|どう(なり|です|でしょ)|いつ|教えて/;
+function isClosing(text) {
+  const t = String(text || "").replace(/:[a-z0-9_+-]+:/gi, "").replace(/\s+/g, " ").trim();
+  return t.length <= 40 && CLOSING_RE.test(t) && !ASKING_RE.test(t);
+}
+// 検索で DM を拾う（DM の一覧が取れない Slack 用）: 自分宛ての DM（to:me）を直近 30 日で探し、
+// DM ごとに直近のやり取りを読んで、相手の発言で止まっているものだけ返す。
+// 直近のやり取りが読めないときは、自分の発言（from:me・最大 400 件）と突き合わせる
 async function dmsBySearch(cfg, already) {
   const since = new Date(Date.now() - 30 * 86400e3 + 9 * 3600e3).toISOString().slice(0, 10);
-  const find = async (query) => {
-    const r = await api(cfg, "search.messages", { query: `${query} after:${since}`, count: 100, sort: "timestamp", sort_dir: "desc" });
-    return (r.messages && r.messages.matches) || [];
+  const find = async (query, page = 1) => {
+    const r = await api(cfg, "search.messages", { query: `${query} after:${since}`, count: 100, page, sort: "timestamp", sort_dir: "desc" });
+    return { list: (r.messages && r.messages.matches) || [], pages: (r.messages && r.messages.paging && r.messages.paging.pages) || 1 };
   };
-  const toMe = await find("to:me");
-  const fromMe = await find("from:me").catch(() => []);
-  const myLast = new Map();
-  for (const m of fromMe) { const ch = (m.channel || {}).id; if (ch && !(parseFloat(myLast.get(ch) || 0) >= parseFloat(m.ts))) myLast.set(ch, m.ts); }
+  const toMe = (await find("to:me")).list;
   const theirLast = new Map();
   for (const m of toMe) {
     const ch = m.channel || {};
     if (!ch.id || !(ch.is_im || ch.is_mpim) || m.user === cfg.userId) continue;
     if (!theirLast.has(ch.id) || parseFloat(m.ts) > parseFloat(theirLast.get(ch.id).ts)) theirLast.set(ch.id, m);
   }
+  let myLast = null; // 必要になったときだけ読む
+  const loadMine = async () => {
+    myLast = new Map();
+    for (let page = 1; page <= 4; page++) {
+      let r; try { r = await find("from:me", page); } catch (e) { break; }
+      for (const m of r.list) { const ch = (m.channel || {}).id; if (ch && !(parseFloat(myLast.get(ch) || 0) >= parseFloat(m.ts))) myLast.set(ch, m.ts); }
+      if (page >= r.pages || r.list.length < 100) break;
+      await sleep(400);
+    }
+  };
   const out = [];
-  for (const [chId, m] of [...theirLast.entries()].slice(0, 25)) {
-    if (parseFloat(myLast.get(chId) || 0) > parseFloat(m.ts)) continue;  // 自分がそのあと返している
-    if (already.some((x) => x.channel === chId && x.ts === m.ts)) continue;
-    const st = stateOf(cfg, m, false);
+  const cands = [...theirLast.entries()].sort((x, y) => parseFloat(y[1].ts) - parseFloat(x[1].ts)).slice(0, 30);
+  for (const [chId, hit] of cands) {
+    if (already.some((x) => x.channel === chId)) continue;
+    let last = hit;
+    try {
+      // 直近のやり取り（スタンプ込み）。最後が自分なら返信済み
+      const h = await api(cfg, "conversations.history", { channel: chId, limit: 5 });
+      const msgs = (h.messages || []).filter((x) => !x.subtype || x.subtype === "file_share" || x.subtype === "thread_broadcast");
+      if (msgs.length) {
+        if (msgs[0].user === cfg.userId) continue;
+        last = msgs[0];
+      }
+    } catch (e) {
+      if (!myLast) await loadMine();
+      if (parseFloat(myLast.get(chId) || 0) > parseFloat(hit.ts)) continue;
+    }
+    if (!last.user || last.bot_id) continue;
+    const st = stateOf(cfg, last, false);
     if (st.state === "done") continue;
-    const ch = m.channel;
-    out.push({ kind: "dm", channel: chId, channelName: ch.is_mpim ? (ch.name || "グループDM") : "", ts: m.ts, threadTs: m.thread_ts || "",
-      user: m.user, userName: m.username || (await userName(cfg, m.user)), text: await plain(cfg, m.text), permalink: m.permalink || "",
-      state: st.state, emoji: st.emoji, unsureEmoji: !!st.unsure, at: Math.round(parseFloat(m.ts) * 1000) });
+    if (st.state === "open" && isClosing(last.text)) continue; // 「ありがとうございます！」などの締めは返事不要
+    const ch = hit.channel;
+    let text = await plain(cfg, last.text);
+    if (!text.trim() && (last.files || []).length) text = "📎 " + last.files.map((f) => f.name || f.title || "ファイル").join(", ");
+    out.push({ kind: "dm", channel: chId, channelName: ch.is_mpim ? (ch.name || "グループDM") : "", ts: last.ts, threadTs: last.thread_ts || "",
+      user: last.user, userName: hit.username || (await userName(cfg, last.user)), text: text || "（スタンプ・ファイル）", permalink: hit.permalink || "",
+      state: st.state, emoji: st.emoji, unsureEmoji: !!st.unsure, at: Math.round(parseFloat(last.ts) * 1000) });
+    await sleep(150);
   }
   return out;
 }
 
 const users = new Map();
+const avatars = new Map(); // 人 → アイコンの画像（avatars.slack-edge.com。ログイン無しで見られる）
 async function userName(cfg, id) {
   if (!id) return "";
   if (users.has(id)) return users.get(id);
@@ -111,7 +145,7 @@ async function userName(cfg, id) {
     const j = await api(cfg, "users.info", { user: id });
     const p = j.user.profile || {};
     const n = p.display_name || p.real_name || j.user.real_name || j.user.name || id;
-    users.set(id, n); return n;
+    users.set(id, n); avatars.set(id, p.image_72 || p.image_48 || ""); return n;
   } catch (e) { users.set(id, id); return id; }
 }
 // Slack の書式（<@U123>、<url|ラベル>、&amp; など）を読みやすい文字に直す
@@ -119,7 +153,9 @@ async function plain(cfg, text) {
   let t = String(text || "");
   const ids = [...new Set([...t.matchAll(/<@([UW][A-Z0-9]+)>/g)].map((m) => m[1]))];
   for (const id of ids) t = t.split(`<@${id}>`).join("@" + (await userName(cfg, id)));
-  return t.replace(/<#[A-Z0-9]+\|([^>]+)>/g, "#$1").replace(/<(https?:[^|>]+)\|([^>]+)>/g, (m, u, l) => (l === u ? u : `[${l.replace(/[\[\]]/g, "")}](${u})`)).replace(/<(https?:[^>]+)>/g, "$1")
+  return t.replace(/<mailto:[^|>]+\|([^>]+)>/g, "$1").replace(/<mailto:([^>]+)>/g, "$1").replace(/<tel:[^|>]+\|([^>]+)>/g, "$1")
+    .replace(/<!subteam\^[A-Z0-9]+\|([^>]+)>/g, "$1").replace(/<!subteam\^[A-Z0-9]+>/g, "@グループ")
+    .replace(/<#[A-Z0-9]+\|([^>]+)>/g, "#$1").replace(/<#[A-Z0-9]+>/g, "#チャンネル").replace(/<(https?:[^|>]+)\|([^>]+)>/g, (m, u, l) => (l === u ? u : `[${l.replace(/[\[\]]/g, "")}](${u})`)).replace(/<(https?:[^>]+)>/g, "$1")
     .replace(/<!(here|channel|everyone)>/g, "@$1").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 }
 // 自分の反応（返信・スタンプ）からボールの状態を決める: done（閉じる）/ ack（了解済み・作業は残る）/ open
@@ -199,6 +235,7 @@ async function scan() {
         if (out.some((x) => x.channel === im.id && x.ts === last.ts)) continue;
         const st = stateOf(cfg, last, false);
         if (st.state === "done") continue;
+        if (st.state === "open" && isClosing(last.text)) continue;
         out.push({ kind: "dm", channel: im.id, channelName: im.is_mpim ? (im.name || "グループDM") : "", ts: last.ts, threadTs: last.thread_ts || "",
           user: last.user, userName: await userName(cfg, last.user || im.user), text: await plain(cfg, last.text), permalink: "",
           state: st.state, emoji: st.emoji, unsureEmoji: !!st.unsure, at: Math.round(parseFloat(last.ts) * 1000) });
@@ -226,15 +263,41 @@ ipcRenderer.on("slack-thread", async (_e, { channel, threadTs, reqId }) => {
     for (const m of list) {
       if (m.user && m.user !== cfg.userId) ids.add(m.user);
       for (const x of String(m.text || "").matchAll(/<@([UW][A-Z0-9]+)(?:\|[^>]*)?>/g)) if (x[1] !== cfg.userId) ids.add(x[1]);
-      messages.push({ user: m.user, name: m.user === cfg.userId ? "自分" : (m.username || (await userName(cfg, m.user)) || "bot"), mine: m.user === cfg.userId,
-        ts: m.ts, text: await plain(cfg, m.text), reactions: (m.reactions || []).map((x) => ({ name: x.name, count: x.count, mine: (x.users || []).includes(cfg.userId) })),
-        files: (m.files || []).map((f) => ({ name: f.name || f.title || "ファイル", url: f.permalink || f.url_private || "", mimetype: f.mimetype || "" })) });
+      const nm = m.user === cfg.userId ? "自分" : (m.username || (m.user && (await userName(cfg, m.user))) || (m.bot_profile && m.bot_profile.name) || "bot");
+      if (m.user === cfg.userId) await userName(cfg, m.user);
+      messages.push({ user: m.user, name: nm, mine: m.user === cfg.userId, avatar: avatars.get(m.user) || (m.bot_profile && m.bot_profile.icons && (m.bot_profile.icons.image_72 || m.bot_profile.icons.image_48)) || "",
+        ts: m.ts, edited: !!m.edited, text: await plain(cfg, m.text), reactions: (m.reactions || []).map((x) => ({ name: x.name, count: x.count, mine: (x.users || []).includes(cfg.userId) })),
+        replyCount: m.reply_count || 0,
+        files: (m.files || []).map((f) => ({
+          name: f.name || f.title || "ファイル", title: f.title || "", url: f.permalink || f.url_private || "", download: f.url_private || "", mimetype: f.mimetype || "",
+          filetype: f.filetype || "", pretty: f.pretty_type || "", size: f.size || 0, w: f.original_w || 0, h: f.original_h || 0,
+          thumb: f.thumb_720 || f.thumb_480 || f.thumb_360 || f.thumb_pdf || f.thumb_video || (/^image\//.test(f.mimetype || "") ? f.url_private : "") || "",
+        })) });
     }
     const people = [];
     for (const id of ids) people.push({ id, name: await userName(cfg, id) });
-    ipcRenderer.send("slack-thread-result", { reqId, ok: true, messages, people, teamUrl: cfg.url });
+    // 使われているカスタム絵文字（本文の :name: とリアクション）だけ渡す
+    const all = await customEmoji(cfg), emoji = {};
+    for (const m of messages) {
+      for (const x of String(m.text).matchAll(/:([a-z0-9_+'-]+):/gi)) { const u = emojiOf(all, x[1]); if (u) emoji[x[1]] = u; }
+      for (const r of m.reactions) { const u = emojiOf(all, r.name); if (u) emoji[r.name] = u; }
+    }
+    ipcRenderer.send("slack-thread-result", { reqId, ok: true, messages, people, emoji, selfName: users.get(cfg.userId) || "", teamUrl: cfg.url });
   } catch (err) { ipcRenderer.send("slack-thread-result", { reqId, ok: false, error: String(err.message || err) }); }
 });
+
+// ワークスペースのカスタム絵文字（名前 → 画像）。1回だけ読む。別名（alias:xxx）はたどる
+let emojiAll = null;
+async function customEmoji(cfg) {
+  if (emojiAll) return emojiAll;
+  try { const r = await api(cfg, "emoji.list", {}); emojiAll = r.emoji || {}; } catch (e) { emojiAll = {}; }
+  return emojiAll;
+}
+function emojiOf(all, name, depth = 0) {
+  const v = all[name];
+  if (!v || depth > 3) return "";
+  return /^alias:/.test(v) ? emojiOf(all, v.slice(6), depth + 1) : v;
+}
 
 // メンションの候補: チャンネルのメンバー（最大 300 人。名前は覚えておいて2回目からは速い）
 const peopleCache = new Map();
@@ -264,13 +327,49 @@ ipcRenderer.on("slack-people", async (_e, { channel, reqId }) => {
 });
 
 // 送信（返信）。BALL 本体が「この内容で送信」を押されたときにだけ送ってくる
-ipcRenderer.on("slack-send", async (_e, { channel, threadTs, text, reqId }) => {
+// ファイル付きのときは、BALL 本体が先にファイルを上げて（slack-upload-url → 本体がアップロード）、ここで本文と一緒に投稿する
+ipcRenderer.on("slack-send", async (_e, { channel, threadTs, text, fileIds, reqId }) => {
   const cfg = config();
   if (!cfg) return ipcRenderer.send("slack-send-result", { reqId, ok: false, error: "Slack にログインしていません" });
   try {
+    if (fileIds && fileIds.length) {
+      await api(cfg, "files.completeUploadExternal", { files: JSON.stringify(fileIds), channel_id: channel, thread_ts: threadTs || undefined, initial_comment: text || undefined });
+      return ipcRenderer.send("slack-send-result", { reqId, ok: true });
+    }
     const r = await api(cfg, "chat.postMessage", { channel, text, thread_ts: threadTs || undefined });
     ipcRenderer.send("slack-send-result", { reqId, ok: true, ts: r.ts });
   } catch (err) { ipcRenderer.send("slack-send-result", { reqId, ok: false, error: String(err.message || err) }); }
+});
+
+// ファイルを上げる先を Slack に聞く（上げるのは BALL 本体）
+ipcRenderer.on("slack-upload-url", async (_e, { filename, length, reqId }) => {
+  const cfg = config();
+  if (!cfg) return ipcRenderer.send("slack-upload-url-result", { reqId, ok: false, error: "Slack にログインしていません" });
+  try {
+    const r = await api(cfg, "files.getUploadURLExternal", { filename, length });
+    ipcRenderer.send("slack-upload-url-result", { reqId, ok: true, uploadUrl: r.upload_url, fileId: r.file_id, token: cfg.token });
+  } catch (err) { ipcRenderer.send("slack-upload-url-result", { reqId, ok: false, error: String(err.message || err) }); }
+});
+// スタンプを付ける・外す（片山さんが BALL 本体で押したときだけ届く）
+ipcRenderer.on("slack-react", async (_e, { channel, ts, name, remove, reqId }) => {
+  const cfg = config();
+  if (!cfg) return ipcRenderer.send("slack-react-result", { reqId, ok: false, error: "Slack にログインしていません" });
+  try {
+    await api(cfg, remove ? "reactions.remove" : "reactions.add", { channel, timestamp: ts, name });
+    ipcRenderer.send("slack-react-result", { reqId, ok: true });
+  } catch (err) {
+    const msg = String(err.message || err);
+    if (/already_reacted|no_reaction/.test(msg)) return ipcRenderer.send("slack-react-result", { reqId, ok: true });
+    ipcRenderer.send("slack-react-result", { reqId, ok: false, error: msg });
+  }
+});
+// 絵文字を選ぶ小窓用: カスタム絵文字の全部（別名はたどった画像）
+ipcRenderer.on("slack-emoji-all", async (_e, { reqId }) => {
+  const cfg = config();
+  if (!cfg) return ipcRenderer.send("slack-emoji-all-result", { reqId, ok: false });
+  const all = await customEmoji(cfg), out = {};
+  for (const n of Object.keys(all)) { const u = emojiOf(all, n); if (u) out[n] = u; }
+  ipcRenderer.send("slack-emoji-all-result", { reqId, ok: true, emoji: out });
 });
 
 ipcRenderer.on("slack-scan-now", scan);
