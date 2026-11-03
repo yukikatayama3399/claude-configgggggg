@@ -524,12 +524,14 @@
       el = document.createElement("div"); el.id = "diag"; el.className = "ov";
       el.innerHTML = `<div class="ovc" role="dialog" aria-modal="true" aria-labelledby="diagTitle" style="max-width:720px">
         <h2 id="diagTitle">Messenger 読み取りの診断</h2>
-        <p class="hint">名前やメッセージの中身は入っていません。画面の作りだけです。うまく読めないときは、これをコピーして Claude に送ってください。</p>
+        <p class="hint">名前やメッセージの中身は入っていません。画面の作りだけです。うまく読めないときは、これをコピーして Claude に送ってください。「読み取り画面を見る」で、裏で開いている Messenger の画面をそのまま見られます（PIN の入力やログインが出ていたら、そこで済ませてください。閉じるとまた見えなくなります）。</p>
         <pre id="diagText" style="white-space:pre-wrap;font-family:var(--f-mono);font-size:11.5px;background:var(--soft);border-radius:8px;padding:12px;max-height:50vh;overflow:auto;margin:0"></pre>
-        <div class="ovf"><span class="hint">右のブラウザで Messenger の一覧を開いて下の帯を押すと、そのページを読むように切り替わります</span><span><button type="button" class="btn" id="diagCopy">コピー</button> <button type="button" class="btn dark" id="diagClose">閉じる</button></span></div></div>`;
+        <div class="ovf"><span class="hint">右のブラウザで Messenger の一覧を開いて下の帯を押すと、そのページを読むように切り替わります</span><span><button type="button" class="btn" id="diagShow">読み取り画面を見る</button> <button type="button" class="btn" id="diagCopy">コピー</button> <button type="button" class="btn dark" id="diagClose">閉じる</button></span></div></div>`;
       document.body.appendChild(el);
       el.onclick = (e) => { if (e.target === el) el.hidden = true; };
       $("diagClose").onclick = () => (el.hidden = true);
+      // 透明にしている読み取り画面を見えるようにする（PIN 入力やログインが出ていないか確認・操作できる。閉じると透明に戻る）
+      $("diagShow").onclick = () => { el.hidden = true; if (IS_APP) window.ball.messengerShow(); else toast("アプリ版で使えます"); };
       $("diagCopy").onclick = () => {
         const tx = $("diagText").textContent;
         navigator.clipboard.writeText(tx).then(() => toast("コピーしました"), () => { const r = document.createRange(); r.selectNodeContents($("diagText")); getSelection().removeAllRanges(); getSelection().addRange(r); toast("選択しました。⌘C でコピーしてください"); });
