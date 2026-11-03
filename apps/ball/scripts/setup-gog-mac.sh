@@ -27,14 +27,24 @@ command -v gog >/dev/null 2>&1 || fail "gog が見つかりません。"
 [ -f "$ENV_FILE" ] || fail "$ENV_FILE がありません。先に3つの値を書いてください（README 参照）。"
 chmod 600 "$ENV_FILE"
 
-# KEY=VALUE を読む（前後の空白・引用符は外す）
-read_val() { grep -E "^[[:space:]]*$1[[:space:]]*=" "$ENV_FILE" | tail -1 | sed -E "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//; s/^[\"']//; s/[\"'][[:space:]]*$//" | tr -d '\r'; }
+# KEY=VALUE を読む。コピーのときに値の途中で改行が入っても、次の KEY= の行までを1つの値としてつなげる。
+# 空白・改行・引用符は取り除く（base64 とパスワードに空白は入らない）。
+read_val() {
+  awk -v key="$1" '
+    /^[[:space:]]*[A-Z_][A-Z0-9_]*[[:space:]]*=/ { cur = $0; sub(/[[:space:]]*=.*/, "", cur); gsub(/[[:space:]]/, "", cur)
+      if (cur == key) { on = 1; v = $0; sub(/^[^=]*=/, "", v); out = out v; next } else { on = 0 } }
+    on { out = out $0 }
+    END { gsub(/[[:space:]"\047]/, "", out); printf "%s", out }' "$ENV_FILE"
+}
 CRED="$(read_val GOG_CREDENTIALS_B64)"
 TOKEN="$(read_val GOG_TOKEN_EXPORT_B64)"
 PASS="$(read_val GOG_KEYRING_PASSWORD)"
+log "読み取った長さ: GOG_CREDENTIALS_B64=${#CRED} / GOG_TOKEN_EXPORT_B64=${#TOKEN} / GOG_KEYRING_PASSWORD=${#PASS}（正しくは 412 / 4336 / 29）"
 [ -n "$CRED" ]  || fail "GOG_CREDENTIALS_B64 が空です"
 [ -n "$TOKEN" ] || fail "GOG_TOKEN_EXPORT_B64 が空です"
 [ -n "$PASS" ]  || fail "GOG_KEYRING_PASSWORD が空です"
+[ "${#CRED}" -eq 412 ]  || echo "!! GOG_CREDENTIALS_B64 の長さが 412 ではありません。最後までコピーできているか確認してください" >&2
+[ "${#TOKEN}" -eq 4336 ] || echo "!! GOG_TOKEN_EXPORT_B64 の長さが 4336 ではありません。最後までコピーできているか確認してください" >&2
 
 export GOG_KEYRING_BACKEND=file
 export GOG_KEYRING_PASSWORD="$PASS"
