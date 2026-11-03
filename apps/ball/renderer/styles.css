@@ -316,3 +316,7 @@ td.new{background:var(--cell)}
 .doc .di{grid-row:1/3;font-size:18px}
 .doc .dn{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .doc .dd{font-size:10.5px;color:var(--muted);font-family:var(--f-mono)}
+.lnk small{font-weight:500;font-size:10.5px;color:var(--muted);margin-left:4px}
+.bubrow.mine .bb .lnk{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.4);color:#fff}
+.bubrow.mine .bb .lnk small{color:rgba(255,255,255,.75)}
+.bb.rich .ln,.sm .x.rich .ln{white-space:pre-wrap}

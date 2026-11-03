@@ -207,6 +207,8 @@
     try {
       const x = new URL(u), h = x.hostname.replace(/^www\./, "");
       if (h === "docs.google.com") return /\/spreadsheets\//.test(x.pathname) ? "📊 スプレッドシート" : /\/presentation\//.test(x.pathname) ? "📽 スライド" : /\/forms\//.test(x.pathname) ? "📝 フォーム" : "📄 Google ドキュメント";
+      if (h === "forms.gle") return "📝 Google フォーム";
+      if (h === "script.google.com") return "📝 Web フォーム（Google）";
       if (h === "drive.google.com") return "📁 Drive のファイル";
       if (h === "meet.google.com") return "🎥 Meet";
       if (h === "calendar.google.com" || (h === "google.com" && /calendar/.test(x.pathname))) return "📅 カレンダー";
@@ -222,10 +224,52 @@
     if (cut > 0) t = t.slice(0, cut);
     return t.replace(/\[image:[^\]]*\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
   }
+  // 本文のリンクを拾って、名前を付ける。
+  //  - [名前](URL)（HTML メールの <a> と Slack の <URL|名前> はこの形にしてある）→ その名前
+  //  - 「お申込フォーム：URL」のように同じ行の短い前置き → それ
+  //  - URL だけの行 → 少し上の見出し（*■ お申込フォーム* / 【…】 など）
+  // 返す t はリンクを \0番号\0 に置き換えた本文
+  const PH = (k) => "\u0000" + k + "\u0000";
+  const tidyLabel = (s) => String(s || "").replace(/\u0000\d+\u0000/g, "").replace(/^[\s*_~>＞■□●○◆◇▼▶・\-–—【\[]+|[\s*_~:：→】\]]+$/g, "").replace(/\s+/g, " ").trim();
+  const isHeading = (s) => /^\s*[*＊]?\s*[■□●○◆◇▼▶【]/.test(s) || /^\s*\*[^*]+\*\s*$/.test(s);
+  function parseLinks(raw) {
+    const links = [];
+    const t = cleanBody(raw).replace(/\[([^\]\n]{1,80})\]\((https?:\/\/[^)\s]+)\)|<(https?:\/\/[^>\s]+)>|(https?:\/\/[^\s<>"」）)]+)/g, (m, label, lu, a, b) => {
+      if (lu) { links.push({ url: lu, label: label.trim() === lu ? "" : label.trim() }); return PH(links.length - 1); }
+      const full = a || b, u = full.replace(/[.,、。]+$/, "");
+      links.push({ url: u, label: "" });
+      return PH(links.length - 1) + full.slice(u.length);
+    });
+    const lines = t.split("\n");
+    lines.forEach((line, n) => {
+      for (const m of line.matchAll(/\u0000(\d+)\u0000/g)) {
+        const L = links[+m[1]]; if (L.label) continue;
+        const before = line.slice(0, m.index);
+        if (before.trim()) {
+          // 同じ行の前置き。文になっている長いものは名前にしない
+          const b = tidyLabel(before);
+          if (b && b.length <= 24 && !/[。！？]$/.test(b)) L.label = b;
+          continue;
+        }
+        // URL だけの行: 3行上までの見出し、なければ直前の短い行
+        for (let p = n - 1, seen = 0; p >= 0 && seen < 3; p--) {
+          if (!lines[p].trim()) continue; seen++;
+          if (/\u0000\d+\u0000/.test(lines[p])) break;
+          const c = tidyLabel(lines[p]);
+          if (c && c.length <= 30 && (isHeading(lines[p]) || (seen === 1 && c.length <= 20 && !/[。、！？]/.test(c)))) { L.label = c; break; }
+        }
+      }
+    });
+    return { t, links };
+  }
+  function linkBtn(L) {
+    const auto = linkLabel(L.url), icon = auto.split(" ")[0];
+    const label = L.label ? icon + " " + L.label : auto;
+    return `<button type="button" class="lnk" data-url="${esc(L.url)}" data-label="${esc(L.label || auto.replace(/^\S+\s/, ""))}" title="${esc(L.url)}\nクリックで別ウィンドウ / ⌘クリックで右のタブ">${esc(label)}<small>${esc(hostOf(L.url))}</small></button>`;
+  }
   function richBody(raw) {
-    const urls = [];
-    const t = cleanBody(raw).replace(/<(https?:\/\/[^>\s]+)>|(https?:\/\/[^\s<>"」）)]+)/g, (m, a, b) => { urls.push(a || b); return "\u0000" + (urls.length - 1) + "\u0000"; });
-    const fill = (str) => esc(str).replace(/\u0000(\d+)\u0000/g, (m, k) => `<button type="button" class="lnk" data-url="${esc(urls[+k])}" title="${esc(urls[+k])}">${esc(linkLabel(urls[+k]))}</button>`);
+    const { t, links } = parseLinks(raw);
+    const fill = (str) => esc(str).replace(/\u0000(\d+)\u0000/g, (m, k) => linkBtn(links[+k]));
     return t.split("\n").map((line) => {
       const plain = line.replace(/\u0000\d+\u0000/g, "").trim();
       if (/^\*[^*].*\*$/.test(plain)) return `<div class="bh">${esc(plain.replace(/^\*|\*$/g, ""))}</div>`;
@@ -243,7 +287,7 @@
   const driveCache = {};
   const URL_RE = /<(https?:\/\/[^>\s]+)>|(https?:\/\/[^\s<>"」）)]+)/g;
   const gFileId = (u) => { const m = String(u).match(/\/(?:d|folders)\/([a-zA-Z0-9_-]{20,})/) || String(u).match(/[?&]id=([a-zA-Z0-9_-]{20,})/); return m ? m[1] : ""; };
-  const isDocLink = (u) => /docs\.google\.com\/(document|spreadsheets|presentation|forms)|drive\.google\.com\/(file|open|drive\/folders)|\.(pdf|pptx?|key|docx?|xlsx?|csv|zip)(\?|$)/i.test(u);
+  const isDocLink = (u) => /docs\.google\.com\/(document|spreadsheets|presentation|forms)|drive\.google\.com\/(file|open|drive\/folders)|forms\.gle\/|script\.google\.com\/[^?#]*macros\/|\.(pdf|pptx?|key|docx?|xlsx?|csv|zip)(\?|$)/i.test(u);
   function docIcon(name, mime, url) {
     const x = (String(name) + " " + String(mime) + " " + String(url)).toLowerCase();
     if (/presentation|\.pptx?\b|\.key\b|slides/.test(x)) return "📽";
@@ -252,7 +296,7 @@
     if (/document|\.docx?\b|wordprocessing/.test(x)) return "📄";
     if (/image\/|\.(png|jpe?g|gif|heic)\b/.test(x)) return "🖼";
     if (/folder/.test(x)) return "📁";
-    if (/forms/.test(x)) return "📝";
+    if (/forms|script\.google|フォーム/.test(x)) return "📝";
     return "📎";
   }
   const shortDate = (d) => { const t = typeof d === "number" ? new Date(d) : new Date(d); return isNaN(t) ? "" : `${t.getMonth() + 1}/${t.getDate()}`; };
@@ -260,7 +304,7 @@
   function collectDocs(i) {
     const t = i.thread, docs = [], seen = new Set();
     const add = (d) => { const key = d.url || d.name + "|" + d.size; if (seen.has(key)) return; seen.add(key); docs.push(d); };
-    const linksIn = (text, date) => { for (const m of cleanBody(text).matchAll(URL_RE)) { const u = (m[1] || m[2]).replace(/[.,、。]+$/, ""); if (isDocLink(u)) add({ kind: "link", url: u, gid: gFileId(u), date }); } };
+    const linksIn = (text, date) => { for (const L of parseLinks(text).links) if (isDocLink(L.url)) add({ kind: "link", url: L.url, gid: gFileId(L.url), name: L.label || "", date }); };
     if (t.kind === "gmail") {
       const msgs = t.live ? (t.data ? t.data.messages : []) : (t.messages || []);
       msgs.forEach((m) => {
@@ -283,7 +327,7 @@
     if (!docs.length) return "";
     return `<div class="docbar" role="list" aria-label="このスレッドの資料（古い順）"><span class="dbl">資料 ${docs.length}</span>${docs.map((d, k) => {
       const meta = d.gid && driveCache[d.gid];
-      const name = d.name || (meta && meta.name) || linkLabel(d.url).replace(/^\S+\s/, "");
+      const name = (meta && meta.name) || d.name || linkLabel(d.url).replace(/^\S+\s/, "");
       const icon = docIcon(name, d.mime || (meta && meta.mimeType) || "", d.url || "");
       return `<button type="button" class="doc" role="listitem" data-doc="${k}" title="${esc(name)}${d.url ? "\n" + esc(d.url) : ""}"><span class="di">${icon}</span><span class="dn">${esc(name)}</span>${d.date ? `<span class="dd">${esc(shortDate(d.date))}</span>` : ""}</button>`;
     }).join("")}</div>`;
@@ -308,16 +352,22 @@
   }
   function bindDocsBar(i, docs) {
     const bar = $("thr").querySelector(".docbar"); if (!bar) return;
-    bar.querySelectorAll("[data-doc]").forEach((b) => (b.onclick = () => {
+    bar.querySelectorAll("[data-doc]").forEach((b) => (b.onclick = (event) => {
       const d = docs[+b.dataset.doc];
       if (d.kind === "att") {
         if (!IS_APP || !i.thread.live) return toast("見本の添付ファイルです");
         toast("添付ファイルを開いています…");
         window.ball.gmailAttachment(d.att).then((r) => toast(r.ok ? "開きました" : "開けませんでした：" + r.error));
-      } else openTab(d.url, (d.gid && driveCache[d.gid] && driveCache[d.gid].name) || d.name || linkLabel(d.url));
+      } else openLink(d.url, (d.gid && driveCache[d.gid] && driveCache[d.gid].name) || d.name || linkLabel(d.url).replace(/^\S+\s/, ""), event);
     }));
   }
-  function bindLinks(root) { root.querySelectorAll(".lnk[data-url]").forEach((b) => (b.onclick = () => openTab(b.dataset.url, b.textContent.replace(/^\S+\s/, "")))); }
+  // リンクは BALL と同じログインのまま別ウィンドウで開く（スレッドと下書きを見ながら中身を確かめられる）。⌘クリックなら右のタブで
+  function openLink(url, title, ev) {
+    if (ev && (ev.metaKey || ev.ctrlKey)) return openTab(url, title);
+    if (IS_APP && window.ball.openPreview) window.ball.openPreview({ url, title });
+    else window.open(url, "_blank", "noopener");
+  }
+  function bindLinks(root) { root.querySelectorAll(".lnk[data-url]").forEach((b) => (b.onclick = (e) => openLink(b.dataset.url, b.dataset.label, e))); }
 
   function msgCard(m, open, full) {
     // 会議メモ（転送されたものも）は本文がまるごと大事なので、引用を省かない
@@ -338,9 +388,9 @@
     if (t.kind === "slack" && t.live) { renderSlackThread(i); return; }
     if (t.kind === "slack") {
       $("thr").innerHTML = `<div class="thr"><h4>${t.ws === "DM" ? "DM: " : ""}${esc(t.ch)}${t.ws === "DM" ? "" : " のスレッド"}<span>${esc(t.ws)}</span></h4>
-        ${t.msgs.map((m) => `<div class="sm"><span class="av" style="background:${m[0]}">${esc(m[1][0])}</span><div><div class="n">${esc(m[1])}<time>${esc(m[2])}</time></div><div class="x">${esc(m[3])}</div>${m[4] ? `<span class="react">${esc(m[4])}</span>` : ""}</div></div>`).join("")}
+        ${t.msgs.map((m) => `<div class="sm"><span class="av" style="background:${m[0]}">${esc(m[1][0])}</span><div><div class="n">${esc(m[1])}<time>${esc(m[2])}</time></div><div class="x rich">${richBody(m[3])}</div>${m[4] ? `<span class="react">${esc(m[4])}</span>` : ""}</div></div>`).join("")}
         ${t.draft ? draftBox(i, "slack") : ""}</div>`;
-      bindDraft(i);
+      bindLinks($("thr")); bindDraft(i);
       return;
     }
     // Gmail
@@ -410,9 +460,10 @@
       ${t.error ? `<div class="empty">${esc(t.error)}</div>` : `<div class="bubs">${msgs.map((m, k) => `<div class="bubrow${m.mine ? " mine" : ""}">${
         m.image ? `<button type="button" class="bbimg" data-img="${k}" title="大きく開く"><img src="${esc(m.image)}" alt="写真" loading="lazy" referrerpolicy="no-referrer"></button>`
         : m.file ? `<button type="button" class="bb bbfile" data-file="${k}">${esc(m.text)}</button>`
-        : `<div class="bb">${esc(m.text)}</div>`}</div>`).join("")}</div>`}
+        : `<div class="bb rich">${richBody(m.text)}</div>`}</div>`).join("")}</div>`}
       ${draftBox(i, "msgr")}
     </div>`;
+    bindLinks($("thr"));
     $("msgrReload").onclick = () => { if (!t.live) return toast("見本の会話です"); t.data = null; t.error = null; renderMsgrThread(i); };
     mountDocsBar(i, ".thd");
     $("msgrMute").onclick = () => { muteName(t.name); i.hidden = true; toast(`${t.name} は今後 BALL に出しません`); const next = items.find((x) => !x.hidden && !x.done && x.sec === "me"); if (next) select(next.id); else left(); };
@@ -784,6 +835,8 @@
   // 自分が返信した・✅ など完了のスタンプを押した → 閉じる。👍 など了解のスタンプ → 「了解済み」で残す
   let slackData = null;
   const slackAgo = (ms) => { const h = (Date.now() - ms) / 3600e3; return h < 1 ? Math.max(1, Math.round(h * 60)) + "分前" : h < 24 ? Math.round(h) + "時間前" : Math.round(h / 24) + "日前"; };
+  // 一覧の件名や引用用に、リンクの書式（[名前](URL)）と *太字* の記号を落とす
+  const flat = (s) => String(s || "").replace(/\[([^\]\n]+)\]\((https?:[^)\s]+)\)/g, "$1").replace(/(^|\s)\*([^*\n]+)\*/g, "$1$2");
   function applySlack(data) {
     slackData = data;
     if (data.status === "login") return setFt("ft-slack", "Slack: 読み取り画面でログインが必要（押す）", "ng");
@@ -799,12 +852,12 @@
       chips.push([slackAgo(m.at), "them"]);
       const fields = {
         sec: "me", proj: "none", src: "slack", live: true, hidden: false, done: false,
-        title: `${m.userName}：${m.text.replace(/\s+/g, " ").slice(0, 34)}`, sub: where, ago: "", chips,
+        title: `${m.userName}：${flat(m.text).replace(/\s+/g, " ").slice(0, 34)}`, sub: where, ago: "", chips,
       };
       let it = items.find((x) => x.id === id);
       if (!it) {
         it = Object.assign({ id, memo: "", activeTab: 0,
-          feed: [["prog", "Slack から自動で取り込み"], ["ai", `${where} で ${m.userName}さんから${m.kind === "dm" ? "の DM" : "メンション"}です。${m.state === "ack" ? `\n:${m.emoji}: を押してあるので返信は済み扱いです。作業が残っていれば、ここで片付けます。` : ""}\n\n「${m.text.slice(0, 120)}」\n\n右にスレッドを出しています。返信の下書きはここで相談できるようになります（Claude をつないだあと）。今は右の下書き欄に書いて「送信…」で送れます。`]],
+          feed: [["prog", "Slack から自動で取り込み"], ["ai", `${where} で ${m.userName}さんから${m.kind === "dm" ? "の DM" : "メンション"}です。${m.state === "ack" ? `\n:${m.emoji}: を押してあるので返信は済み扱いです。作業が残っていれば、ここで片付けます。` : ""}\n\n「${flat(m.text).slice(0, 120)}」\n\n右にスレッドを出しています。返信の下書きはここで相談できるようになります（Claude をつないだあと）。今は右の下書き欄に書いて「送信…」で送れます。`]],
           thread: { kind: "slack", live: true, channel: m.channel, threadTs: m.threadTs, ts: m.ts, where, permalink: m.permalink, draft: "" },
           tabs: m.permalink ? [{ title: "Slack", url: m.permalink, sim: "slack", key: id + "-0" }] : [{ title: "Slack", url: "https://app.slack.com/client", sim: "slack", key: id + "-0" }] }, fields);
         items.unshift(it);
@@ -813,7 +866,7 @@
     // 一覧から消えた（返信した・完了のスタンプを押した）ものは閉じる
     items.filter((x) => x.live && x.src === "slack" && !x.done && !ids.has(x.id)).forEach((x) => { x.done = true; D.closed.unshift(`Slack: ${x.title.slice(0, 30)} · 返信済み`); });
     const n = data.items.length, dm = data.items.filter((x) => x.kind === "dm").length;
-    setFt("ft-slack", `Slack ${agoText(data.at)} · メンション${n - dm}・DM${dm}`, "");
+    setFt("ft-slack", `Slack ${agoText(data.at)} · メンション${n - dm}・DM${dm}${data.warn ? "（DM 一覧は読めず・押して詳細）" : ""}`, data.warn ? "mock" : "");
     left();
   }
   function renderSlackThread(i) {
@@ -833,11 +886,12 @@
     const msgs = t.data ? t.data.messages : [];
     $("thr").innerHTML = `<div class="thr">
       <div class="thd"><h4>${esc(t.where)}${t.threadTs ? " のスレッド" : ""}</h4><span><button type="button" class="btn" id="slackReload">読み直す</button>${t.permalink ? ` <button type="button" class="btn" id="slackOpen">Slack で開く ↗</button>` : ""}</span></div>
-      ${t.error ? `<div class="empty">読めませんでした：${esc(t.error)}</div>` : msgs.map((m, k) => `<div class="sm${m.ts === t.ts ? " hl" : ""}"><span class="av" style="background:${m.mine ? "#1E7B4E" : "#4A154B"}">${esc((m.name || "?")[0])}</span><div style="min-width:0"><div class="n">${esc(m.name)}<time>${esc(new Date(parseFloat(m.ts) * 1000).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</time></div><div class="x">${esc(m.text)}</div>${
+      ${t.error ? `<div class="empty">読めませんでした：${esc(t.error)}</div>` : msgs.map((m, k) => `<div class="sm${m.ts === t.ts ? " hl" : ""}"><span class="av" style="background:${m.mine ? "#1E7B4E" : "#4A154B"}">${esc((m.name || "?")[0])}</span><div style="min-width:0"><div class="n">${esc(m.name)}<time>${esc(new Date(parseFloat(m.ts) * 1000).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }))}</time></div><div class="x rich">${richBody(m.text)}</div>${
         m.files.length ? `<div class="atts">${m.files.map((f, j) => `<button type="button" class="att" data-msg="${k}" data-file="${j}">📎 ${esc(f.name)}</button>`).join("")}</div>` : ""}${
         m.reactions.length ? `<div>${m.reactions.map((r) => `<span class="react${r.mine ? " mine" : ""}">:${esc(r.name)}: ${r.count}</span>`).join(" ")}</div>` : ""}</div></div>`).join("")}
       ${draftBox(i, "slacklive")}
     </div>`;
+    bindLinks($("thr"));
     $("slackReload").onclick = () => { t.data = null; t.error = null; renderSlackThread(i); };
     mountDocsBar(i, ".thd");
     if ($("slackOpen")) $("slackOpen").onclick = () => openTab(t.permalink, "Slack");
@@ -846,6 +900,7 @@
   }
   $("ft-slack").onclick = () => {
     if (!IS_APP) return toast("Slack の取り込みはデスクトップアプリ版で動きます");
+    if (slackData && slackData.status === "ok" && slackData.warn) { showInfo("Slack：DM の一覧を読めませんでした", slackData.warn, "読み直す", () => { toast("Slack を読み込み直しています…"); window.ball.slackScan(); }); return; }
     if (slackData && slackData.status === "error") { showInfo("Slack 読み取りのエラー", slackData.error || "", "読み取り画面を見る", () => window.ball.slackShow()); return; }
     if (!slackData || slackData.status !== "ok") { toast("読み取り画面を開きます。Slack にログインしてから閉じてください"); window.ball.slackShow(); return; }
     toast("Slack を読み込み直しています…"); window.ball.slackScan();

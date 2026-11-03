@@ -202,6 +202,34 @@ ipcMain.handle("gmail-send", async (e, d) => {
 });
 ipcMain.handle("gmail-attachment", wrap(async (a) => { const p = await gmail.openAttachment(a); await shell.openPath(p); return p; }));
 
+// ---------- リンクの確認ウィンドウ ----------
+// 本文のリンク（申込フォーム・資料など）を、右のブラウザと同じログイン（persist:ball）のまま別ウィンドウで開く。
+// BALL 本体の画面からだけ受け付け、http(s) 以外は開かない。ウィンドウには BALL の窓口（preload）を渡さない
+let previewSeq = 0;
+function openPreview(url, title) {
+  if (!/^https?:\/\//i.test(String(url || ""))) return;
+  const b = win && !win.isDestroyed() ? win.getBounds() : { x: 80, y: 60, width: 1400, height: 900 };
+  const off = (previewSeq++ % 6) * 28;
+  const pw = new BrowserWindow({
+    width: Math.min(1120, b.width - 80), height: Math.min(880, b.height - 40),
+    x: b.x + Math.round(b.width * 0.3) - 40 + off, y: b.y + 40 + off,
+    title: title ? `${title} — BALL` : "BALL", backgroundColor: "#FFFFFF",
+    webPreferences: { partition: "persist:ball", contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  pw.webContents.setWindowOpenHandler(({ url: u }) => {
+    if (/accounts\.google\.com|appleid\.apple\.com|facebook\.com\/(login|dialog)/.test(u)) return { action: "allow" };
+    openPreview(u, "");
+    return { action: "deny" };
+  });
+  // Esc で閉じる
+  pw.webContents.on("before-input-event", (_e, input) => { if (input.type === "keyDown" && input.key === "Escape" && !input.meta && !input.control) pw.close(); });
+  pw.loadURL(url);
+}
+ipcMain.on("open-preview", (e, a) => {
+  if (!win || e.sender !== win.webContents) return;
+  openPreview(a && a.url, a && a.title);
+});
+
 ipcMain.on("open-external", (_e, url) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url);
 });

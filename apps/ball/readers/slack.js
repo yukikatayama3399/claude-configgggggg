@@ -44,6 +44,33 @@ async function api(cfg, method, params = {}) {
   throw lastErr || new Error(method + ": error");
 }
 
+// 速度制限などで落ちたら、少し待って同じ取り先で取り直す
+async function apiRetry(cfg, method, params, waits = [1500, 5000, 12000]) {
+  for (let k = 0; ; k++) {
+    try { return await api(cfg, method, params); }
+    catch (e) { if (k >= waits.length || /invalid_auth|not_authed|token_revoked|missing_scope/.test(e.message)) throw e; await sleep(waits[k]); }
+  }
+}
+// DM・グループ DM の一覧。conversations.list → users.conversations の順に試す
+async function listDMs(cfg) {
+  const errs = [];
+  for (const method of ["conversations.list", "users.conversations"]) {
+    try {
+      const ims = [];
+      let cursor = "";
+      for (let page = 0; page < 3; page++) {
+        const r = await apiRetry(cfg, method, { types: "im,mpim", exclude_archived: true, limit: 200, cursor });
+        ims.push(...(r.channels || []));
+        cursor = r.response_metadata && r.response_metadata.next_cursor;
+        if (!cursor) break;
+        await sleep(400);
+      }
+      return ims;
+    } catch (e) { errs.push(String(e.message || e)); }
+  }
+  throw new Error(errs.join(" / "));
+}
+
 const users = new Map();
 async function userName(cfg, id) {
   if (!id) return "";
@@ -60,7 +87,7 @@ async function plain(cfg, text) {
   let t = String(text || "");
   const ids = [...new Set([...t.matchAll(/<@([UW][A-Z0-9]+)>/g)].map((m) => m[1]))];
   for (const id of ids) t = t.split(`<@${id}>`).join("@" + (await userName(cfg, id)));
-  return t.replace(/<#[A-Z0-9]+\|([^>]+)>/g, "#$1").replace(/<(https?:[^|>]+)\|([^>]+)>/g, "$2").replace(/<(https?:[^>]+)>/g, "$1")
+  return t.replace(/<#[A-Z0-9]+\|([^>]+)>/g, "#$1").replace(/<(https?:[^|>]+)\|([^>]+)>/g, (m, u, l) => (l === u ? u : `[${l.replace(/[\[\]]/g, "")}](${u})`)).replace(/<(https?:[^>]+)>/g, "$1")
     .replace(/<!(here|channel|everyone)>/g, "@$1").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
 }
 // 自分の反応（返信・スタンプ）からボールの状態を決める: done（閉じる）/ ack（了解済み・作業は残る）/ open
@@ -120,14 +147,10 @@ async function scan() {
         state: st.state, emoji: st.emoji, unsureEmoji: !!st.unsure, at: Math.round(parseFloat(m.ts) * 1000) });
     }
     // 2) DM で相手の発言で止まっているもの（最近動いた DM から順に）
-    const ims = [];
-    let cursor = "";
-    for (let page = 0; page < 3; page++) {
-      const r = await api(cfg, "conversations.list", { types: "im,mpim", exclude_archived: true, limit: 200, cursor });
-      ims.push(...(r.channels || []));
-      cursor = r.response_metadata && r.response_metadata.next_cursor;
-      if (!cursor) break;
-    }
+    // DM の一覧は Enterprise Grid だと速度制限で弾かれやすい（弾かれた応答はブラウザからは「通信できない」に見える）。
+    // 時間を置いて取り直し、だめなら別の API で取る。それでも取れなければメンションだけ出して、注意書きを付ける
+    let warn = "";
+    const ims = await listDMs(cfg).catch((e) => { warn = "DM の一覧を読めませんでした（" + String(e.message || e).slice(0, 120) + "）。メンションだけ出しています"; return []; });
     ims.sort((a, b) => (b.updated || b.created || 0) - (a.updated || a.created || 0));
     for (const im of ims.slice(0, 25)) {
       try {
@@ -144,7 +167,7 @@ async function scan() {
         await sleep(120);
       } catch (e) { /* 読めない DM は飛ばす */ }
     }
-    ipcRenderer.send("slack-result", { at, status: "ok", team: cfg.name, items: out });
+    ipcRenderer.send("slack-result", { at, status: "ok", team: cfg.name, items: out, warn });
   } catch (err) {
     const msg = String(err && err.message || err);
     if (/invalid_auth|not_authed|token_revoked/.test(msg)) chosen = null; // ログインし直したときに選び直す

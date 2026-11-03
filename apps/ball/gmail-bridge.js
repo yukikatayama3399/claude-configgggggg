@@ -101,6 +101,13 @@ function walk(part, acc) {
 }
 function htmlToText(h) {
   return h.replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<script[\s\S]*?<\/script>/gi, "")
+    // リンクは「[名前](URL)」で残す（画面で名前つきのボタンにする）
+    .replace(/<a\b[^>]*?href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (m, u, inner) => {
+      const label = inner.replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+      u = u.replace(/&amp;/g, "&");
+      if (!/^https?:/i.test(u)) return label;
+      return !label || label === u || /^https?:/i.test(label) ? " " + u + " " : `[${label.replace(/[\[\]]/g, "")}](${u})`;
+    })
     .replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|div|tr|li|h\d)>/gi, "\n").replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&")
     .replace(/\n{3,}/g, "\n\n").trim();
