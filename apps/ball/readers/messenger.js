@@ -13,7 +13,28 @@ function isLoginPage() {
 }
 
 // 一覧の1行（リンクでも、リンクでない行でもよい）から、名前・最後のメッセージ・時刻・未読を読む
+// 画面上で同じ高さに並んでいる文字を1行として読む（絵文字の画像で文が割れても1行のまま）。
+// 1px の読み上げ用の隠し文字（「オンライン中」など）は入れない
+function linesByY(el) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  const parts = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const t = n.textContent.replace(/\s+/g, " ").trim();
+    if (!t) continue;
+    const r = n.parentElement.getBoundingClientRect();
+    if (r.width <= 2 || r.height <= 2) continue;
+    parts.push({ t, top: r.top, left: r.left, h: r.height });
+  }
+  const rows = [];
+  for (const p of parts) {
+    const row = rows.find((x) => Math.abs(x.top - p.top) < Math.max(6, Math.min(x.h, p.h) * 0.5));
+    if (row) row.items.push(p); else rows.push({ top: p.top, h: p.h, items: [p] });
+  }
+  return rows.sort((a, b) => a.top - b.top).map((r) => r.items.sort((a, b) => a.left - b.left).map((x) => x.t).join(" ").replace(/\s+·\s+/g, " · ").trim()).filter((s) => s && s !== "·");
+}
 function linesOf(el) {
+  const byY = linesByY(el);
+  if (byY.length >= 2) return byY;
   let lines = (el.innerText || "").split("\n").map((s) => s.trim()).filter((s) => s && s !== "·");
   if (lines.length < 2) {
     // 1行に詰まっている作りのときは、文字の入った末端の要素を順に拾う
@@ -30,8 +51,8 @@ function absUrl(href) {
 const STATUS_RE = /^(オンライン中|オンライン|アクティブ|アクティブ中|Active now|Online|\d+\s*(分|時間)前にアクティブ|Active \d+\w* ago)$/i;
 function readItem(el, href) {
   let lines = linesOf(el).filter((l) => !STATUS_RE.test(l));
-  // 読み上げ用の「未読メッセージ:」は外して、未読の印として使う
-  let unreadMark = false;
+  // 読み上げ用の「未読メッセージ:」は外して、未読の印として使う（隠し文字として入っていることもある）
+  let unreadMark = /未読メッセージ|Unread message/i.test(el.textContent || "");
   lines = lines.map((l) => { const x = l.replace(/^(未読メッセージ|Unread message)\s*[:：]\s*/i, ""); if (x !== l) unreadMark = true; return x; }).filter(Boolean);
   if (lines.length < 2) return null;
   let name = lines[0];
@@ -39,8 +60,6 @@ function readItem(el, href) {
   let rest = lines.slice(1);
   let time = "";
   if (rest.length && TIME_RE.test(rest[rest.length - 1])) time = rest.pop();
-  // 名前の途中に絵文字があると名前が2行に割れる（例: オーリーズ✖alpaka）。短くて「:」の無い行は名前の続きとみなす
-  while (rest.length >= 2 && !/[:：]/.test(rest[0]) && rest[0].length <= 24) name += " " + rest.shift();
   let snippet = rest.join(" ").replace(/\s*·\s*$/, "");
   const mt = snippet.match(/\s·\s([^·]+)$/);
   if (!time && mt && TIME_RE.test(mt[1].trim())) { time = mt[1].trim(); snippet = snippet.slice(0, mt.index); }
@@ -131,50 +150,62 @@ function scrape() {
 // 会話のページ（/t/<id>）で、メッセージ欄（role=main）の行を上から読む。
 // 右寄せの吹き出し＝自分、左寄せ＝相手、として判定する。
 function readConversation() {
-  const main = document.querySelector('[role="main"]') || document.body;
-  const mrect = main.getBoundingClientRect();
-  const mid = mrect.left + mrect.width / 2;
-  const rows = [...main.querySelectorAll('[role="row"]')];
-  const out = [];
-  for (const row of rows) {
-    const textEls = [...row.querySelectorAll('div[dir="auto"], span[dir="auto"]')].filter((el) => el.childElementCount === 0 || el.querySelector("br"));
-    let text = textEls.map((el) => el.innerText.trim()).filter(Boolean).join("\n");
-    const imgs = [...row.querySelectorAll("img")].filter((im) => im.getBoundingClientRect().width > 80).length;
-    if (!text && !imgs) continue;
-    if (/^(\d{1,2}:\d{2}|\d+月\d+日.*|今日|昨日|月|火|水|木|金|土|日曜日?)$/.test(text)) continue; // 日付・時刻の区切り
-    const anchor = textEls[0] || row.querySelector("img") || row;
-    const r = anchor.getBoundingClientRect();
-    const mine = r.width > 0 ? r.left + r.width / 2 > mid : false;
-    if (imgs && !text) text = imgs > 1 ? `📷 画像 ${imgs}枚` : "📷 画像";
-    else if (imgs) text += `\n📷 画像 ${imgs}枚`;
-    const prev = out[out.length - 1];
-    if (prev && prev.text === text && prev.mine === mine) continue;
-    out.push({ mine, text });
+  const w = window.innerWidth || 1200, h = window.innerHeight || 900;
+  // 会話欄の範囲: 入力欄（メッセージを書く欄）の左右を基準にする。右端の「チャット情報」欄や左の一覧は入れない
+  const box = document.querySelector('[role="textbox"][contenteditable="true"]');
+  const br = box && box.getBoundingClientRect();
+  let colL, colR;
+  if (br && br.width > 100) {
+    // 入力欄の左右にはアイコン（＋、写真、スタンプなど）が並ぶので、少し広めに取る
+    colL = Math.max(0, br.left - 160); colR = Math.min(w, br.right + 110);
+  } else {
+    const main = document.querySelector('[role="main"]');
+    const mr = main ? main.getBoundingClientRect() : { left: w * 0.35, right: w };
+    colL = mr.left; colR = mr.right;
   }
-  // 吹き出しに目印（role=row）が無い作りのときは、見た目の位置で読む:
-  // 画面の右側（会話欄）にある文字のかたまりを上から順に、中央より右なら自分、左なら相手
-  if (!out.length) {
-    const w = window.innerWidth || 1200, h = window.innerHeight || 900;
-    const left = main === document.body ? w * 0.35 : mrect.left;
-    const center = main === document.body ? left + (w - left) / 2 : mid;
-    const blocks = [...document.querySelectorAll('div[dir="auto"], span[dir="auto"]')].filter((el) => {
-      if (el.closest('[contenteditable="true"], [role="textbox"], [role="navigation"], [role="banner"]')) return false;
-      if (el.querySelector('div[dir="auto"], span[dir="auto"]')) return false; // いちばん内側だけ
-      const b = el.getBoundingClientRect();
-      return b.width > 0 && b.height > 0 && b.left >= left && b.top > 140 && b.bottom < h - 60;
-    }).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-    for (const el of blocks) {
-      const text = el.innerText.trim();
-      if (!text || /^(\d{1,2}:\d{2}|\d+月\d+日.*|今日|昨日|既読|送信済み|Seen|Sent)$/.test(text)) continue;
-      const b = el.getBoundingClientRect();
-      const mine = b.left + b.width / 2 > center;
-      const prev = out[out.length - 1];
-      if (prev && prev.text === text) continue;
-      out.push({ mine, text });
-    }
+  const center = (colL + colR) / 2;
+  const bottom = br ? br.top - 4 : h - 60;
+  const inCol = (r) => r.width > 0 && r.height > 0 && r.left >= colL - 2 && r.right <= colR + 2 && r.top > 120 && r.bottom < bottom;
+  const skip = (el) => !!el.closest('[contenteditable="true"], [role="textbox"], [role="navigation"], [role="banner"], [role="complementary"], [role="toolbar"], [role="dialog"]');
+  const items = [];
+  // 文字: いちばん内側の dir=auto のかたまり
+  for (const el of document.querySelectorAll('div[dir="auto"], span[dir="auto"]')) {
+    if (skip(el) || el.querySelector('div[dir="auto"], span[dir="auto"]')) continue;
+    const r = el.getBoundingClientRect();
+    if (!inCol(r)) continue;
+    const text = el.innerText.trim();
+    if (!text || /^(\d{1,2}:\d{2}|\d+月\d+日.*|今日|昨日|既読|送信済み|Seen|Sent|入力中…?)$/.test(text)) continue;
+    // 会話欄の上下の端にある見出し（相手の名前など）は入れない
+    if (r.width > (colR - colL) * 0.9) continue;
+    items.push({ top: r.top, mine: r.left + r.width / 2 > center, text });
+  }
+  // 写真: 会話欄の中の大きめの画像（アイコンは小さいので入れない）。押すと開けるように元の URL も渡す
+  for (const im of document.querySelectorAll("img")) {
+    if (skip(im)) continue;
+    const r = im.getBoundingClientRect();
+    if (!inCol(r) || r.width < 80 || r.height < 60) continue;
+    items.push({ top: r.top, mine: r.left + r.width / 2 > center, image: im.currentSrc || im.src, text: "📷 写真" });
+  }
+  // ファイル: 会話欄の中の、ファイル名らしいリンク
+  for (const a of document.querySelectorAll("a[href]")) {
+    if (skip(a)) continue;
+    const r = a.getBoundingClientRect();
+    if (!inCol(r)) continue;
+    const t = (a.innerText || "").trim().split("\n")[0];
+    if (!/\.(pdf|docx?|xlsx?|pptx?|csv|zip|txt|key|numbers|pages|mov|mp4|png|jpe?g)\b/i.test(t) && !a.hasAttribute("download")) continue;
+    items.push({ top: r.top, mine: r.left + r.width / 2 > center, file: a.href, text: "📎 " + t });
+  }
+  items.sort((x, y) => x.top - y.top);
+  const out = [];
+  for (const it of items) {
+    const prev = out[out.length - 1];
+    if (prev && prev.text === it.text && !it.image) continue;
+    // 写真と同じ位置にある説明文の重複は省く
+    if (prev && it.image && prev.image === it.image) continue;
+    out.push({ mine: it.mine, text: it.text, image: it.image || "", file: it.file || "" });
   }
   const name = (document.querySelector('[role="main"] h1, [role="main"] h2, h1, h2') || {}).innerText || "";
-  return { name: name.trim(), messages: out.slice(-12), rows: rows.length };
+  return { name: name.trim(), messages: out.slice(-15), rows: items.length };
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let readingThread = false;

@@ -288,3 +288,6 @@ td.new{background:var(--cell)}
 .bubrow.mine .bb{background:#0866FF;color:#fff}
 .confirm{border-top:1px solid var(--line);padding:10px 12px;display:grid;gap:8px;background:var(--me-bg);font-size:12.5px}
 .df .btn+.btn{margin-left:6px}
+.bbimg{border:0;padding:0;background:transparent;border-radius:14px;overflow:hidden;max-width:60%;cursor:zoom-in}
+.bbimg img{display:block;max-width:100%;max-height:260px;border-radius:14px}
+.bbfile{border:1px solid var(--line);cursor:pointer;text-align:left}

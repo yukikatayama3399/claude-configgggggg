@@ -263,11 +263,17 @@
     const msgs = t.live ? (t.data ? t.data.messages : []) : t.messages;
     $("thr").innerHTML = `<div class="thr">
       <div class="thd"><h4>Messenger：${esc(t.name)}</h4><span><button type="button" class="btn" id="msgrReload">読み直す</button> <button type="button" class="btn" id="openInMsgr">Messenger で開く ↗</button></span></div>
-      ${t.error ? `<div class="empty">${esc(t.error)}</div>` : `<div class="bubs">${msgs.map((m) => `<div class="bubrow${m.mine ? " mine" : ""}"><div class="bb">${esc(m.text)}</div></div>`).join("")}</div>`}
+      ${t.error ? `<div class="empty">${esc(t.error)}</div>` : `<div class="bubs">${msgs.map((m, k) => `<div class="bubrow${m.mine ? " mine" : ""}">${
+        m.image ? `<button type="button" class="bbimg" data-img="${k}" title="大きく開く"><img src="${esc(m.image)}" alt="写真" loading="lazy" referrerpolicy="no-referrer"></button>`
+        : m.file ? `<button type="button" class="bb bbfile" data-file="${k}">${esc(m.text)}</button>`
+        : `<div class="bb">${esc(m.text)}</div>`}</div>`).join("")}</div>`}
       ${draftBox(i, "msgr")}
     </div>`;
     $("msgrReload").onclick = () => { if (!t.live) return toast("見本の会話です"); t.data = null; t.error = null; renderMsgrThread(i); };
     $("openInMsgr").onclick = () => openConversationTab(i);
+    // 写真・ファイルは押すと右のブラウザで開く
+    $("thr").querySelectorAll("[data-img]").forEach((b) => (b.onclick = () => openTab(msgs[+b.dataset.img].image, "写真")));
+    $("thr").querySelectorAll("[data-file]").forEach((b) => (b.onclick = () => openTab(msgs[+b.dataset.file].file, msgs[+b.dataset.file].text.replace(/^📎\s*/, ""))));
     bindDraft(i);
   }
   function openConversationTab(i) {
