@@ -279,3 +279,10 @@ td.new{background:var(--cell)}
 .older summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);padding:4px 0}
 .older[open]{gap:8px}
 .older .mcard{margin-top:8px}
+
+/* スレッド（Messenger） */
+.bubs{display:grid;gap:6px;max-width:760px}
+.bubrow{display:flex}
+.bubrow.mine{justify-content:flex-end}
+.bb{max-width:78%;padding:7px 12px;border-radius:16px;background:var(--soft);font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.bubrow.mine .bb{background:#0866FF;color:#fff}

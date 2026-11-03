@@ -56,7 +56,14 @@ window.BALL_DATA = (function () {
         ["prog", "1 tool · Messenger の未読を確認（3件）"],
         ["ai", "メッセンジャーの未読は3件で、返事が必要なのは1件です。\n来週お茶しながら紹介したい会社がある、という連絡なので、日程の候補を3つ入れた返信を下書きしました。\n\n候補はカレンダーの空きから取っています。\n・11/10（月）16:00〜\n・11/12（水）17:00〜\n・11/13（木）11:00〜\n\nメッセンジャーは右で開いているので、そのまま送れます。"],
       ],
-      memo: "", thread: null,
+      memo: "",
+      thread: { kind: "msgr", name: "K さん（例）", draft: "ありがとうございます！ぜひ。\n11/10（月）16時〜、11/12（水）17時〜、11/13（木）11時〜あたりどうでしょう？",
+        messages: [
+          { mine: true, text: "先日はありがとうございました！" },
+          { mine: false, text: "こちらこそです！" },
+          { mine: false, text: "片山さん、来週どこかでお茶しませんか？紹介したい会社があって" },
+          { mine: false, text: "SNS 広告まわりで困ってるところです" },
+        ] },
       tabs: [t("Messenger", "https://www.facebook.com/messages/t/", "messenger")],
     },
     {

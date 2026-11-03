@@ -202,6 +202,7 @@
   }
   function renderThread(i) {
     const t = i.thread;
+    if (t.kind === "msgr") { renderMsgrThread(i); return; }
     if (t.kind === "slack") {
       $("thr").innerHTML = `<div class="thr"><h4>${t.ws === "DM" ? "DM: " : ""}${esc(t.ch)}${t.ws === "DM" ? "" : " のスレッド"}<span>${esc(t.ws)}</span></h4>
         ${t.msgs.map((m) => `<div class="sm"><span class="av" style="background:${m[0]}">${esc(m[1][0])}</span><div><div class="n">${esc(m[1])}<time>${esc(m[2])}</time></div><div class="x">${esc(m[3])}</div>${m[4] ? `<span class="react">${esc(m[4])}</span>` : ""}</div></div>`).join("")}
@@ -243,19 +244,77 @@
     }));
     bindDraft(i);
   }
+  // Messenger: 直近のやり取りを吹き出しで出し、下書きを会話の入力欄に入れる
+  function renderMsgrThread(i) {
+    const t = i.thread;
+    if (t.live && !t.data && !t.error) {
+      $("thr").innerHTML = `<div class="thr"><div class="empty">${esc(t.name)}さんとのやり取りを読み込み中…</div></div>`;
+      if (!t.loading && IS_APP) {
+        t.loading = true;
+        window.ball.messengerThread(t.href).then((r) => {
+          t.loading = false;
+          if (r.ok && r.messages && r.messages.length) t.data = r;
+          else t.error = r.ok ? `メッセージを読み取れませんでした（行 ${r.rows || 0} 個）。「Messenger で開く」で見てください` : r.error;
+          if (curItem() === i && S.rmode === "thread") renderMsgrThread(i);
+        });
+      }
+      return;
+    }
+    const msgs = t.live ? (t.data ? t.data.messages : []) : t.messages;
+    $("thr").innerHTML = `<div class="thr">
+      <div class="thd"><h4>Messenger：${esc(t.name)}</h4><span><button type="button" class="btn" id="msgrReload">読み直す</button> <button type="button" class="btn" id="openInMsgr">Messenger で開く ↗</button></span></div>
+      ${t.error ? `<div class="empty">${esc(t.error)}</div>` : `<div class="bubs">${msgs.map((m) => `<div class="bubrow${m.mine ? " mine" : ""}"><div class="bb">${esc(m.text)}</div></div>`).join("")}</div>`}
+      ${draftBox(i, "msgr")}
+    </div>`;
+    $("msgrReload").onclick = () => { if (!t.live) return toast("見本の会話です"); t.data = null; t.error = null; renderMsgrThread(i); };
+    $("openInMsgr").onclick = () => openConversationTab(i);
+    bindDraft(i);
+  }
+  function openConversationTab(i) {
+    const url = i.thread.href || (i.tabs[0] && i.tabs[0].url);
+    let tab = i.tabs.find((x) => x.url === url);
+    if (!tab) { tab = { title: `${i.thread.name} - Messenger`, url, sim: "messenger", key: i.id + "-c" }; i.tabs.unshift(tab); }
+    i.activeTab = i.tabs.indexOf(tab); S.rmode = "browser"; right();
+    return tab;
+  }
+  // 会話を右のブラウザで開き、入力欄に下書きを入れる（送信は本人が Enter）
+  function insertIntoMessenger(i, text) {
+    if (!IS_APP || !i.thread.live) return toast("見本なので入れません。アプリ版では会話の入力欄に入ります");
+    const tab = openConversationTab(i);
+    const w = webviews[tab.key];
+    const js = `(function(t){var b=document.querySelector('[role="textbox"][contenteditable="true"]');if(!b)return false;b.focus();document.execCommand('insertText',false,t);return true;})(${JSON.stringify(text)})`;
+    let tries = 0;
+    const attempt = () => {
+      w.executeJavaScript(js).then((ok) => {
+        if (ok) toast("入力欄に入れました。内容を確認して Enter で送ってください");
+        else if (++tries < 8) setTimeout(attempt, 1000);
+        else toast("入力欄が見つかりませんでした。下書きをコピーして貼ってください");
+      }).catch(() => { if (++tries < 8) setTimeout(attempt, 1000); });
+    };
+    setTimeout(attempt, 1200);
+  }
   function draftBox(i, kind) {
     const t = i.thread;
-    const saved = t.draftId ? `Gmail の下書きに保存済み` : "まだ保存していません";
+    const saved = t.draftId ? `Gmail の下書きに保存済み` : kind === "msgr" ? "送るのは Messenger で Enter" : "まだ保存していません";
+    const actions = kind === "gmail"
+      ? `<span class="hint">送るときは「Gmail で開く」から。下書きがそのスレッドに入っています</span><span class="sp"></span><button type="button" class="btn send" id="saveDraft">Gmail の下書きに保存</button>`
+      : kind === "msgr"
+        ? `<button type="button" class="btn" id="copyDraft">コピー</button><span class="sp"></span><button type="button" class="btn send" id="saveDraft">Messenger の入力欄に入れる</button>`
+        : `<span class="sp"></span><button type="button" class="btn send" id="saveDraft">送信</button>`;
     return `<div class="draft"><div class="dh"><span>下書き（送るまで送信されません）</span><span id="draftState">${saved}</span></div>
       <textarea id="draftText" aria-label="下書き" placeholder="真ん中で「下書き書いて」と言うとここに入ります。直接書いても OK。">${esc(t.draft || "")}</textarea>
-      <div class="df">${kind === "gmail"
-        ? `<span class="hint">送るときは「Gmail で開く」から。下書きがそのスレッドに入っています</span><span class="sp"></span><button type="button" class="btn send" id="saveDraft">Gmail の下書きに保存</button>`
-        : `<span class="sp"></span><button type="button" class="btn send" id="saveDraft">送信</button>`}</div></div>`;
+      <div class="df">${actions}</div></div>`;
   }
   function bindDraft(i) {
     const t = i.thread, ta = $("draftText"), btn = $("saveDraft");
     if (!ta || !btn) return;
-    ta.oninput = () => { t.draft = ta.value; $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
+    ta.oninput = () => { t.draft = ta.value; if (t.kind === "gmail") $("draftState").textContent = t.draftId ? "変更あり（未保存）" : "まだ保存していません"; };
+    if (t.kind === "msgr") {
+      const cp = $("copyDraft");
+      if (cp) cp.onclick = () => navigator.clipboard.writeText(ta.value).then(() => toast("コピーしました"), () => { ta.select(); toast("選択しました。⌘C でコピーしてください"); });
+      btn.onclick = () => { if (!ta.value.trim()) return toast("下書きが空です"); insertIntoMessenger(i, ta.value); };
+      return;
+    }
     btn.onclick = async () => {
       if (t.kind !== "gmail" || !t.live || !IS_APP) return toast("見本なので保存・送信はしません");
       const msgs = t.data.messages, last = msgs[msgs.length - 1];
@@ -412,11 +471,16 @@
         title: `Messenger：${c.name}`, sub: c.snippet ? c.snippet.slice(0, 40) : "Facebook メッセンジャー", chips,
       };
       if (!it) {
-        it = Object.assign({ id, memo: "", thread: null, activeTab: 0,
-          feed: [["prog", "Messenger から自動で取り込み"], ["ai", `${c.name}さんとの会話です。${c.unread ? "未読があります。" : "相手の発言で止まっています。"}\n最後のメッセージ：${c.snippet || "（読み取れず）"}\n\n右のブラウザで会話を開いています。中身の判断と返信の下書きは、Claude をつないだあとにここで出るようになります。`]],
+        it = Object.assign({ id, memo: "", activeTab: 0,
+          thread: { kind: "msgr", live: true, href: c.href, name: c.name, draft: "" },
+          feed: [["prog", "Messenger から自動で取り込み"], ["ai", `${c.name}さんとの会話です。${c.unread ? "未読があります。" : "相手の発言で止まっています。"}\n最後のメッセージ：${c.snippet || "（読み取れず）"}\n\n右に直近のやり取りを出しています。返信の段取りはここで相談できるようになります（Claude をつないだあと）。今は右の下書き欄に書いて「Messenger の入力欄に入れる」で送れます。`]],
           tabs: [{ title: `${c.name} - Messenger`, url: c.href, sim: "messenger", key: id + "-0" }] }, fields);
         items.unshift(it);
-      } else Object.assign(it, fields);
+      } else {
+        // 新しいメッセージが来ていたら、スレッドは読み直す
+        if (it.sub !== fields.sub && it.thread) { it.thread.data = null; it.thread.error = null; }
+        Object.assign(it, fields);
+      }
     });
     left();
   }

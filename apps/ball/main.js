@@ -67,6 +67,16 @@ ipcMain.on("msgr-result", (_e, data) => {
   lastMsgr = data;
   if (win && !win.isDestroyed()) win.webContents.send("msgr-update", data);
 });
+// 1つの会話の直近メッセージを、裏ウィンドウで読んで返す
+let threadReq = 0;
+ipcMain.handle("msgr-thread", (_e, href) => new Promise((resolve) => {
+  if (!msgrWin || msgrWin.isDestroyed()) return resolve({ ok: false, error: "Messenger の読み取り画面がありません" });
+  const reqId = ++threadReq;
+  const timer = setTimeout(() => { ipcMain.removeListener("thread-result", onRes); resolve({ ok: false, error: "時間内に読めませんでした" }); }, 20000);
+  function onRes(_ev, data) { if (data.reqId !== reqId) return; clearTimeout(timer); ipcMain.removeListener("thread-result", onRes); resolve(data); }
+  ipcMain.on("thread-result", onRes);
+  msgrWin.webContents.send("read-thread", { href, reqId });
+}));
 // 右のブラウザで開いている Messenger のページを、読み取りに使う
 ipcMain.on("msgr-use-url", (_e, url) => {
   if (!/^https:\/\/(www\.)?(facebook\.com\/messages|messenger\.com)/.test(url)) return;

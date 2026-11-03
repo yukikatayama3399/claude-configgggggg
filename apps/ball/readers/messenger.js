@@ -80,6 +80,54 @@ function scrape() {
   ipcRenderer.send("msgr-result", { at, status: convos.length ? "ok" : "nolist", url: location.href, convos, diag: diagnose(anchors) });
 }
 
+// ---------- 1つの会話の直近メッセージを読む ----------
+// 会話のページ（/t/<id>）で、メッセージ欄（role=main）の行を上から読む。
+// 右寄せの吹き出し＝自分、左寄せ＝相手、として判定する。
+function readConversation() {
+  const main = document.querySelector('[role="main"]') || document.body;
+  const mrect = main.getBoundingClientRect();
+  const mid = mrect.left + mrect.width / 2;
+  const rows = [...main.querySelectorAll('[role="row"]')];
+  const out = [];
+  for (const row of rows) {
+    const textEls = [...row.querySelectorAll('div[dir="auto"], span[dir="auto"]')].filter((el) => el.childElementCount === 0 || el.querySelector("br"));
+    let text = textEls.map((el) => el.innerText.trim()).filter(Boolean).join("\n");
+    const imgs = [...row.querySelectorAll("img")].filter((im) => im.getBoundingClientRect().width > 80).length;
+    if (!text && !imgs) continue;
+    if (/^(\d{1,2}:\d{2}|\d+月\d+日.*|今日|昨日|月|火|水|木|金|土|日曜日?)$/.test(text)) continue; // 日付・時刻の区切り
+    const anchor = textEls[0] || row.querySelector("img") || row;
+    const r = anchor.getBoundingClientRect();
+    const mine = r.width > 0 ? r.left + r.width / 2 > mid : false;
+    if (imgs && !text) text = imgs > 1 ? `📷 画像 ${imgs}枚` : "📷 画像";
+    else if (imgs) text += `\n📷 画像 ${imgs}枚`;
+    const prev = out[out.length - 1];
+    if (prev && prev.text === text && prev.mine === mine) continue;
+    out.push({ mine, text });
+  }
+  const name = (document.querySelector('[role="main"] h1, [role="main"] h2') || {}).innerText || "";
+  return { name: name.trim(), messages: out.slice(-12), rows: rows.length };
+}
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let readingThread = false;
+ipcRenderer.on("read-thread", async (_e, { href, reqId }) => {
+  readingThread = true;
+  const back = location.href;
+  try {
+    // 会話のリンクを押して開く（ページを読み込み直すより速く、ログイン状態も崩れない）
+    const path = new URL(href).pathname;
+    const link = [...document.querySelectorAll('a[href*="/t/"]')].find((a) => (a.getAttribute("href") || "").startsWith(path) || href.includes(a.getAttribute("href")));
+    if (link) link.click(); else { history.pushState({}, "", path); window.dispatchEvent(new PopStateEvent("popstate")); }
+    let res = { messages: [] };
+    for (let i = 0; i < 12; i++) { await sleep(700); res = readConversation(); if (res.messages.length) break; }
+    ipcRenderer.send("thread-result", { reqId, ok: true, ...res });
+  } catch (err) {
+    ipcRenderer.send("thread-result", { reqId, ok: false, error: String(err && err.message || err) });
+  } finally {
+    readingThread = false;
+    if (location.href !== back) { try { history.back(); } catch (e) { /* そのままでよい */ } }
+  }
+});
+
 window.addEventListener("DOMContentLoaded", () => {
   setTimeout(scrape, 8000);
   setInterval(scrape, 60 * 1000);
