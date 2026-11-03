@@ -1,0 +1,14 @@
+{
+  "name": "ball",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BALL: Slack・Gmail・Messenger・カレンダーを1つにまとめるタスクハブ（使用感プレビュー版）",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "preview": "node scripts/make-preview.js"
+  },
+  "devDependencies": {
+    "electron": "44.7.2"
+  }
+}

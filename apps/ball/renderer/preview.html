@@ -1,0 +1,136 @@
+<title>BALL 使用感プレビュー</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+
+<div class="cap" id="cap"><b>BALL 使用感プレビュー</b><span>ブラウザで見ている版です。右側は見本の画面で、デスクトップアプリ版ではここにログインしたままの本物の Gmail・Slack・Messenger・メルカリなどが開きます。データは 11/3 時点の実データをもとにした例です。送信・書き込みはしません。</span></div>
+
+<div class="app">
+  <div class="tb">
+    <div class="dots" aria-hidden="true"><i></i><i></i><i></i></div>
+    <div class="logo"><span class="b" aria-hidden="true"></span>BALL</div>
+    <button type="button" class="tbbtn" id="leftToggle" title="左の一覧を出す / しまう（⌘1）">☰</button>
+    <span class="today">11/4（火）在宅 · 稼働 2.1h</span>
+    <div class="ptabs" id="ptabs" role="group" aria-label="プロジェクト"></div>
+    <span class="sp"></span>
+    <button type="button" class="tbbtn" id="ovBtn">全体図</button>
+    <span class="sync"><i></i>同期 1分前</span>
+  </div>
+
+  <div class="cols" id="cols">
+    <aside class="col left" aria-label="ボール一覧">
+      <div class="date"><span>TUE, NOV 4</span><span id="meCount"></span></div>
+      <form class="add" id="addForm"><input id="addInput" aria-label="ボールを追加" placeholder="ボールを追加（話してもOK · ⌘K）"><button class="btn dark" type="submit">追加</button></form>
+      <div class="banto">
+        <h3>番頭 <span>まとめ役の AI · 3分前</span></h3>
+        <form class="add" id="bantoForm"><input id="bantoInput" aria-label="番頭に頼む" placeholder="ざっくり頼む（誰に振るかは番頭が決める）"><button class="btn dark" type="submit">送信</button></form>
+        <div class="jobs" id="jobs"></div>
+      </div>
+      <div id="sections" class="sec" style="gap:12px"></div>
+    </aside>
+
+    <section class="col center" id="center" aria-label="このボールの AI">
+      <div class="ch" id="chHead"></div>
+      <div class="ctabs" role="group" aria-label="表示切替">
+        <button type="button" id="ct-chat" aria-pressed="true">チャット</button>
+        <button type="button" id="ct-memo" aria-pressed="false">メモ</button>
+        <span class="sp"></span>
+        <button type="button" id="ct-done" class="done">完了</button>
+      </div>
+      <div class="feed" id="feed"></div>
+      <div>
+        <div class="st" id="state"></div>
+        <form class="comp" id="comp">
+          <textarea id="compText" aria-label="メッセージ" placeholder="メッセージ（Aqua Voice の音声入力もそのまま入ります · ⌘Enter で送信）"></textarea>
+          <div class="crow">
+            <select id="perm" aria-label="AI の権限"><option>下書きまで</option><option>シート記入まで</option><option>読むだけ</option></select>
+            <select id="model" aria-label="モデル"><option>Opus 5.5</option><option>Sonnet 5.5</option></select>
+            <span class="sp"></span><span class="hint">送信は自分で</span>
+            <button class="btn dark" type="submit">送信</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <div class="split" id="split" role="separator" aria-label="幅を変える"></div>
+
+    <section class="col right" aria-label="ブラウザ">
+      <div class="rbar">
+        <div class="rtop">
+          <div class="mode" role="group" aria-label="右側の表示">
+            <button type="button" id="m-browser" aria-pressed="true">ブラウザ</button>
+            <button type="button" id="m-thread" aria-pressed="false">スレッド</button>
+          </div>
+          <div class="btabs" id="btabs"></div>
+          <button type="button" class="newtab" id="newtab" title="新しいタブ（⌘T）">＋</button>
+        </div>
+        <form class="url" id="urlbar">
+          <button type="button" id="navBack" aria-label="戻る">‹</button>
+          <button type="button" id="navFwd" aria-label="進む">›</button>
+          <button type="button" id="navReload" aria-label="再読み込み">↻</button>
+          <input id="urlInput" aria-label="URL" spellcheck="false" placeholder="URL か検索語（⌘L）">
+          <button type="button" id="navOut" aria-label="いつものブラウザで開く" title="いつものブラウザで開く">↗</button>
+        </form>
+      </div>
+      <div class="rbody">
+        <div class="webviews" id="webviews"></div>
+        <div class="sim" id="sim"></div>
+        <div class="thrwrap" id="thr" hidden></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="ft">
+    <span class="ok mock"><i></i>Gmail 見本</span><span class="ok mock"><i></i>Slack 見本</span><span class="ok mock"><i></i>Messenger 見本</span><span class="ok mock"><i></i>カレンダー 見本</span>
+    <span>裏側はまだつないでいません（画面と操作の確認用）</span>
+    <span class="sp"></span>
+    <span>Claude 5h<span class="bar"><i style="width:18%"></i></span>18% · 週<span class="bar"><i style="width:41%"></i></span>41%</span>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<div class="ov" id="ov" hidden>
+  <div class="ovc" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+    <div class="ovs">
+      <span class="hint">BALL 全体図</span>
+      <h1 id="ovTitle">いま、ボールを持っているのは誰か。</h1>
+      <p>Slack・Gmail・Messenger・カレンダーから入ってくるやり取りを、すべて「ボール」として扱います。ボールは必ず、自分・AI・相手のどこか1か所にあります。目の前に出るのは自分ボールだけです。</p>
+    </div>
+    <div class="ovs">
+      <h2>ボールの流れ</h2>
+      <div class="flow">
+        <div class="fbox"><b>入ってくる</b><ul><li>Slack の依頼・DM</li><li>Gmail（人からの返信だけ）</li><li>Messenger</li><li>カレンダーの予定・[作業]</li><li>声や手入力</li></ul></div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="fbox"><b>番頭が仕分ける</b><span class="hint">同じ件は1つにまとめる。誰がボールを持っているかを決める。</span></div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="lanes">
+          <div class="lane me"><b>自分ボール</b><span>返信する・判断する。AI が下書きまで用意している。</span></div>
+          <div class="lane ai"><b>AI 作業中</b><span>下書き・調べもの・シート記入。終わったら自分ボールに戻る。</span></div>
+          <div class="lane them"><b>相手ボール（返事待ち）</b><span>返事が来たら、または決めた日数が過ぎたら自分ボールに戻る。</span></div>
+        </div>
+        <span class="arrow" aria-hidden="true">→</span>
+        <div class="fbox fdone"><b>自動で閉じる</b><span class="hint">返信した・送った・予定が終わった・他の人が答えた。完了ボタンを押さなくても消える。</span></div>
+      </div>
+    </div>
+    <div class="ovs">
+      <h2>画面の見方</h2>
+      <div class="wire">
+        <div><em>左</em><b>ボール一覧</b><span>番頭への依頼、自分ボール、AI 作業中、返事待ち、今日の予定。押すと中と右が切り替わる。</span></div>
+        <div><em>中</em><b>このボールの AI</b><span>このボールのことだけを知っている Claude と話す。チャットとメモ。声で話しかけてもいい。</span></div>
+        <div><em>右</em><b>ブラウザ</b><span>Gmail・Slack・Messenger・メルカリ・シートなど、どんなサイトもログインしたまま開く。ボールごとにタブを覚えている。「スレッド」に切り替えると、AI の下書きと送信ボタンが出る。</span></div>
+      </div>
+    </div>
+    <div class="ovs">
+      <h2>いまの状態</h2>
+      <div class="status3">
+        <div><b>画面と操作</b><span>できた。触って使い心地を確かめる段階。</span></div>
+        <div><b>本物のブラウザ</b><span>デスクトップアプリ版で動く。ログインはアプリの中で一度だけ。</span></div>
+        <div><b>取り込みと Claude</b><span>まだ。データは見本。画面が固まってからつなぐ。</span></div>
+      </div>
+    </div>
+    <div class="ovf"><span class="hint">送るのは必ず自分。AI は下書きまで。⌘1 で左をしまう / ⌘L で URL / ⌘T で新しいタブ</span><button type="button" class="btn dark" id="ovStart">使ってみる</button></div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
