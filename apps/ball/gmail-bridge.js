@@ -64,11 +64,27 @@ async function status() {
   catch (e) { return { ok: false, reason: "auth", message: e.message }; }
 }
 
+// 会議メモ: Gemini の自動メモ（「更新」タブに入るので別に探す）と、それを転送したメール
+const NOTES_QUERY = '(from:gemini-notes@google.com OR subject:"Gemini によるメモ" OR (subject:Fwd subject:"メモ:")) newer_than:14d';
+const NOTES_RE = /gemini-notes@google\.com|Gemini によるメモ|^(Fwd|FW)[:：]\s*メモ[:：]/i;
+
 async function inbox() {
-  const d = await runJson(["gmail", "search", QUERY, "--max", "40"]);
-  return (d.threads || [])
-    .filter((t) => !SELF_RE.test(t.from || "") && !AUTO_RE.test((t.from || "") + " " + (t.subject || "")) && !CAL_RE.test(t.subject || ""))
-    .map((t) => ({ id: t.id, date: t.date, from: t.from, subject: t.subject, unread: (t.labels || []).includes("UNREAD"), count: t.messageCount }));
+  const [d, n] = await Promise.all([
+    runJson(["gmail", "search", QUERY, "--max", "40"]),
+    runJson(["gmail", "search", NOTES_QUERY, "--max", "15"]).catch(() => ({ threads: [] })),
+  ]);
+  const seen = new Set();
+  const out = [];
+  for (const t of n.threads || []) {
+    seen.add(t.id);
+    out.push({ id: t.id, date: t.date, from: t.from, subject: t.subject, unread: (t.labels || []).includes("UNREAD"), count: t.messageCount, notes: true });
+  }
+  for (const t of d.threads || []) {
+    if (seen.has(t.id)) continue;
+    if (SELF_RE.test(t.from || "") || AUTO_RE.test((t.from || "") + " " + (t.subject || "")) || CAL_RE.test(t.subject || "")) continue;
+    out.push({ id: t.id, date: t.date, from: t.from, subject: t.subject, unread: (t.labels || []).includes("UNREAD"), count: t.messageCount, notes: NOTES_RE.test((t.from || "") + " " + (t.subject || "")) });
+  }
+  return out.sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
 // Gmail API の生データ（payload）から本文・ヘッダ・添付を取り出す

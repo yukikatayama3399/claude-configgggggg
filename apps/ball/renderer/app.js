@@ -72,6 +72,7 @@
     if (pins.length) html += `<div class="sec"><div class="sech"><span>ピン留め</span></div>${pins.map(card).join("")}</div>`;
     html += sec("自分ボール", by("me").filter((i) => !i.pinned));
     html += sec("AI 作業中", by("ai"));
+    if (by("notes").length) html += sec("会議メモ（議事録）", by("notes"));
     html += sec("返事待ち（相手ボール）", by("them"));
     const liveCal = items.filter((x) => x.live && x.src === "cal" && x.sec === "cal" && !x.hidden && (S.proj === "all" || x.proj === S.proj));
     if (calLoaded) {
@@ -101,7 +102,7 @@
   // ---------- 中：このボールの AI ----------
   function center() {
     const i = curItem(), pj = D.projects[i.proj];
-    const ball = { me: ["自分ボール", "c-me"], ai: ["AI 作業中", "c-ai"], them: ["相手ボール", "c-them"], cal: ["今日の予定", "c-them"] }[i.sec];
+    const ball = { me: ["自分ボール", "c-me"], ai: ["AI 作業中", "c-ai"], them: ["相手ボール", "c-them"], cal: ["予定", "c-them"], notes: ["会議メモ", "c-ai"] }[i.sec] || ["", "c-them"];
     $("chHead").innerHTML = `<span class="proj"><span class="pd" style="background:${pj.color}"></span>${esc(pj.name)}</span><h2>${esc(i.title)}</h2><span class="chip ${ball[1]}">${ball[0]}</span>`;
     $("ct-chat").setAttribute("aria-pressed", S.ctab === "chat");
     $("ct-memo").setAttribute("aria-pressed", S.ctab === "memo");
@@ -198,14 +199,57 @@
     const kept = (cut > 0 ? lines.slice(0, cut) : lines).join("\n").trim();
     return { text: kept || String(body || "").trim(), trimmed: cut > 0 };
   }
-  function msgCard(m, open) {
-    const q = trimQuote(m.body);
+  // ---------- メール本文を見やすくする ----------
+  // リンクはボタンに（改行で割れた長いリンクもつなぐ）、*見出し* は太字、[担当] の行は担当者つきのリストに、
+  // 自分（Yuki Katayama / 片山）の担当は色付き。末尾のアンケート・住所・[image: …] は隠す
+  const ME_RE = /Yuki Katayama|片山|katayama/i;
+  function linkLabel(u) {
+    try {
+      const x = new URL(u), h = x.hostname.replace(/^www\./, "");
+      if (h === "docs.google.com") return /\/spreadsheets\//.test(x.pathname) ? "📊 スプレッドシート" : /\/presentation\//.test(x.pathname) ? "📽 スライド" : /\/forms\//.test(x.pathname) ? "📝 フォーム" : "📄 Google ドキュメント";
+      if (h === "drive.google.com") return "📁 Drive のファイル";
+      if (h === "meet.google.com") return "🎥 Meet";
+      if (h === "calendar.google.com" || (h === "google.com" && /calendar/.test(x.pathname))) return "📅 カレンダー";
+      if (/slack\.com$/.test(h)) return "💬 Slack";
+      if (/zoom\.us$/.test(h)) return "🎥 Zoom";
+      return "🔗 " + h;
+    } catch (e) { return "🔗 リンク"; }
+  }
+  function cleanBody(raw) {
+    let t = String(raw || "").replace(/\r/g, "");
+    t = t.replace(/<(https?:\/\/[^>]+)>/g, (m, u) => "<" + u.replace(/\s+/g, "") + ">");
+    const cut = t.search(/このメールの内容はお役に立ちましたか|Was this (email|helpful)|Google LLC, 1600 Amphitheatre/);
+    if (cut > 0) t = t.slice(0, cut);
+    return t.replace(/\[image:[^\]]*\]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  function richBody(raw) {
+    const urls = [];
+    const t = cleanBody(raw).replace(/<(https?:\/\/[^>\s]+)>|(https?:\/\/[^\s<>"」）)]+)/g, (m, a, b) => { urls.push(a || b); return "\u0000" + (urls.length - 1) + "\u0000"; });
+    const fill = (str) => esc(str).replace(/\u0000(\d+)\u0000/g, (m, k) => `<button type="button" class="lnk" data-url="${esc(urls[+k])}" title="${esc(urls[+k])}">${esc(linkLabel(urls[+k]))}</button>`);
+    return t.split("\n").map((line) => {
+      const plain = line.replace(/\u0000\d+\u0000/g, "").trim();
+      if (/^\*[^*].*\*$/.test(plain)) return `<div class="bh">${esc(plain.replace(/^\*|\*$/g, ""))}</div>`;
+      if (/^(推奨される次のステップ|次のステップ|Next steps|概要|詳細|まとめ)$/.test(plain)) return `<div class="bh">${esc(plain)}</div>`;
+      const ai = line.match(/^\s*\[([^\]]+)\]\s*(.+)$/);
+      if (ai) return `<div class="actl${ME_RE.test(ai[1]) ? " mine" : ""}"><span class="who">${esc(ai[1])}</span><span>${fill(ai[2])}</span></div>`;
+      return line.trim() ? `<div class="ln">${fill(line)}</div>` : `<div class="gap"></div>`;
+    }).join("");
+  }
+  // 会議メモの「次のステップ」から自分の担当を抜き出す
+  function myActions(raw) {
+    return cleanBody(raw).split("\n").map((l) => l.match(/^\s*\[([^\]]+)\]\s*(.+)$/)).filter((m) => m && ME_RE.test(m[1])).map((m) => m[2].replace(/<https?:[^>]+>/g, "").trim());
+  }
+  function bindLinks(root) { root.querySelectorAll(".lnk[data-url]").forEach((b) => (b.onclick = () => openTab(b.dataset.url, b.textContent.replace(/^\S+\s/, "")))); }
+
+  function msgCard(m, open, full) {
+    // 会議メモ（転送されたものも）は本文がまるごと大事なので、引用を省かない
+    const q = full ? { text: String(m.body || "").trim(), trimmed: false } : trimQuote(m.body);
     const att = (m.attachments || []).map((a, k) => `<button type="button" class="att" data-msg="${esc(m.id)}" data-att="${k}" title="開く">📎 ${esc(a.filename)}<span>${esc(a.size)}</span></button>`).join("");
     return `<div class="mcard${open ? " open" : ""}">
       <div class="mhd"><b>${esc(nameOf(m.from))}</b><span>${esc(emailOf(m.from))}</span><time>${esc(m.date)}</time></div>
       <div class="mto">宛先 ${esc(m.to)}${m.cc ? `　CC ${esc(m.cc)}` : ""}</div>
       ${att ? `<div class="atts">${att}</div>` : ""}
-      <div class="mb">${esc(q.text)}</div>
+      <div class="mb rich">${richBody(q.text)}</div>
       ${q.trimmed ? `<div class="hint">（引用部分は省略。全文は「Gmail で開く」）</div>` : ""}
     </div>`;
   }
@@ -239,12 +283,17 @@
     const last = msgs[msgs.length - 1];
     const older = msgs.slice(0, -1).reverse();
     const subject = (last && last.subject) || t.subject || i.title;
+    const mine = i.notes ? [...new Set(msgs.flatMap((m) => myActions(m.body)))] : [];
+    if (i.notes && t.live) { i.chips = [["議事録", "ai"]].concat(mine.length ? [[`自分の担当 ${mine.length}件`, "me"]] : []); if (mine.length) i.sec = "me"; }
     $("thr").innerHTML = `<div class="thr">
       <div class="thd"><h4>${esc(subject)}</h4><button type="button" class="btn" id="openInGmail">Gmail で開く ↗</button></div>
-      ${last ? msgCard(last, true) : ""}
-      ${older.length ? `<details class="older"><summary>過去のやり取り（${older.length}件）</summary>${older.map((m) => msgCard(m, false)).join("")}</details>` : ""}
+      ${i.notes ? `<div class="mine-box"><b>${mine.length ? `自分の担当（${mine.length}件）` : "自分の担当はありませんでした"}</b>${mine.length ? `<ul>${mine.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<span class="hint">議事録の作成や、担当をボールに分けるのは Claude をつないだあとにここで</span></div>` : ""}
+      ${last ? msgCard(last, true, !!i.notes) : ""}
+      ${older.length ? `<details class="older"><summary>過去のやり取り（${older.length}件）</summary>${older.map((m) => msgCard(m, false, !!i.notes)).join("")}</details>` : ""}
       ${draftBox(i, "gmail")}
     </div>`;
+    bindLinks($("thr"));
+    if (i.notes && t.live) left();
     $("openInGmail").onclick = () => { const url = gmailUrl(t.threadId || ""); if (!t.threadId) return toast("見本のスレッドです"); const tab = i.tabs.find((x) => x.url === url); if (tab) { i.activeTab = i.tabs.indexOf(tab); S.rmode = "browser"; right(); } else openTab(url, "Gmail - このスレッド"); };
     $("thr").querySelectorAll(".att").forEach((b) => (b.onclick = () => {
       const m = msgs.find((x) => x.id === b.dataset.msg), a = m && m.attachments[+b.dataset.att];
@@ -277,7 +326,7 @@
     const msgs = t.live ? (t.data ? t.data.messages : []) : t.messages;
     const more = t.live && t.data && !t.data.reachedTop;
     $("thr").innerHTML = `<div class="thr">
-      <div class="thd"><h4>Messenger：${esc(t.name)}</h4><span><button type="button" class="btn" id="msgrReload">読み直す</button> <button type="button" class="btn" id="openInMsgr">Messenger で開く ↗</button></span></div>
+      <div class="thd"><h4>Messenger：${esc(t.name)}</h4><span><button type="button" class="btn" id="msgrMute" title="仕事と関係ない相手を BALL に出さないようにする">今後この相手を出さない</button> <button type="button" class="btn" id="msgrReload">読み直す</button> <button type="button" class="btn" id="openInMsgr">Messenger で開く ↗</button></span></div>
       ${t.live && t.data ? `<div class="hint">${t.data.reachedTop ? "最初のメッセージまで読みました" : "直近から遡って読んでいます"}（${msgs.length}件）${more ? ` <button type="button" class="btn" id="msgrMore">もっと過去を読む</button>` : ""}</div>` : ""}
       ${t.error ? `<div class="empty">${esc(t.error)}</div>` : `<div class="bubs">${msgs.map((m, k) => `<div class="bubrow${m.mine ? " mine" : ""}">${
         m.image ? `<button type="button" class="bbimg" data-img="${k}" title="大きく開く"><img src="${esc(m.image)}" alt="写真" loading="lazy" referrerpolicy="no-referrer"></button>`
@@ -286,6 +335,7 @@
       ${draftBox(i, "msgr")}
     </div>`;
     $("msgrReload").onclick = () => { if (!t.live) return toast("見本の会話です"); t.data = null; t.error = null; renderMsgrThread(i); };
+    $("msgrMute").onclick = () => { muteName(t.name); i.hidden = true; toast(`${t.name} は今後 BALL に出しません`); const next = items.find((x) => !x.hidden && !x.done && x.sec === "me"); if (next) select(next.id); else left(); };
     if ($("msgrMore")) $("msgrMore").onclick = () => { t.steps = (t.steps || 4) + 10; t.data = null; t.error = null; renderMsgrThread(i); };
     $("openInMsgr").onclick = () => openConversationTab(i);
     // 写真は開けなかったら「📷 写真」の文字に差し替える。押すと右のブラウザで開く
@@ -562,6 +612,11 @@
     el.querySelector("span").textContent = text;
   }
   let lastMsgrData = null;
+  // 仕事と関係ない相手は出さない。最初から外すもの + 「今後この相手を出さない」で足したもの（この Mac に保存）
+  const MUTE_DEFAULT = [/nu\s*star/i, /voyage\s*poker/i];
+  const mutedNames = () => { try { return JSON.parse(store.get("ball.msgrMute") || "[]"); } catch (e) { return []; } };
+  const isMuted = (name) => MUTE_DEFAULT.some((re) => re.test(name || "")) || mutedNames().includes(name);
+  function muteName(name) { const l = mutedNames(); if (!l.includes(name)) l.push(name); store.set("ball.msgrMute", JSON.stringify(l)); }
   function applyMessenger(data) {
     lastMsgrData = data;
     msgrStatus(data);
@@ -569,7 +624,7 @@
     // 見本の Messenger ボールは本物が来たら外す
     const mock = items.find((x) => x.id === "msgr"); if (mock) mock.hidden = true;
     const want = new Map();
-    data.convos.forEach((c, idx) => {
+    data.convos.filter((c) => !isMuted(c.name)).forEach((c, idx) => {
       if (c.unread || (!c.mine && idx < 8)) want.set("m-" + c.id, c);
     });
     // 返信済みになったものは閉じる
@@ -794,14 +849,17 @@
     [...r.data].reverse().forEach((t) => {
       const id = "g-" + t.id; ids.add(id);
       const fields = {
-        sec: "me", proj: "none", src: "gmail", live: true, hidden: false, done: false,
-        title: t.subject || "（件名なし）", sub: nameOf(t.from), ago: (t.date || "").slice(5, 16),
-        chips: [[t.unread ? "未読" : "未返信", t.unread ? "warn" : "me"]].concat(t.count > 1 ? [[t.count + "通", "them"]] : []),
+        sec: t.notes ? "notes" : "me", proj: "none", src: "gmail", live: true, hidden: false, done: false,
+        title: t.notes ? "議事録：" + (t.subject || "").replace(/^(Fwd|FW)[:：]\s*/i, "").replace(/^(メモ|共有されたドキュメント)[:：]\s*/, "").replace(/^「|」.*$|（\d{4}年.*$/g, "").replace(/\s*-\s*\d{4}\/\d{2}\/\d{2}.*$/, "") : (t.subject || "（件名なし）"),
+        sub: nameOf(t.from), ago: (t.date || "").slice(5, 16), notes: !!t.notes,
+        chips: t.notes ? [["議事録", "ai"]] : [[t.unread ? "未読" : "未返信", t.unread ? "warn" : "me"]].concat(t.count > 1 ? [[t.count + "通", "them"]] : []),
       };
       let it = items.find((x) => x.id === id);
       if (!it) {
         it = Object.assign({ id, memo: "", activeTab: 0,
-          feed: [["prog", "Gmail から自動で取り込み"], ["ai", `${nameOf(t.from)}さんからのメールです。右にスレッドを出しています。\n\n返信の段取りはここで相談できるようになります（Claude をつないだあと）。今は右の下書き欄に直接書いて、Gmail の下書きに保存できます。`]],
+          feed: t.notes
+            ? [["prog", "会議メモ（Gemini）を自動で取り込み"], ["ai", `会議のメモです。右に要点と、自分（Yuki Katayama）の担当を色付きで出しています。リンクはボタンから開けます。\n\n議事録への清書や、担当ごとのボール分けは、Claude をつないだあとにここで頼めるようになります。`]]
+            : [["prog", "Gmail から自動で取り込み"], ["ai", `${nameOf(t.from)}さんからのメールです。右にスレッドを出しています。\n\n返信の段取りはここで相談できるようになります（Claude をつないだあと）。今は右の下書き欄に直接書いて、Gmail の下書きに保存できます。`]],
           thread: { kind: "gmail", live: true, threadId: t.id, draft: "" },
           tabs: [{ title: "Gmail - このスレッド", url: gmailUrl(t.id), sim: "gmail", key: id + "-0" }] }, fields);
         items.unshift(it);
