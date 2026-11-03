@@ -121,7 +121,12 @@
     // カレンダーの作業は、時刻の早い順（時系列で片付けるので）。他のボールはこれまでどおりの順で、その下に並べる
     const mine = by("me").filter((i) => !i.pinned);
     const calMine = mine.filter((i) => i.calStart).sort(byStart);
-    html += sec("自分ボール", mine.filter((i) => !i.calStart).sort(byNewest).concat(calMine));
+    // 自分ボール: いちばん上に今日・明日の作業（時刻の早い順）、その下に届いたもの（新しい順）。見出しで分ける
+    const got = mine.filter((i) => !i.calStart).sort(byNewest);
+    html += `<div class="sec"><div class="sech"><span>自分ボール</span><span class="n">${mine.length}</span></div>`
+      + (calMine.length ? `<div class="subh">📅 今日・明日の作業（時刻の早い順）</div>${calMine.map(card).join("")}` : "")
+      + (got.length ? `<div class="subh">🕘 届いたもの（新しい順）</div>${got.map(card).join("")}` : "")
+      + `</div>`;
     html += sec("AI 作業中", by("ai").sort(byNewest));
     if (by("notes").length) html += sec("会議メモ（議事録）", by("notes").sort(byNewest));
     html += sec("返事待ち（相手ボール）", by("them").sort(byNewest));
@@ -1719,22 +1724,27 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
   // [作業] の予定 → 自分ボール。それ以外 → 「今日の予定」「明日の予定」。予定は押すと右に詳細が出る
   let calLoaded = false, calAt = 0, calErr = null;
   const todayStr = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-  const dayLabel = (d) => { const t = todayStr(); const tm = new Date(Date.parse(t) + 86400e3).toISOString().slice(0, 10); return d === tm ? "明日" : d.slice(5).replace("-", "/"); };
+  const dayLabel = (d) => { const t = todayStr(); const tm = new Date(Date.parse(t) + 86400e3).toISOString().slice(0, 10); return d === tm ? "明日" : `${d.slice(5).replace("-", "/")}（${"日月火水木金土"[new Date(d + "T00:00:00Z").getUTCDay()]}）`; };
   const hhmm = (iso) => (iso && iso.length > 10 ? iso.slice(11, 16) : "終日");
   const STATUS_JA = { accepted: "出席", declined: "欠席", tentative: "未定", needsAction: "未回答", organizer: "主催" };
   async function loadCalendar() {
-    const r = await window.ball.calendarEvents(2);
+    const r = await window.ball.calendarEvents(8); // 今日から 1 週間ぶん
     if (!r.ok) { calErr = r.error; setFt("ft-cal", "カレンダー: 読み込みエラー（押して再読込）", "ng"); return; }
     calErr = null; calLoaded = true; calAt = Date.now();
     items.filter((x) => x.src === "cal" && !x.live).forEach((x) => (x.hidden = true));
     const ids = new Set();
     r.data.forEach((e) => {
       const id = "c-" + e.id + "-" + e.start.slice(0, 10); ids.add(id);
-      const isBall = e.isWork && !/今日の5件/.test(e.summary);
       const day = e.start.slice(0, 10);
+      // 自分ボールにするのは、今日と明日の [作業]（時刻のあるもの）。それより先は下の日ごとの予定に並ぶ
+      const tomorrow = new Date(Date.now() + 86400e3 + 9 * 3600e3).toISOString().slice(0, 10);
+      const isBall = e.isWork && !/今日の5件/.test(e.summary) && !e.allDay && day <= tomorrow;
+      // 「[作業/定例]」だけの件名は、説明欄の1行目か「（件名なし）」にする
+      const bare = e.summary.replace(/^\[作業[^\]]*\]\s*/, "").trim();
+      const workTitle = bare || (String(e.description || "").split("\n").map((x) => x.trim()).find(Boolean) || "").slice(0, 60) || `${e.summary}（件名なし）`;
       const fields = {
         sec: isBall ? "me" : "cal", proj: "none", src: "cal", live: true, hidden: false,
-        title: isBall ? e.summary.replace(/^\[作業[^\]]*\]\s*/, "") : e.summary,
+        title: isBall ? workTitle : (e.summary || "（件名なし）"),
         sub: isBall ? "カレンダーの作業" : `${hhmm(e.start)}〜${hhmm(e.end)}`,
         ago: "", calDay: day, calTime: e.allDay ? "終日" : hhmm(e.start), calStart: e.start,
         chips: isBall ? [[day === todayStr() ? "今日" : dayLabel(day), "me"]] : [],

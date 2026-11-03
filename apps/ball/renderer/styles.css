@@ -432,3 +432,4 @@ details.sctx[open] summary::before{content:"▾ "}
 .mclip{font-size:11px;color:var(--muted)}
 .chip.c-time{background:transparent;border:1px solid var(--line);color:var(--ink);font-family:var(--f-mono);font-weight:600}
 .chip.c-time.cal{border-color:var(--them);color:var(--them)}
+.subh{font-size:11px;font-weight:700;color:var(--muted);padding:6px 2px 2px;letter-spacing:.02em}
