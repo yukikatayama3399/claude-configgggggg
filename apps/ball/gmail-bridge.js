@@ -50,9 +50,9 @@ async function findGog() {
   return null;
 }
 
-// ボール候補: 最後のメッセージが自分以外の人から来ている、受信トレイのスレッド
+// ボール候補: 受信トレイのスレッド。最後のメッセージが相手からなら「自分ボール」、自分からなら「返事待ち（相手ボール）」
 const QUERY = [
-  "in:inbox", "newer_than:14d", "-from:me",
+  "in:inbox", "newer_than:14d",
   "-category:promotions", "-category:social", "-category:updates", "-category:forums",
   "-label:問い合わせ完了", "-label:カレンダー通知", "-label:メルマガ・通知", "-label:配信不能通知",
 ].join(" ");
@@ -73,7 +73,7 @@ const NOTES_RE = /gemini-notes@google\.com|Gemini によるメモ|^(Fwd|FW)[:：
 
 async function inbox() {
   const [d, n] = await Promise.all([
-    runJson(["gmail", "search", QUERY, "--max", "40"]),
+    runJson(["gmail", "search", QUERY, "--max", "60"]),
     runJson(["gmail", "search", NOTES_QUERY, "--max", "15"]).catch(() => ({ threads: [] })),
   ]);
   const seen = new Set();
@@ -84,8 +84,12 @@ async function inbox() {
   }
   for (const t of d.threads || []) {
     if (seen.has(t.id)) continue;
-    if (SELF_RE.test(t.from || "") || AUTO_RE.test((t.from || "") + " " + (t.subject || "")) || CAL_RE.test(t.subject || "")) continue;
-    out.push({ id: t.id, date: t.date, from: t.from, subject: t.subject, unread: (t.labels || []).includes("UNREAD"), count: t.messageCount, notes: NOTES_RE.test((t.from || "") + " " + (t.subject || "")) });
+    const mine = SELF_RE.test(t.from || "");
+    if (!mine && AUTO_RE.test((t.from || "") + " " + (t.subject || ""))) continue;
+    if (CAL_RE.test(t.subject || "")) continue;
+    // 自分だけのスレッド（1通・自分から）は送っただけなので出さない。相手がいるやり取りで最後が自分なら「返事待ち」
+    if (mine && (t.messageCount || 1) < 2) continue;
+    out.push({ id: t.id, date: t.date, from: t.from, subject: t.subject, unread: (t.labels || []).includes("UNREAD"), count: t.messageCount, mine, notes: !mine && NOTES_RE.test((t.from || "") + " " + (t.subject || "")) });
   }
   return out.sort((a, b) => (a.date < b.date ? 1 : -1));
 }

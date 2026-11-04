@@ -103,17 +103,20 @@
   // Messenger は最後のメッセージの文（空白・記号・時刻表示を除いた形）、Gmail・Slack は最後の受信時刻、カレンダーはその予定
   const normText = (t) => String(t || "").replace(/[\s\u3000・…。、,.!！?？:：「」"'()（）]/g, "").replace(/\d+(分|時間|日|週間)$/, "").slice(0, 24);
   const doneKey = (x) => x.src === "msgr" ? `msgr|${x.msgrName || x.id}|${normText(x.sub)}` : x.src === "cal" ? x.id : `${x.id}|${x.at || ""}`;
+  const realBall = (x) => IS_APP && (x.live || ["gmail", "slack", "msgr", "cal"].includes(x.src)) && x.id !== "home";
   function markDone(x) {
     x.done = true;
-    if (!x.live) return;
+    if (!realBall(x)) return;
     const st = dones(); st[doneKey(x)] = Date.now();
     const ks = Object.keys(st); if (ks.length > 3000) ks.sort((a, b) => st[a] - st[b]).slice(0, ks.length - 3000).forEach((k) => delete st[k]);
     try { localStorage.setItem(DONE_KEY, JSON.stringify(st)); } catch (e) { /* 覚えられなくても、この起動中は閉じたまま */ }
   }
-  const applyDone = () => { const st = dones(); items.forEach((x) => { if (x.live && !x.done && st[doneKey(x)]) x.done = true; }); };
+  const applyDone = () => { const st = dones(); items.forEach((x) => { if (realBall(x) && !x.done && st[doneKey(x)]) x.done = true; }); };
 
   // ---------- 並び順 ----------
   // メール・Slack・Messenger は受け取った時刻の新しい順（新着が上）。カレンダーの作業は、これから来る時刻の早い順
+  // gog の Gmail 一覧の日時は世界標準時（UTC）なので、日本時間に直して扱う
+  function utcTime(str) { const m = String(str || "").match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/); if (!m) return dateTime(str); const d = new Date(`${m[1]}T${m[2]}:00Z`); return isNaN(d) ? 0 : d.getTime(); }
   function dateTime(str) { const d = new Date(String(str || "").replace(/^(\d{4}-\d{2}-\d{2}) /, "$1T")); return isNaN(d) ? 0 : d.getTime(); }
   function relTime(t) {
     t = String(t || "").trim();
@@ -1245,7 +1248,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     const kc = KIND_CHIP[j.kind]; if (kc) { const c = kc.slice(); c.ai = true; chips.unshift(c); }
     if (target) { const c = [`続き: ${target.title.slice(0, 14)}`, "them"]; c.ai = true; chips.push(c); }
     x.chips = chips;
-    if (j.kind === "fyi" || j.kind === "done") x.sec = "fyi";
+    if ((j.kind === "fyi" || j.kind === "done") && x.sec !== "them") x.sec = "fyi";
     x.ccWarn = j.ccWarning || "";
     if (!x.judgedFeed && !x.claudeSid) {
       x.judgedFeed = true;
@@ -1390,7 +1393,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       const chips = [[c.unread ? "未読" : "既読・未返信", c.unread ? "warn" : "me"]];
       if (c.time) chips.push([c.time, "them"]);
       const fields = {
-        sec: "me", proj: "none", src: "msgr", ago: c.time || "", at: relTime(c.time), atApprox: /日|週|か月|ヶ月|年|^\d+\s*[dwy]$/.test(c.time || ""), msgr: true, msgrName: c.name, done: false, hidden: false,
+        sec: "me", proj: "none", src: "msgr", live: true, ago: c.time || "", at: relTime(c.time), atApprox: /日|週|か月|ヶ月|年|^\d+\s*[dwy]$/.test(c.time || ""), msgr: true, msgrName: c.name, done: false, hidden: false,
         title: `Messenger：${c.name}`, sub: c.snippet ? c.snippet.slice(0, 40) : "Facebook メッセンジャー", chips,
       };
       if (!it) {
@@ -1975,16 +1978,17 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
     [...r.data].reverse().forEach((t) => {
       const id = "g-" + t.id; ids.add(id);
       const fields = {
-        sec: t.notes ? "notes" : "me", proj: "none", src: "gmail", live: true, hidden: false, done: false,
+        sec: t.notes ? "notes" : t.mine ? "them" : "me", proj: "none", src: "gmail", live: true, hidden: false, done: false,
         title: t.notes ? "議事録：" + (t.subject || "").replace(/^(Fwd|FW)[:：]\s*/i, "").replace(/^(メモ|共有されたドキュメント)[:：]\s*/, "").replace(/^「|」.*$|（\d{4}年.*$/g, "").replace(/\s*-\s*\d{4}\/\d{2}\/\d{2}.*$/, "") : (t.subject || "（件名なし）"),
-        sub: nameOf(t.from), ago: (t.date || "").slice(5, 16), at: dateTime(t.date), notes: !!t.notes,
-        chips: t.notes ? [["議事録", "ai"]] : [[t.unread ? "未読" : "未返信", t.unread ? "warn" : "me"]].concat(t.count > 1 ? [[t.count + "通", "them"]] : []),
+        sub: t.mine ? "自分が送信 · 相手の返事待ち" : nameOf(t.from), ago: "", at: utcTime(t.date), notes: !!t.notes,
+        chips: t.notes ? [["議事録", "ai"]] : t.mine ? [["返事待ち", "them"]].concat(t.count > 1 ? [[t.count + "通", "them"]] : []) : [[t.unread ? "未読" : "未返信", t.unread ? "warn" : "me"]].concat(t.count > 1 ? [[t.count + "通", "them"]] : []),
       };
       let it = items.find((x) => x.id === id);
       if (!it) {
         it = Object.assign({ id, memo: "", activeTab: 0,
           feed: t.notes
             ? [["prog", "会議メモ（Gemini）を自動で取り込み"], ["ai", `会議のメモです。右に要点と、自分（Yuki Katayama）の担当を色付きで出しています。リンクはボタンから開けます。\n\n議事録への清書や担当の整理はここで頼めます（例:「議事録にしてメモに入れといて」）。`]]
+            : t.mine ? [["prog", "Gmail から自動で取り込み"], ["ai", `自分が最後に送ったメールで、相手の返事待ちです。右にスレッドを出しています。\n催促や追加の連絡はここで頼めます（例:「やんわり催促の下書き書いて」）。`]]
             : [["prog", "Gmail から自動で取り込み"], ["ai", `${nameOf(t.from)}さんからのメールです。右にスレッドを出しています。\n\n返信はここで頼めます（例:「丁寧めに返信の下書き書いて」）。下書きは右の下書き欄に入り、Gmail への保存も送信も自分のボタンです。`]],
           thread: { kind: "gmail", live: true, threadId: t.id, draft: "" },
           tabs: [{ title: "Gmail - このスレッド", url: gmailUrl(t.id), sim: "gmail", key: id + "-0" }] }, fields);
