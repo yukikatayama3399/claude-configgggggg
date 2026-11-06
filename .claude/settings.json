@@ -21,5 +21,10 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "mcp__Slack__slack_read_channel"
+    ]
   }
 }
