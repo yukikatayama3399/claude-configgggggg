@@ -3,201 +3,207 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HAWK トライアル</title>
+<title>HAWK</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
+/* 配色は本番 HAWK（Tailwind 標準パレット）に合わせる。本番にダークモードは無いので常にライト表示 */
 :root{
-  --bg:#f5f6f8;--card:#fff;--ink:#1f2328;--sub:#6a717b;--faint:#9aa1aa;--line:#e4e7eb;--chip:#eef1f4;--hover:#f7f8fa;
-  --green:#1aa86b;--green-d:#128556;--green-bg:#e9f8f1;--green-line:#bfe8d4;
-  --orange:#e8742a;--orange-bg:#fff4ea;--orange-line:#f7d2b5;
-  --blue:#2f6fda;--blue-bg:#edf3fd;--blue-line:#c8d9f6;
-  --red:#d1344b;--red-bg:#fdeef0;--red-line:#f4c4cc;
-  --camp:#d1346b;--adset:#1aa86b;--ad:#e3a008;
-  --est:#d8f3e8;--shadow:0 8px 30px rgba(15,23,42,.12);
+  color-scheme:light;
+  --bg:#f9fafb;--card:#fff;--ink:#111827;--ink2:#374151;--sub:#6b7280;--faint:#9ca3af;--line:#e5e7eb;--line2:#f3f4f6;--chip:#f3f4f6;--hover:#f9fafb;
+  --green:#10b981;--green-d:#059669;--green-dd:#047857;--green-bg:#ecfdf5;--green-line:#a7f3d0;--green-50:#f0fdf4;--green-200:#bbf7d0;
+  --orange:#f97316;--orange-d:#ea580c;--orange-bg:#fffbeb;--orange-line:#fed7aa;
+  --blue:#2563eb;--blue-bg:#eff6ff;--blue-line:#bfdbfe;
+  --red:#ef4444;--red-d:#dc2626;--red-bg:#fef2f2;--red-line:#fecaca;
+  --camp:#be185d;--adset:#10b981;--ad:#f59e0b;
+  --est:#d1fae5;--shadow:0 10px 15px -3px rgba(0,0,0,.1),0 4px 6px -4px rgba(0,0,0,.1);--shadow-sm:0 1px 2px rgba(0,0,0,.05);
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#121417;--card:#1b1f24;--ink:#e7e9ec;--sub:#a3aab3;--faint:#727a84;--line:#2e343b;--chip:#262b31;--hover:#22272d;
-  --green-bg:#16302a;--green-line:#24533f;--orange-bg:#33251a;--orange-line:#5a3b22;--blue-bg:#18263b;--blue-line:#2a4166;--red-bg:#3a1c22;--red-line:#64303a;--est:#173a2d;--shadow:0 8px 30px rgba(0,0,0,.5)}}
-:root[data-theme="dark"]{--bg:#121417;--card:#1b1f24;--ink:#e7e9ec;--sub:#a3aab3;--faint:#727a84;--line:#2e343b;--chip:#262b31;--hover:#22272d;
-  --green-bg:#16302a;--green-line:#24533f;--orange-bg:#33251a;--orange-line:#5a3b22;--blue-bg:#18263b;--blue-line:#2a4166;--red-bg:#3a1c22;--red-line:#64303a;--est:#173a2d;--shadow:0 8px 30px rgba(0,0,0,.5)}
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;font-size:14px;line-height:1.6}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;cursor:pointer}a{color:var(--green-d)}
-input,select,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
-textarea{resize:vertical}input:focus,select:focus,textarea:focus{outline:2px solid var(--green-line);border-color:var(--green)}
+input,select,textarea{font:inherit;color:var(--ink);background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:8px 10px;width:100%}
+textarea{resize:vertical}input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(16,185,129,.2)}
 .hidden{display:none!important}
+svg.i{width:16px;height:16px;flex:none;vertical-align:-3px}
 /* header */
-header{position:sticky;top:0;z-index:30;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:0 20px;height:60px}
-.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:22px;letter-spacing:.03em;margin-right:18px;cursor:pointer;white-space:nowrap}
-.trial-badge{font-size:11px;font-weight:700;background:#fff3cd;color:#7a5600;border-radius:99px;padding:2px 9px;letter-spacing:0}
-nav{display:flex;gap:2px;flex:1;min-width:0}
-.menu{position:relative}.menu>button{background:none;border:0;padding:8px 12px;border-radius:8px;color:var(--ink);font-size:15px;white-space:nowrap}
-.menu>button::after{content:"▾";font-size:10px;color:var(--faint);margin-left:6px}.menu>button:hover,.menu.open>button{background:var(--chip)}
-.menu .dd{position:absolute;top:44px;left:0;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);min-width:210px;padding:6px;display:none}
-.menu.open .dd{display:block}.dd button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:7px}
-.dd button:hover{background:var(--green-bg)}.dd .lock{font-size:11px;color:var(--faint)}
-.hright{display:flex;align-items:center;gap:14px;margin-left:auto}
-.who{line-height:1.25;font-size:12px}.who b{display:block;font-size:13px}.who span{color:var(--sub)}
-.hbtn{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 12px;white-space:nowrap}.hbtn:hover{background:var(--hover)}
-.days{font-size:12px;color:var(--sub);white-space:nowrap}.days b{color:var(--orange)}
-main{max-width:1320px;margin:0 auto;padding:22px 24px 60px}
+header{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:0 24px;height:64px}
+.logo{display:flex;align-items:center;gap:10px;margin-right:28px;cursor:pointer;white-space:nowrap}.logo img{height:38px;display:block}
+.trial-badge{font-size:11px;font-weight:700;background:#fef3c7;color:#92400e;border-radius:9999px;padding:2px 9px}
+nav{display:flex;gap:4px;flex:1;min-width:0}
+.menu{position:relative}.menu>button{display:flex;align-items:center;gap:6px;background:none;border:0;padding:8px 14px;border-radius:6px;color:var(--ink2);font-size:15px;white-space:nowrap}
+.menu>button svg{width:14px;height:14px;color:var(--faint)}.menu>button:hover,.menu.open>button,.menu.cur>button{background:var(--line2)}
+.menu .dd{position:absolute;top:46px;left:0;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);min-width:220px;padding:6px;display:none}
+.menu.open .dd{display:block}.dd button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:none;border:0;padding:9px 12px;border-radius:6px;color:var(--ink2)}
+.dd button:hover{background:#e8f3ed}.dd .lock{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--faint)}.dd .lock svg{width:12px;height:12px}
+.hright{display:flex;align-items:center;gap:18px;margin-left:auto}
+.ws{display:flex;align-items:center;gap:8px;font-size:17px;color:var(--ink)}.ws svg{color:var(--faint)}
+.who{line-height:1.3;font-size:13px;color:var(--ink2)}.who span{display:block;color:var(--sub);font-size:11px}
+.hbtn{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:6px;padding:7px 14px;white-space:nowrap;color:var(--ink2);box-shadow:var(--shadow-sm)}.hbtn:hover{background:var(--hover)}
+.days{font-size:12px;color:var(--sub);white-space:nowrap}.days b{color:var(--orange-d)}
+main{max-width:1320px;margin:0 auto;padding:24px 24px 64px}
 /* common */
-.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:8px;padding:9px 16px;font-weight:700;background:var(--green);color:#fff;white-space:nowrap}
-.btn:hover{background:var(--green-d)}.btn:disabled{opacity:.45;cursor:not-allowed}
-.btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line);font-weight:500}.btn.ghost:hover{background:var(--hover)}
-.btn.sm{padding:5px 10px;font-size:12px}.btn.danger{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px}
-.chip{display:inline-flex;align-items:center;gap:4px;background:var(--chip);border-radius:6px;padding:3px 9px;font-size:12px;margin:0 6px 6px 0}
-.chip button{background:none;border:0;padding:0 0 0 2px;color:var(--faint);font-size:13px;line-height:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:6px;padding:9px 16px;font-weight:700;background:var(--green);color:#fff;white-space:nowrap;box-shadow:var(--shadow-sm)}
+.btn:hover{background:var(--green-d)}.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.ghost{background:#fff;color:var(--ink2);border:1px solid var(--line);font-weight:500}.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:5px 10px;font-size:12px}.btn.danger{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line);font-weight:500;box-shadow:none}.btn.danger:hover{background:#fee2e2}
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow-sm)}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--chip);color:var(--ink2);border-radius:6px;padding:3px 10px;font-size:12px;margin:0 6px 6px 0}
+.chip button{background:none;border:0;padding:0 0 0 2px;color:var(--faint);font-size:13px;line-height:1}.chip button:hover{color:var(--red)}
 .muted{color:var(--sub)}.small{font-size:12px}.tiny{font-size:11px}
-h1.page{font-size:22px;margin:0}
-.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
-.pill{display:inline-block;font-size:11px;font-weight:700;border-radius:5px;padding:1px 8px;color:#fff}
+h1.page{font-size:24px;font-weight:700;margin:0}
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.pill{display:inline-block;font-size:11px;font-weight:700;border-radius:4px;padding:2px 8px;color:#fff;letter-spacing:.02em}
 .pill.camp{background:var(--camp)}.pill.adset{background:var(--adset)}.pill.ad{background:var(--ad)}
 .platform-ico{display:inline-flex;gap:3px;vertical-align:middle}
 .ico{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
-.ico.fb{background:#1877f2}.ico.ig{background:linear-gradient(45deg,#f9a825,#e1306c,#833ab4)}.ico.tt{background:#111}
+.ico.fb{background:#1877f2}.ico.ig{background:radial-gradient(circle at 30% 107%,#fdf497 0%,#fd5949 45%,#d6249f 60%,#285aeb 90%)}.ico.tt{background:#000}
 /* brief list */
-.search{padding:14px 16px;margin-bottom:14px}.search label{font-size:12px;color:var(--sub)}
+.search{padding:14px 18px;margin-bottom:16px}.search label{display:block;font-size:13px;color:var(--ink2);margin-bottom:6px}
 table.list{width:100%;border-collapse:collapse}
-.list th{font-size:13px;text-align:left;color:var(--ink);padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
-.list td{padding:14px;border-bottom:1px solid var(--line);vertical-align:top}
-.list tr:hover td{background:var(--hover)}
-.bname{font-size:16px;font-weight:600;cursor:pointer}.bname:hover{color:var(--green-d)}
-.notebox{background:var(--chip);border-radius:8px;padding:8px 10px;font-size:12px;max-height:92px;overflow:hidden;white-space:pre-wrap;max-width:320px}
-.mini{display:flex;flex-direction:column;gap:5px}.mini button{border-radius:7px;padding:5px 10px;font-size:12px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
-.b-aud{background:var(--orange-bg);border:1px solid var(--orange-line);color:var(--orange)}
-.b-est{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue)}
-.b-dlv{background:var(--green-bg);border:1px solid var(--green-line);color:var(--green-d)}
+.list th{font-size:14px;font-weight:700;text-align:left;color:var(--ink);padding:14px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+.list td{padding:16px;border-bottom:1px solid var(--line2);vertical-align:top}
+.list tr:hover td{background:#fcfcfd}
+.bname{font-size:17px;font-weight:500;cursor:pointer;color:var(--ink)}.bname:hover{color:var(--green-d)}
+.notebox{background:var(--line);border-radius:6px;padding:8px 10px;font-size:12px;max-height:110px;overflow:hidden;white-space:pre-wrap;max-width:340px;color:var(--ink2)}
+.editico{background:none;border:0;color:var(--sub);padding:2px;vertical-align:middle}.editico:hover{color:var(--green-d)}
+.mini{display:flex;flex-direction:column;gap:6px}.mini button{display:flex;align-items:center;gap:6px;border-radius:6px;padding:6px 12px;font-size:12px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.b-aud{background:var(--orange-bg);border:1px solid var(--orange-line);color:var(--orange)}.b-aud:hover{background:#fef3c7}
+.b-est{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue)}.b-est:hover{background:#dbeafe}
+.b-dlv{background:var(--green-50);border:1px solid var(--green-200);color:var(--green-d)}.b-dlv:hover{background:#dcfce7}
+.listwrap{overflow-x:auto}.list td:first-child .bname{max-width:300px}
 .empty{text-align:center;padding:50px 20px;color:var(--sub)}
 /* brief detail */
-.dhead{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}
-.dhead h1{font-size:22px;margin:0;flex:1}.back{background:none;border:0;font-size:22px;color:var(--sub);padding:0 8px}
-.dgrid{display:grid;grid-template-columns:330px minmax(0,1fr) 300px}
-.dcol{padding:18px 22px;min-width:0}.dcol+.dcol{border-left:1px solid var(--line)}
-.dcol h3{margin:0 0 12px;font-size:17px}
-.noteinput{position:relative}.noteinput textarea{min-height:120px;padding-bottom:40px}
-.noteinput .send{position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;border:0;background:var(--green);color:#fff;font-size:18px}
-.noteinput .send:disabled{opacity:.4}
-.tmpl{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 14px}.tmpl button{font-size:11px;border:1px dashed var(--line);background:none;border-radius:6px;padding:2px 8px;color:var(--sub)}
-.note{background:var(--chip);border-radius:10px;padding:12px 14px;margin-bottom:10px;white-space:pre-wrap;font-size:13px;word-break:break-word}
-.note .at{color:var(--sub);font-size:12px;margin-bottom:4px}
-.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:16px}
-.tabs button{background:none;border:0;padding:8px 16px;font-size:15px;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px}
-.tabs button.on{color:var(--green-d);border-color:var(--green);font-weight:700}
-.sect{border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.sect>.sh{background:var(--hover);padding:10px 16px;font-weight:700;display:flex;align-items:center;gap:8px}
-.frow{display:grid;grid-template-columns:130px 1fr 26px;gap:10px;align-items:center;padding:11px 16px;border-top:1px solid var(--line);min-height:52px}
-.frow .k{color:var(--sub);font-size:13px}.frow .v{font-size:15px;cursor:pointer;border-radius:6px;padding:2px 6px;margin-left:-6px;min-height:26px;word-break:break-word}
-.frow .v:hover{background:var(--hover)}.frow .v.blank{color:var(--faint);font-size:13px}
-.frow .v .s{display:block;font-size:12px;color:var(--sub)}
-.frow .x{background:none;border:0;color:var(--faint);font-size:16px}.frow .x:hover{color:var(--red)}
+.dhead{display:flex;align-items:center;gap:12px;padding:20px 24px;border-bottom:1px solid var(--line)}
+.dhead h1{font-size:24px;font-weight:700;margin:0;flex:1;display:flex;align-items:center;gap:8px}.back{display:inline-flex;background:none;border:0;color:var(--ink2);padding:4px 8px}.back svg{width:22px;height:22px}
+.owner{display:flex;align-items:center;gap:10px;color:var(--sub);font-size:14px}.owner b{font-weight:400;color:var(--ink2)}
+.dgrid{display:grid;grid-template-columns:340px minmax(0,1fr) 320px}
+.dcol{padding:20px 24px;min-width:0}.dcol+.dcol{border-left:1px solid var(--line)}
+.dcol h3{margin:0 0 14px;font-size:18px;font-weight:700}
+.noteinput{position:relative}.noteinput textarea{min-height:140px;padding:12px 14px 46px;border-color:var(--line)}
+.noteinput .send{position:absolute;right:12px;bottom:12px;width:36px;height:36px;border-radius:50%;border:0;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center}
+.noteinput .send:disabled{opacity:.5}
+.tmpl{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 14px}.tmpl button{font-size:11px;border:1px dashed #d1d5db;background:#fff;border-radius:6px;padding:2px 8px;color:var(--sub)}.tmpl button:hover{border-color:var(--green);color:var(--green-d)}
+.note{background:var(--hover);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:12px;white-space:pre-wrap;font-size:14px;word-break:break-word;color:var(--ink2)}
+.note .at{color:var(--sub);font-size:13px;margin-bottom:4px}
+.tabs{display:flex;gap:8px;border-bottom:1px solid var(--line);margin-bottom:18px}
+.tabs button{background:none;border:0;padding:10px 18px;font-size:15px;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--green-d);border-color:var(--green-d);font-weight:600}
+.sect{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+.sect>.sh{background:var(--hover);padding:12px 18px;font-weight:600;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}.sect>.sh svg{color:var(--sub)}
+.frow{display:grid;grid-template-columns:140px 1fr 26px;gap:10px;align-items:center;padding:12px 20px;border-top:1px solid var(--line2);min-height:56px}.sect>.sh+.frow{border-top:0}
+.frow .k{color:var(--faint);font-size:13px}.frow .v{font-size:15px;font-weight:500;color:var(--ink);cursor:pointer;border-radius:6px;padding:3px 8px;margin-left:-8px;min-height:28px;word-break:break-word}
+.frow .v:hover{background:var(--line2)}.frow .v.blank{color:var(--faint);font-size:13px;font-weight:400}
+.frow .v .s{display:block;font-size:12px;color:var(--sub);font-weight:400;margin-top:2px}
+.frow .x{background:none;border:0;color:var(--ink2);display:flex;align-items:center;justify-content:center}.frow .x:hover{color:var(--red)}
 .frow.missing .v.blank{color:var(--red)}
 .frow.flash{animation:flash 1.6s ease}@keyframes flash{0%{background:var(--green-bg)}100%{background:transparent}}
 .frow .editor{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.frow .editor input,.frow .editor select{flex:1;min-width:110px}
-.aibox{border:1px solid var(--green-line);background:var(--green-bg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px}
-.aibox h4{margin:0 0 6px;font-size:13px;display:flex;align-items:center;gap:6px}.aibox ul{margin:4px 0 8px;padding-left:18px}.aibox li{margin:2px 0}
-.aibox.warn{border-color:var(--orange-line);background:var(--orange-bg)}
-.menuBtn{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;padding:11px 14px;font-weight:700;font-size:15px;margin-bottom:10px;text-align:left}
-.lack{background:var(--red-bg);border:1px solid var(--red-line);border-radius:8px;padding:10px 14px;color:var(--red);font-size:13px;margin-bottom:12px}
-.lack b{display:block;margin-bottom:2px}.lack ul{margin:0;padding-left:18px}
-.made{border-top:1px solid var(--line);padding-top:12px;margin-top:6px}
-.madeitem{display:flex;align-items:center;gap:6px;margin-bottom:6px}.madeitem button.open{flex:1;min-width:0;text-align:left;border-radius:7px;padding:6px 10px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.madeitem .del{background:none;border:0;color:var(--faint);font-size:14px}
-.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;margin-top:10px}
-.ccard{position:relative;border:2px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;background:var(--chip);aspect-ratio:4/5}
+.aibox{border:1px solid var(--green-line);background:var(--green-bg);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--ink2)}
+.aibox h4{margin:0 0 6px;font-size:13px;display:flex;align-items:center;gap:6px;color:var(--green-dd)}.aibox ul{margin:4px 0 8px;padding-left:18px}.aibox li{margin:2px 0}
+.menuBtn{display:flex;align-items:center;gap:10px;width:100%;border-radius:6px;padding:12px 16px;font-weight:700;font-size:16px;margin-bottom:12px;text-align:left}.menuBtn svg{width:18px;height:18px}
+.menuBtn .warn{margin-left:auto;color:var(--orange)}
+.lack{background:var(--red-bg);border:1px solid var(--red-line);border-radius:6px;padding:10px 14px;color:var(--red);font-size:14px;margin-bottom:14px}
+.lack b{display:block;margin-bottom:2px;color:var(--red-d)}.lack ul{margin:0;padding-left:18px}
+.made{border-top:1px solid var(--line);padding-top:14px;margin-top:6px}
+.madeitem{display:flex;align-items:center;gap:6px;margin-bottom:6px}.madeitem button.open{display:block;flex:1;min-width:0;text-align:left;border-radius:6px;padding:7px 12px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.madeitem button.open svg{width:13px;height:13px;margin-right:4px}
+.madeitem .del{background:none;border:0;color:var(--faint);display:flex}.madeitem .del:hover{color:var(--red)}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-top:12px}
+.ccard{position:relative;border:2px solid var(--line);border-radius:6px;overflow:hidden;cursor:pointer;background:var(--chip);aspect-ratio:4/5}
 .ccard img{width:100%;height:100%;object-fit:cover;display:block}.ccard.on{border-color:var(--green)}
-.ccard .ck{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.9);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--green-d)}
-.ccard.on .ck{background:var(--green);color:#fff;border-color:var(--green)}
-.ccard .cn{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;font-size:11px;padding:14px 6px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.seg{display:inline-flex;background:var(--chip);border-radius:9px;padding:3px}.seg button{border:0;background:none;padding:6px 14px;border-radius:7px;font-size:13px}.seg button.on{background:var(--card);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-.fl{font-weight:700;margin:16px 0 6px;display:block}
+.ccard .ck{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.92);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:transparent}
+.ccard .ck svg{width:13px;height:13px}.ccard.on .ck{background:var(--green);color:#fff;border-color:var(--green)}
+.ccard .cn{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.6));color:#fff;font-size:11px;padding:14px 6px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg{display:inline-flex;background:var(--line2);border:1px solid var(--line);border-radius:6px;overflow:hidden}.seg button{border:0;background:#fff;padding:8px 18px;font-size:14px;color:var(--ink2)}.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:#e8efe9;color:#14532d;font-weight:700}
+.fl{font-weight:700;margin:18px 0 8px;display:flex;align-items:center;gap:8px;font-size:15px}
+.cnt{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;border-radius:9999px;background:#9ca3af;color:#fff;font-size:12px;font-weight:700;padding:0 6px}
 /* modal */
-.ov{position:fixed;inset:0;background:rgba(15,20,25,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow:auto}
-.modal{background:var(--card);border-radius:14px;width:min(1180px,100%);box-shadow:var(--shadow);margin:auto 0}
+.ov{position:fixed;inset:0;background:rgba(17,24,39,.5);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow:auto}
+.modal{background:#fff;border-radius:8px;width:min(1180px,100%);box-shadow:0 25px 50px -12px rgba(0,0,0,.25);margin:auto 0}
 .modal.narrow{width:min(620px,100%)}
-.mh{display:flex;align-items:center;gap:12px;padding:20px 26px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card);border-radius:14px 14px 0 0;z-index:2}
-.mh h2{margin:0;font-size:21px;flex:1;display:flex;align-items:center;gap:8px}.mh .close{background:none;border:0;font-size:26px;line-height:1;color:var(--ink)}
-.mb{padding:22px 26px}.mf{padding:16px 26px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;position:sticky;bottom:0;background:var(--card);border-radius:0 0 14px 14px}
-.titleedit{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px;margin-bottom:6px}.titleedit input{max-width:520px;font-weight:700}
+.mh{display:flex;align-items:center;gap:12px;padding:22px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;border-radius:8px 8px 0 0;z-index:2}
+.mh h2{margin:0;font-size:22px;font-weight:700;flex:1;display:flex;align-items:center;gap:8px}.mh .close{display:flex;background:none;border:0;color:var(--ink);padding:4px}.mh .close svg{width:24px;height:24px}
+.mb{padding:24px 28px}.mf{padding:16px 28px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;position:sticky;bottom:0;background:#fff;border-radius:0 0 8px 8px}
+.titleedit{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;margin-bottom:6px}.titleedit input{max-width:520px;font-weight:700}.titleedit svg{color:var(--sub)}
 /* audience */
-.kv4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0}
-.kv4>div{border:1px solid var(--line);border-radius:8px;padding:8px 14px}.kv4 .k{font-size:12px;color:var(--sub)}.kv4 .v{font-weight:700}
-.total{border:1px solid var(--line);border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.total b{font-size:20px}
-.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.plan{border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;position:relative}.plan.on{border-color:var(--orange);box-shadow:0 0 0 2px var(--orange-line)}
-.plan .ph{display:flex;justify-content:space-between;font-weight:700;font-size:16px}.plan .sz{font-weight:600;margin:8px 0}
-.bar{height:8px;border-radius:9px;background:var(--chip);overflow:hidden;margin-bottom:12px}.bar i{display:block;height:100%;background:var(--orange);border-radius:9px}
-.plan .use{position:absolute;top:-10px;right:12px;background:var(--orange);color:#fff;font-size:11px;font-weight:700;border-radius:99px;padding:1px 9px}
+.kv4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0}
+.kv4>div{border:1px solid var(--line);border-radius:6px;padding:8px 16px;background:var(--hover)}.kv4 .k{font-size:12px;color:var(--sub)}.kv4 .v{font-weight:700}
+.total{border:1px solid var(--line);border-radius:6px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.total b{font-size:20px}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.plan{border:1px solid var(--line);border-radius:8px;padding:18px;cursor:pointer;position:relative;box-shadow:var(--shadow-sm)}.plan.on{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange)}
+.plan .ph{display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:16px}.plan .ph span:last-child{display:flex;align-items:center;gap:6px}.plan .sz{font-weight:600;margin:10px 0}
+.bar{height:8px;border-radius:9999px;background:var(--line2);overflow:hidden;margin-bottom:14px}.bar i{display:block;height:100%;background:var(--orange);border-radius:9999px}
+.plan .use{position:absolute;top:-10px;right:12px;background:var(--orange);color:#fff;font-size:11px;font-weight:700;border-radius:9999px;padding:1px 10px}
 .addint{display:flex;gap:6px;margin-top:6px}.addint input{font-size:12px;padding:5px 8px}
 /* estimate */
 .esttab{width:100%;border-collapse:separate;border-spacing:0 6px}
-.esttab th{font-size:12px;color:var(--sub);font-weight:600;text-align:right;padding:2px 10px}.esttab th.grp{text-align:left;font-size:15px;color:var(--ink);font-weight:700}
+.esttab th{font-size:12px;color:var(--faint);font-weight:500;text-align:right;padding:2px 10px}.esttab th.grp{text-align:left;font-size:15px;color:var(--ink);font-weight:700}
 .esttab td{padding:8px 10px;text-align:right;white-space:nowrap}.esttab td.m{text-align:left;font-weight:700}
-.esttab td.n{position:relative;font-weight:600}.esttab td.n i{position:absolute;left:0;top:3px;bottom:3px;background:var(--est);border-radius:4px;z-index:0}.esttab td.n span{position:relative;z-index:1}
-.esttab .u{color:var(--sub);font-size:11px;margin-right:4px}
-.esttab input{width:78px;padding:3px 6px;text-align:right;font-size:13px;display:inline-block}
+.esttab td.n{position:relative;font-weight:600}.esttab td.n i{position:absolute;left:0;top:2px;bottom:2px;background:var(--est);border-radius:4px;z-index:0}.esttab td.n span{position:relative;z-index:1}
+.esttab .u{color:var(--faint);font-size:11px;margin-right:4px}
+.esttab .ev{cursor:pointer;font-weight:600;border-radius:4px;padding:1px 4px}.esttab .ev:hover{background:var(--line2)}
+.esttab input{width:80px;padding:3px 6px;text-align:right;font-size:13px;display:inline-block;font-weight:600}
 .gap{width:24px}
-.refs{width:100%;border-collapse:collapse;font-size:12px}.refs th{color:var(--sub);text-align:right;padding:8px;border-bottom:1px solid var(--line);font-weight:600}.refs th:first-child,.refs td:first-child{text-align:left}
-.refs td{padding:8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}.refs td .s{display:block;color:var(--sub);font-size:11px}
-.kpicmp{display:inline-block;font-size:12px;border-radius:6px;padding:2px 8px;margin-left:8px}.kpicmp.ok{background:var(--green-bg);color:var(--green-d)}.kpicmp.ng{background:var(--orange-bg);color:var(--orange)}
-.warnline{color:var(--orange);font-size:12px;margin-top:4px}
+.refs{width:100%;border-collapse:collapse;font-size:12px}.refs th{color:var(--ink2);text-align:right;padding:8px;border-bottom:1px solid var(--line);font-weight:700;background:var(--hover)}.refs th:first-child,.refs td:first-child{text-align:left}
+.refs td{padding:8px;border-bottom:1px solid var(--line2);text-align:right;vertical-align:top}.refs td .s{display:block;color:var(--sub);font-size:11px}
+.kpicmp{display:inline-block;font-size:12px;border-radius:6px;padding:2px 8px;margin-left:8px}.kpicmp.ok{background:var(--green-bg);color:var(--green-d)}.kpicmp.ng{background:#fff7ed;color:var(--orange-d)}
+.warnline{color:var(--orange-d);font-size:12px;margin-top:4px}
 .cond{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 16px;font-size:13px}.cond div span{display:block;color:var(--sub);font-size:11px}
 /* delivery */
-.dl-head{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}.dl-head .k{font-size:12px;color:var(--sub)}
-.lvl{border:1px solid var(--line);border-left:4px solid var(--camp);border-radius:10px;padding:16px 18px;margin-bottom:12px}
+.dl-head{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}.dl-head .k{font-size:13px;color:var(--sub)}
+.lvl{border:1px solid var(--line);border-left:4px solid var(--camp);border-radius:8px;padding:18px 20px;margin-bottom:12px;background:#fff}
 .lvl.adset{border-left-color:var(--adset);margin-left:14px}.lvl.ad{border-left-color:var(--ad);margin-left:28px}
-.lvl .nm{font-weight:700;font-size:16px;margin:8px 0 10px}
+.lvl .nm{font-weight:700;font-size:17px;margin:10px 0 12px}
 .lvl .tools{float:right;display:flex;gap:6px}
-.fgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 18px}
-.fgrid .k{font-size:12px;color:var(--sub)}.fgrid .v{font-weight:500;word-break:break-word}.fgrid .s{display:block;font-size:11px;color:var(--faint)}
+.fgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 20px}
+.fgrid .k{font-size:13px;color:var(--faint)}.fgrid .v{font-weight:500;word-break:break-word;color:var(--ink2)}.fgrid .s{display:block;font-size:12px;color:var(--faint)}
 .fgrid .w2{grid-column:span 2}.fgrid .w4{grid-column:1/-1}
 .fgrid label.k{display:block;margin-bottom:3px}
-.adthumb{width:120px;aspect-ratio:4/5;border-radius:8px;object-fit:cover;background:var(--chip);border:1px solid var(--line)}
+.adthumb{width:120px;aspect-ratio:4/5;border-radius:6px;object-fit:cover;background:var(--chip);border:1px solid var(--line)}
 .picker{display:flex;gap:8px;flex-wrap:wrap}.picker img{width:64px;aspect-ratio:4/5;object-fit:cover;border-radius:6px;border:2px solid var(--line);cursor:pointer}.picker img.on{border-color:var(--green)}
-.fixed{font-size:12px;color:var(--sub);background:var(--hover);border-radius:8px;padding:8px 12px;margin-top:8px}
+.fixed{font-size:12px;color:var(--sub);background:var(--hover);border:1px solid var(--line);border-radius:6px;padding:8px 12px;margin-top:8px}
 /* confirm page */
-.confirm{max-width:980px;margin:0 auto}
-.ctable{width:100%;border-collapse:collapse}.ctable th{width:200px;text-align:left;font-weight:600;color:var(--sub);font-size:13px;padding:11px 16px;border-top:1px solid var(--line);vertical-align:top}
-.ctable td{padding:11px 16px;border-top:1px solid var(--line);word-break:break-word}.ctable tr:first-child th,.ctable tr:first-child td{border-top:0}
-.chead{padding:12px 16px;font-weight:700;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);background:var(--hover);border-radius:12px 12px 0 0}
-.offer{border:2px solid var(--orange);background:var(--orange-bg);border-radius:12px;padding:18px 20px;margin:20px 0 14px}
-.offer h3{margin:0 0 6px;font-size:17px;color:var(--orange)}.offer .code{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px dashed var(--orange);border-radius:8px;padding:6px 12px;font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:16px;margin:6px 0}
-.linkbox{text-align:center;padding:22px}.linkbox label{display:flex;gap:8px;justify-content:center;align-items:center;margin-bottom:14px;color:var(--sub)}.linkbox label input{width:auto}
-.lockbtn{position:relative}.lockbtn::before{content:"🔒 "}
+.confirm{max-width:1000px;margin:0 auto}
+.ctable{width:100%;border-collapse:collapse}.ctable th{width:200px;text-align:left;font-weight:700;color:var(--ink2);font-size:13px;padding:13px 20px;border-top:1px solid var(--line2);vertical-align:top}
+.ctable td{padding:13px 20px;border-top:1px solid var(--line2);word-break:break-word;color:var(--ink)}.ctable tr:first-child th,.ctable tr:first-child td{border-top:0}
+.chead{padding:12px 20px;font-weight:700;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);background:var(--hover);border-radius:8px 8px 0 0}
+.offer{border:1px solid var(--orange-line);background:#fff7ed;border-radius:8px;padding:18px 22px;margin:22px 0 14px}
+.offer h3{margin:0 0 6px;font-size:17px;color:var(--orange-d);display:flex;align-items:center;gap:8px}.offer .code{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px dashed var(--orange);border-radius:6px;padding:6px 12px;font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:16px;margin:6px 0}
+.linkbox{text-align:center;padding:24px}.linkbox label{display:flex;gap:10px;justify-content:center;align-items:center;margin-bottom:16px;color:var(--ink2)}.linkbox label input{width:18px;height:18px}
+.lockbtn{padding:13px 44px!important;font-size:16px!important;background:var(--green);opacity:.55}.lockbtn:hover{opacity:.7;background:var(--green)}
 /* locked page */
-.locked{max-width:760px;margin:30px auto;text-align:center;padding:36px 30px}.locked h2{margin:6px 0 10px}.locked .big{font-size:40px}
+.locked{max-width:760px;margin:30px auto;text-align:center;padding:40px 30px}.locked h2{margin:8px 0 10px}.locked .big{display:inline-flex;width:56px;height:56px;border-radius:50%;background:var(--line2);align-items:center;justify-content:center;color:var(--sub)}.locked .big svg{width:26px;height:26px}
 /* progress */
 .prog{padding:28px 30px}.prog .st{display:flex;align-items:center;gap:10px;padding:7px 0;color:var(--faint)}.prog .st.on{color:var(--ink);font-weight:600}.prog .st.done{color:var(--green-d)}
 .prog .st i{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;flex:none}
 .prog .st.on i{border-color:var(--green);border-top-color:transparent;animation:spin .8s linear infinite}.prog .st.done i{background:var(--green);border-color:var(--green);color:#fff}
 @keyframes spin{to{transform:rotate(360deg)}}
-.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1f2328;color:#fff;border-radius:10px;padding:10px 18px;z-index:80;box-shadow:var(--shadow);font-size:13px;max-width:90vw}
-.guide{position:fixed;right:18px;bottom:18px;z-index:40;width:300px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
-.guide .gh{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:700}.guide .gh button{margin-left:auto;background:none;border:0;color:var(--sub)}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#111827;color:#fff;border-radius:8px;padding:10px 18px;z-index:80;box-shadow:var(--shadow);font-size:13px;max-width:90vw}
+.guide{position:fixed;right:18px;bottom:18px;z-index:40;width:300px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
+.guide .gh{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:700}.guide .gh button{margin-left:auto;background:none;border:0;color:var(--sub);display:flex}
 .guide ol{margin:0;padding:10px 14px 12px 34px;font-size:13px}.guide li{margin:5px 0;color:var(--sub)}.guide li.done{color:var(--green-d);text-decoration:line-through}.guide li.now{color:var(--ink);font-weight:700}
-.guidefab{position:fixed;right:18px;bottom:18px;z-index:40;border-radius:99px;box-shadow:var(--shadow)}
-@media (max-width:1100px){.dgrid{grid-template-columns:1fr}.dcol+.dcol{border-left:0;border-top:1px solid var(--line)}.fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.guidefab{position:fixed;right:18px;bottom:18px;z-index:40;border-radius:9999px;box-shadow:var(--shadow)}
+@media (max-width:1100px){.dgrid{grid-template-columns:1fr}.dcol+.dcol{border-left:0;border-top:1px solid var(--line)}.fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.ws{display:none}}
 @media (max-width:760px){
-  header{padding:0 12px;gap:2px;height:auto;min-height:56px;flex-wrap:wrap}nav{order:3;width:100%;overflow-x:auto;padding-bottom:6px}.logo{margin-right:4px}.who{display:none}.days{display:none}
+  header{padding:0 12px;gap:2px;height:auto;min-height:56px;flex-wrap:wrap}nav{order:3;width:100%;overflow-x:auto;padding-bottom:6px}.logo{margin-right:4px}.logo img{height:32px}.who{display:none}.days{display:none}
   main{padding:14px 12px 60px}.plans,.kv4,.dl-head,.cond{grid-template-columns:1fr}.frow{grid-template-columns:92px 1fr 22px;padding:10px 12px}
   .mb{padding:16px}.mh{padding:14px 16px}.mf{padding:12px 16px}.list thead{display:none}.list td{display:block;border:0;padding:6px 14px}.list tr{display:block;border-bottom:1px solid var(--line);padding:8px 0}
   .esttab{font-size:12px}.esttab input{width:58px}.lvl.adset{margin-left:6px}.lvl.ad{margin-left:12px}.ctable th{width:110px}.guide{left:12px;right:12px;width:auto}
-  .esttab-wrap,.refs-wrap{overflow-x:auto}
+  .esttab-wrap,.refs-wrap{overflow-x:auto}.dhead h1{font-size:19px}.owner{display:none}
 }
 @media print{header,.guide,.guidefab,.no-print{display:none!important}main{padding:0}}
 </style>
 </head>
 <body>
 <header>
-  <div class="logo" onclick="go('#/briefs')">
-    <svg viewBox="0 0 40 40" width="34" height="34" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#0f5132"/><path d="M9 24c4-7 10-11 18-12-3 2-5 4-6 7 3-1 6-1 9 0-5 1-8 3-10 7-2-2-6-3-11-2z" fill="#fff"/><circle cx="27" cy="15.5" r="1.3" fill="#0f5132"/></svg>
-    HAWK <span class="trial-badge">トライアル</span>
-  </div>
+  <div class="logo" onclick="go('#/briefs')"><img src="logo.png" alt="HAWK"><span class="trial-badge">トライアル</span></div>
   <nav id="nav"></nav>
   <div class="hright">
     <span class="days" id="days"></span>
-    <div class="who"><b id="wCompany"></b><span id="wUser"></span></div>
-    <button class="hbtn" id="logout">ログアウト</button>
+    <div class="ws" id="ws"></div>
+    <div class="who" id="who"></div>
+    <button class="hbtn" id="logout"></button>
   </div>
 </header>
 <main id="main"></main>
@@ -216,6 +222,25 @@ table.list{width:100%;border-collapse:collapse}
 // ---------- 小道具 ----------
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const IC = {
+  chev: '<path d="m6 9 6 6 6-6"/>', chevL: '<path d="m15 18-6-6 6-6"/>', arrowR: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>', x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>', check: '<path d="M20 6 9 17l-5-5"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  calc: '<rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/>',
+  plusC: '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>', panel: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+  pen: '<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
+  alert: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  printer: '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/>',
+  gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/>',
+  sparkles: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+};
+const ic = (n, st = "") => `<svg class="i" ${st ? `style="${st}"` : ""} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;
 const yen = (n) => "¥" + Math.round(Number(n) || 0).toLocaleString("ja-JP");
 const num = (n) => Math.round(Number(n) || 0).toLocaleString("ja-JP");
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -431,15 +456,17 @@ const NAV = [
   ["ワークスペース", [["設定"], ["ユーザー"], ["代理店一覧"]]],
 ];
 function renderNav() {
-  $("#nav").innerHTML = NAV.map(([g, items], gi) => `<div class="menu" data-g="${gi}"><button>${g}</button><div class="dd">${items.map(([n, h]) =>
-    `<button data-go="${h || "#/locked/" + encodeURIComponent(n)}"><span>${n}</span>${h ? "" : '<span class="lock">🔒 正式版</span>'}</button>`).join("")}</div></div>`).join("");
+  $("#nav").innerHTML = NAV.map(([g, items], gi) => `<div class="menu" data-g="${gi}"><button>${g}${ic("chev")}</button><div class="dd">${items.map(([n, h]) =>
+    `<button data-go="${h || "#/locked/" + encodeURIComponent(n)}"><span>${n}</span>${h ? "" : '<span class="lock">${ic("lock")}正式版</span>'}</button>`).join("")}</div></div>`).join("");
   $("#nav").onclick = (e) => {
     const m = e.target.closest(".menu"); const it = e.target.closest("[data-go]");
     if (it) { document.querySelectorAll(".menu").forEach((x) => x.classList.remove("open")); go(it.dataset.go); return; }
     if (m && e.target.closest(".menu>button")) { const was = m.classList.contains("open"); document.querySelectorAll(".menu").forEach((x) => x.classList.remove("open")); if (!was) m.classList.add("open"); }
   };
   document.addEventListener("click", (e) => { if (!e.target.closest(".menu")) document.querySelectorAll(".menu").forEach((x) => x.classList.remove("open")); });
-  $("#wCompany").textContent = ME.user.company || ""; $("#wUser").textContent = ME.user.email || ME.user.name;
+  $("#ws").innerHTML = `<span>${esc(ME.user.company || "")}</span>${ic("chev")}`;
+  $("#who").innerHTML = `${esc(ME.user.name || "")}<span>${esc(ME.user.email || "")}</span>`;
+  $("#logout").innerHTML = `${ic("logout")}ログアウト`;
   $("#days").innerHTML = `トライアル残り <b>${ME.trial.daysLeft}日</b>`;
   $("#logout").onclick = () => { if (SERVER) location.href = "/logout"; else toast("ローカル試用中です"); };
   if (!SERVER) $("#logout").classList.add("hidden");
@@ -458,29 +485,36 @@ function route() {
 // =====================================================================
 //   与件一覧
 // =====================================================================
+const FB_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" aria-label="Facebook"><circle cx="12" cy="12" r="12" fill="#1877F2"/><path d="M13.4 19.5v-6.1h2.1l.3-2.4h-2.4V9.5c0-.7.2-1.2 1.2-1.2h1.3V6.1c-.2 0-1-.1-1.9-.1-1.9 0-3.1 1.1-3.1 3.2V11H8.8v2.4h2.1v6.1z" fill="#fff"/></svg>`;
+const IG_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" aria-label="Instagram"><defs><radialGradient id="igg" cx="30%" cy="107%" r="150%"><stop offset="0" stop-color="#fdf497"/><stop offset=".05" stop-color="#fdf497"/><stop offset=".45" stop-color="#fd5949"/><stop offset=".6" stop-color="#d6249f"/><stop offset=".9" stop-color="#285AEB"/></radialGradient></defs><rect width="24" height="24" rx="6" fill="url(#igg)"/><rect x="5.5" y="5.5" width="13" height="13" rx="4" fill="none" stroke="#fff" stroke-width="1.8"/><circle cx="12" cy="12" r="3.2" fill="none" stroke="#fff" stroke-width="1.8"/><circle cx="16.2" cy="7.8" r="1" fill="#fff"/></svg>`;
+const TT_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" aria-label="TikTok"><rect width="24" height="24" rx="6" fill="#000"/><path d="M15.6 5.5c.3 1.6 1.3 2.6 2.9 2.8v2.2c-1 0-2-.3-2.9-.9v4.6c0 2.6-2.1 4.3-4.4 4.3-2.4 0-4.2-1.9-4.2-4.2 0-2.6 2.3-4.5 4.9-4.1v2.3c-1.2-.3-2.5.5-2.5 1.8 0 1.1.9 1.9 1.9 1.9 1.1 0 1.9-.8 1.9-2.1V5.5z" fill="#fff"/></svg>`;
 function platformIcons(d) {
-  if (d.platform === "TikTok") return `<span class="platform-ico"><span class="ico tt">♪</span></span>`;
+  if (d.platform === "TikTok") return `<span class="platform-ico">${TT_SVG}</span>`;
   const m = d.media || "Instagram・Facebook";
-  return `<span class="platform-ico">${/Facebook/.test(m) ? '<span class="ico fb">f</span>' : ""}${/Instagram/.test(m) ? '<span class="ico ig">◎</span>' : ""}</span>`;
+  return `<span class="platform-ico">${/Facebook/.test(m) ? FB_SVG : ""}${/Instagram/.test(m) ? IG_SVG : ""}</span>`;
 }
+let SORT = "new";
 function renderList(q = "") {
   const list = S.briefs.filter((b) => !b.archived && (!q || JSON.stringify([b.name, b.d.client, b.d.product, b.d.platform, b.owner]).includes(q)));
+  if (SORT === "start") list.sort((a, c) => (a.d.start || "9").localeCompare(c.d.start || "9"));
   $("#main").innerHTML = `
-  <div class="toolbar"><h1 class="page">与件</h1><span style="flex:1"></span><button class="btn" id="newB">＋ 新規作成</button></div>
+  <div class="toolbar"><h1 class="page">与件</h1><span style="flex:1"></span><select id="sort" style="width:auto;padding:8px 12px"><option value="new">新規作成順</option><option value="start">配信開始順</option></select><button class="btn" id="newB" style="padding:10px 20px">${ic("plus")}新規作成</button></div>
   <div class="card search"><label>検索</label><input id="q" placeholder="与件名、商材名、クライアント名、担当者名、プラットフォームで検索..." value="${esc(q)}"></div>
-  <div class="card"><table class="list"><thead><tr><th>与件名</th><th>期間</th><th style="text-align:right">予算</th><th>Notes</th><th>オーディエンス設計</th><th>見積り</th><th>配信設計</th></tr></thead><tbody>
+  <div class="card listwrap"><table class="list"><thead><tr><th style="min-width:300px">与件名</th><th style="min-width:190px">期間</th><th style="text-align:right;min-width:130px">予算</th><th style="min-width:380px">Notes</th><th style="min-width:70px">編集</th><th style="min-width:240px">オーディエンス設計</th><th style="min-width:240px">見積り</th><th style="min-width:240px">配信設計</th></tr></thead><tbody>
   ${list.map((b) => `<tr>
     <td><div class="bname" data-open="${b.id}">${platformIcons(b.d)} ${esc(b.name)}</div>
       <div style="margin-top:8px;display:flex;gap:6px"><button class="btn ghost sm" data-open="${b.id}">詳細</button><button class="btn ghost sm" data-arch="${b.id}">アーカイブ</button></div></td>
-    <td class="small">${b.d.start ? `${showDT(b.d.start)}<br>〜<br>${showDT(b.d.end)}<br><span class="muted">${days(b.d)}日間</span>` : '<span class="muted">未設定</span>'}</td>
-    <td style="text-align:right;white-space:nowrap">${b.d.budget ? yen(b.d.budget) : '<span class="muted">—</span>'}</td>
-    <td>${b.notes.length ? `<div class="notebox"><span class="muted">${esc(b.notes.at(-1).at)}</span>\n${esc(b.notes.at(-1).text.slice(0, 160))}</div>` : '<span class="muted small">メモなし</span>'}</td>
-    <td><div class="mini"><button class="b-aud" data-act="aud" data-b="${b.id}">👥 オーディエンス設計</button>${b.audiences.slice(0, 3).map((a) => `<button class="b-aud" data-open-aud="${a.id}" data-b="${b.id}">${esc(a.name)}</button>`).join("")}</div></td>
-    <td><div class="mini"><button class="b-est" data-act="est" data-b="${b.id}">▦ 見積り</button>${b.estimates.slice(0, 3).map((a) => `<button class="b-est" data-open-est="${a.id}" data-b="${b.id}">${esc(a.name)}</button>`).join("")}</div></td>
-    <td><div class="mini"><button class="b-dlv" data-act="dlv" data-b="${b.id}">⊕ 配信設計</button>${b.deliveries.slice(0, 3).map((a) => `<button class="b-dlv" data-open-dlv="${a.id}" data-b="${b.id}">${esc(a.name)}</button>`).join("")}</div></td>
-  </tr>`).join("") || `<tr><td colspan="7"><div class="empty">与件がありません。「＋ 新規作成」から依頼メモを貼り付けてください。</div></td></tr>`}
+    <td><div style="display:flex;align-items:center;gap:10px"><div class="small" style="color:var(--ink2)">${b.d.start ? `${showDT(b.d.start)}<br>〜<br>${showDT(b.d.end)}<br><span class="muted">${days(b.d)}日間</span>` : '<span class="muted">未設定</span>'}</div><button class="editico" data-open="${b.id}">${ic("pen")}</button></div></td>
+    <td style="text-align:right;white-space:nowrap"><span style="font-size:15px">${b.d.budget ? yen(b.d.budget) : '<span class="muted">—</span>'}</span> <button class="editico" data-open="${b.id}">${ic("pen")}</button></td>
+    <td>${b.notes.length ? `<div class="notebox" style="width:340px"><span class="muted">${esc(b.notes.at(-1).at)}</span>\n${esc(b.notes.at(-1).text.slice(0, 160))}</div>` : '<span class="muted small">メモなし</span>'}</td>
+    <td><button class="editico" data-open="${b.id}" style="border:1px solid var(--line);border-radius:6px;padding:6px 8px">${ic("pen")}</button></td>
+    <td><div class="mini"><button class="b-aud" data-act="aud" data-b="${b.id}">${ic("users")}オーディエンス設計</button>${b.audiences.slice(0, 3).map((a) => `<button class="b-aud" data-open-aud="${a.id}" data-b="${b.id}">${ic("users")}${esc(a.name)}</button>`).join("")}</div></td>
+    <td><div class="mini"><button class="b-est" data-act="est" data-b="${b.id}">${ic("calc")}見積り</button>${b.estimates.slice(0, 3).map((a) => `<button class="b-est" data-open-est="${a.id}" data-b="${b.id}">${ic("calc")}${esc(a.name)}</button>`).join("")}</div></td>
+    <td><div class="mini"><button class="b-dlv" data-act="dlv" data-b="${b.id}">${ic("plusC")}配信設計</button>${b.deliveries.slice(0, 3).map((a) => `<button class="b-dlv" data-open-dlv="${a.id}" data-b="${b.id}">${ic("plusC")}${esc(a.name)}</button>`).join("")}</div></td>
+  </tr>`).join("") || `<tr><td colspan="8"><div class="empty">与件がありません。「＋ 新規作成」から依頼メモを貼り付けてください。</div></td></tr>`}
   </tbody></table></div>`;
   $("#newB").onclick = () => { const b = newBrief(); persist(); go(`#/brief/${b.id}`); };
+  $("#sort").value = SORT; $("#sort").onchange = (e) => { SORT = e.target.value; renderList($("#q").value); };
   const qi = $("#q"); qi.oninput = () => { const v = qi.value; renderList(v); const n = $("#q"); n.focus(); n.setSelectionRange(v.length, v.length); };
   $("#main").onclick = (e) => {
     const t = e.target.closest("button,[data-open]"); if (!t) return;
@@ -537,12 +571,12 @@ function renderBrief(id, { flash = [] } = {}) {
   const made = [...b.audiences.map((x) => ["aud", x]), ...b.estimates.map((x) => ["est", x]), ...b.deliveries.map((x) => ["dlv", x])];
   $("#main").innerHTML = `
   <div class="card">
-    <div class="dhead"><button class="back" onclick="go('#/briefs')">‹</button><h1><span id="bn">${esc(b.name)}</span> <button class="back" id="rn" title="名前を変更" style="font-size:16px">✎</button></h1>
-      <span class="muted small">担当者: ${esc(b.owner)}</span></div>
+    <div class="dhead"><button class="back" onclick="go('#/briefs')">${ic("chevL")}</button><h1><span id="bn">${esc(b.name)}</span><button class="editico" id="rn" title="名前を変更">${ic("pen", "width:20px;height:20px")}</button></h1>
+      <span class="owner">担当者: <b>${esc(b.owner)}</b>${ic("pen", "width:20px;height:20px")}</span></div>
     <div class="dgrid">
       <div class="dcol">
         <h3>Notes</h3>
-        <div class="noteinput"><textarea id="note" placeholder="依頼メール・チャット・依頼書・会話ログをそのまま貼り付けてください（最大10,000文字）&#10;追記で「予算は50万に変更」のように更新もできます" maxlength="10000"></textarea><button class="send" id="send" title="AI で読み取る" disabled>→</button></div>
+        <div class="noteinput"><textarea id="note" placeholder="依頼メール・チャット・依頼書・会話ログをそのまま貼り付けてください（最大10,000文字）&#10;追記で「予算は50万に変更」のように更新もできます" maxlength="10000"></textarea><button class="send" id="send" title="AI で読み取る" disabled>${ic("arrowR", "width:18px;height:18px")}</button></div>
         <div class="tmpl"><span class="muted tiny" style="align-self:center">記入例:</span>${Object.keys(TEMPLATES).map((k) => `<button data-t="${esc(k)}">${esc(k)}</button>`).join("")}</div>
         ${b.notes.slice().reverse().map((n) => `<div class="note"><div class="at">${esc(n.at)}</div>${esc(n.text)}</div>`).join("") || '<p class="muted small">まだメモがありません。依頼メモを貼り付けて → を押すと、AI が右の項目を埋めます。</p>'}
       </div>
@@ -552,11 +586,11 @@ function renderBrief(id, { flash = [] } = {}) {
       </div>
       <div class="dcol">
         <h3>Menu</h3>
-        <button class="menuBtn b-aud" id="mAud">👥 オーディエンス設計</button>
-        <button class="menuBtn b-est" id="mEst">▦ 見積り</button>
-        <button class="menuBtn b-dlv" id="mDlv">⊕ 配信設計 ${miss.length ? '<span title="不足項目があります" style="margin-left:auto;color:var(--orange)">⚠</span>' : ""}</button>
+        <button class="menuBtn b-aud" id="mAud">${ic("users")}オーディエンス設計</button>
+        <button class="menuBtn b-est" id="mEst">${ic("calc")}見積り</button>
+        <button class="menuBtn b-dlv" id="mDlv">${ic("plusC")}配信設計${miss.length ? `<span class="warn" title="不足項目があります">${ic("alert")}</span>` : ""}</button>
         ${miss.length ? `<div class="lack"><b>不足項目</b><ul>${miss.map((m) => `<li>${esc(m)}</li>`).join("")}</ul></div>` : ""}
-        <div class="made">${made.length ? made.map(([t, x]) => `<div class="madeitem"><button class="open ${t === "aud" ? "b-aud" : t === "est" ? "b-est" : "b-dlv"}" data-o="${t}" data-id="${x.id}">${t === "aud" ? "👥" : t === "est" ? "▦" : "⊕"} ${esc(x.name)}<span class="tiny muted" style="display:block">${esc(x.at)}</span></button><button class="del" data-del="${t}" data-id="${x.id}" title="削除">✕</button></div>`).join("")
+        <div class="made">${made.length ? made.map(([t, x]) => `<div class="madeitem"><button class="open ${t === "aud" ? "b-aud" : t === "est" ? "b-est" : "b-dlv"}" data-o="${t}" data-id="${x.id}">${ic(t === "aud" ? "users" : t === "est" ? "calc" : "plusC")}${esc(x.name)}<span class="tiny muted" style="display:block">${esc(x.at)}</span></button><button class="del" data-del="${t}" data-id="${x.id}" title="削除">${ic("x")}</button></div>`).join("")
           : '<p class="muted small">オーディエンス設計、見積りまたは配信設計を作成してください</p>'}</div>
       </div>
     </div>
@@ -582,19 +616,19 @@ function renderDetails(b, fl, miss) {
   const reqMiss = new Set(miss);
   tb.innerHTML = `
   ${ai && (ai.assumptions?.length || ai.missing?.length) ? `
-    <div class="aibox"><h4>✦ AI の読み取りメモ <span class="muted tiny" style="font-weight:400">${esc(ai.at || "")}${ai.engine === "rule" ? "・簡易読み取り" : ai.secs ? `・${ai.secs}秒` : ""}</span></h4>
+    <div class="aibox"><h4>${ic("sparkles")}AI の読み取りメモ <span class="muted tiny" style="font-weight:400">${esc(ai.at || "")}${ai.engine === "rule" ? "・簡易読み取り" : ai.secs ? `・${ai.secs}秒` : ""}</span></h4>
       ${ai.assumptions?.length ? `<div class="small"><b>補完・推定した項目</b></div><ul>${ai.assumptions.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
       ${ai.missing?.length ? `<div class="small"><b>依頼者に確認したいこと</b> <button class="btn ghost sm" id="cpq" style="margin-left:6px">確認メールの文面をコピー</button></div><ul>${ai.missing.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
     </div>` : ""}
-  <div class="sect"><div class="sh">▣ Details</div>
+  <div class="sect"><div class="sh">${ic("panel")}Details</div>
   ${FIELDS.map(([k, label]) => { const v = fieldView(b, k);
     const isMiss = (k === "budget" && reqMiss.has("予算")) || (k === "period" && reqMiss.has("期間")) || (k === "objective" && reqMiss.has("目的"));
     return `<div class="frow ${fl.has(k) ? "flash" : ""} ${isMiss ? "missing" : ""}" data-f="${k}"><div class="k">${label}</div><div class="v ${v ? "" : "blank"}" data-edit="${k}">${v || (isMiss ? "未入力（必須）" : "クリックして入力")}</div>
-      ${v && !["platform", "gender", "age", "margin"].includes(k) ? `<button class="x" data-clear="${k}" title="クリア">✕</button>` : "<span></span>"}</div>`; }).join("")}
+      ${v && !["platform", "gender", "age", "margin"].includes(k) ? `<button class="x" data-clear="${k}" title="クリア">${ic("x")}</button>` : "<span></span>"}</div>`; }).join("")}
   </div>
-  ${ai?.interests?.normal?.length ? `<div class="sect" style="margin-top:14px"><div class="sh">◎ ターゲット（AI 提案）</div><div style="padding:12px 16px">
+  ${ai?.interests?.normal?.length ? `<div class="sect" style="margin-top:14px"><div class="sh">${ic("target")}ターゲット（AI 提案）</div><div style="padding:12px 16px">
     <div class="small" style="margin-bottom:8px">${esc(b.d.targetSummary)}</div>${ai.interests.normal.map((i) => `<span class="chip">${esc(i)}</span>`).join("")}
-    <div style="margin-top:6px"><button class="btn sm" id="toAud">このままオーディエンス設計へ →</button></div></div></div>` : ""}`;
+    <div style="margin-top:6px"><button class="btn sm" id="toAud">このままオーディエンス設計へ${ic("arrowR")}</button></div></div></div>` : ""}`;
   tb.onclick = (e) => {
     const ed = e.target.closest("[data-edit]"), cl = e.target.closest("[data-clear]");
     if (cl) { clearField(b, cl.dataset.clear); persist(); renderBrief(b.id); return; }
@@ -650,18 +684,18 @@ let CTAB = "reg";
 function renderMediaTab(b) {
   const d = b.d, tt = d.platform === "TikTok";
   const cr = S.creatives;
-  $("#tabbody").innerHTML = `<div class="sect"><div class="sh">⊕ ${esc(d.platform)} 設定</div><div style="padding:14px 18px">
+  $("#tabbody").innerHTML = `<div class="sect"><div class="sh">${ic("plusC")}${esc(d.platform)} 設定</div><div style="padding:14px 18px">
     <span class="fl" style="margin-top:0">${esc(d.platform)}広告アカウント</span>
     <select id="acc"><option value="">選択してください</option><option ${b.meta.account === SAMPLE_ACCOUNT[d.platform] ? "selected" : ""}>${esc(SAMPLE_ACCOUNT[d.platform])}</option></select>
-    <div class="tiny muted" style="margin-top:4px">🔒 トライアルでは実際の広告アカウントは連携できません（サンプルアカウントで設計できます）</div>
+    <div class="tiny muted" style="margin-top:4px">${ic("lock", "width:12px;height:12px")} トライアルでは実際の広告アカウントは連携できません（サンプルアカウントで設計できます）</div>
     ${tt ? `<span class="fl">アイデンティティ</span><select id="page"><option>${esc((d.client || "ブランド") + "（サンプル）")}</option></select>`
       : `<span class="fl">Facebookページ</span><select id="page"><option value="">選択してください</option><option ${b.meta.page ? "selected" : ""}>${esc(b.meta.page || ((d.client || "ブランド") + "（サンプル）"))}</option></select>`}
-    <span class="fl">クリエイティブ <span class="muted small" style="font-weight:400">${b.meta.creatives.length}件選択中</span></span>
+    <span class="fl">クリエイティブ <span class="cnt">${b.meta.creatives.length}</span></span>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="seg">
       <button data-ct="reg" class="${CTAB === "reg" ? "on" : ""}">登録クリエイティブ</button><button data-ct="fb" class="${CTAB === "fb" ? "on" : ""}">${tt ? "TikTok投稿" : "Facebook投稿"}</button><button data-ct="ig" class="${CTAB === "ig" ? "on" : ""}">${tt ? "Spark Ads" : "Instagram投稿"}</button></div>
-      <span style="flex:1"></span><button class="btn sm" id="newC">＋ 新規作成</button></div>
-    ${CTAB === "reg" ? `<div class="cgrid">${cr.map((c) => `<div class="ccard ${b.meta.creatives.includes(c.id) ? "on" : ""}" data-c="${c.id}"><img src="${c.src}" alt=""><span class="ck">✓</span><div class="cn">${c.type === "動画" ? "▶ " : ""}${esc(c.name)}</div></div>`).join("")}</div>`
-      : `<div class="empty small">🔒 既存の投稿を広告に使う機能は、正式版で媒体と連携するとご利用いただけます。</div>`}
+      <span style="flex:1"></span><button class="btn" id="newC">${ic("plus")}新規作成</button></div>
+    ${CTAB === "reg" ? `<div class="cgrid">${cr.map((c) => `<div class="ccard ${b.meta.creatives.includes(c.id) ? "on" : ""}" data-c="${c.id}"><img src="${c.src}" alt=""><span class="ck">${ic("check")}</span><div class="cn">${c.type === "動画" ? "▶ " : ""}${esc(c.name)}</div></div>`).join("")}</div>`
+      : `<div class="empty small">${ic("lock")} 既存の投稿を広告に使う機能は、正式版で媒体と連携するとご利用いただけます。</div>`}
   </div></div>`;
   $("#acc").onchange = (e) => { b.meta.account = e.target.value; persist(); renderBrief(b.id); };
   $("#page").onchange = (e) => { b.meta.page = e.target.value; persist(); renderBrief(b.id); };
@@ -730,37 +764,37 @@ function makeAudience(b) {
 function openAudience(b, aid) {
   let a = aid ? structuredClone(b.audiences.find((x) => x.id === aid)) : makeAudience(b);
   if (!b.ai?.interests?.normal?.length && !aid) toast("先に依頼メモを読み取ると、興味・関心が自動で入ります", 3500);
-  const isNew = !aid;
-  const m = modal(`<div class="mh"><h2>オーディエンス設計</h2><button class="close">✕</button></div><div class="mb" id="ab"></div>
-    <div class="mf"><span class="muted small" style="margin-right:auto;align-self:center">「この案を使う」で選んだ案が見積り・配信設計に使われます</span>
-    <button class="btn ghost" id="aSave">保存</button><button class="btn ghost" id="aEst" style="color:var(--blue)">▦ 見積りを作成</button><button class="btn" id="aDlv">⊕ 配信設計を作成</button></div>`);
+  const isNew = !aid; const EDIT = {};
+  const m = modal(`<div class="mh"><h2>オーディエンス設計</h2><button class="close">${ic("x")}</button></div><div class="mb" id="ab"></div>
+    <div class="mf"><span class="muted small" style="margin-right:auto;align-self:center">クリックで選んだ案（オレンジ枠）が見積り・配信設計に使われます</span>
+    <button class="btn ghost" id="aSave">保存</button><button class="btn ghost" id="aEst" style="color:var(--blue)">${ic("calc")}見積りを作成</button><button class="btn" id="aDlv">${ic("plusC")}配信設計を作成</button></div>`);
   const body = m.querySelector("#ab");
   const draw = () => {
     computeAud(a);
-    body.innerHTML = `<div class="titleedit"><input id="an" value="${esc(a.name)}"> ✎</div>
-      <div class="kv4"><div><div class="k">媒体</div><div class="v">${esc(a.media)}</div></div><div><div class="k">性別</div><div class="v">${esc(a.gender)}</div></div>
+    body.innerHTML = `<div class="titleedit"><span>${esc(a.name)}</span><button class="editico" id="anr" title="名前を変更">${ic("pen")}</button></div>
+      <div class="kv4"><div><div class="k">媒体</div><div class="v" style="display:flex;align-items:center;gap:6px">${platformIcons({ platform: a.media === "TikTok" ? "TikTok" : "Meta", media: a.media })}${esc(a.media)}</div></div><div><div class="k">性別</div><div class="v">${esc(a.gender)}</div></div>
       <div><div class="k">年代</div><div class="v">${a.ageMin}〜${a.ageMax >= 65 ? "65+" : a.ageMax}歳</div></div><div><div class="k">地域</div><div class="v">${esc(a.regions.join("、") === "日本" ? "日本全国" : a.regions.join("、"))}</div></div></div>
       <div class="total"><span class="muted">全体サイズ</span><b>${range(a.base).map(num).join("〜")}</b></div>
       <div class="plans">${[["narrow", "狭い"], ["normal", "普通"], ["wide", "広い"]].map(([k, l]) => { const p = a.plans[k]; return `
         <div class="plan ${a.chosen === k ? "on" : ""}" data-k="${k}">${a.chosen === k ? '<span class="use">この案を使う</span>' : ""}
-          <div class="ph"><span>${l}</span><span>${p.interests.length ? (p.pct * 100).toFixed(1) + "%" : "—"}</span></div>
+          <div class="ph"><span>${l}</span><span>${p.interests.length ? (p.pct * 100).toFixed(1) + "%" : "—"}<button class="editico" data-ed="${k}" title="興味・関心を編集">${ic("pen")}</button></span></div>
           <div class="sz">${p.interests.length ? range(p.size).map(num).join("〜") : "インタレストなし（全体）"}</div>
           <div class="bar"><i style="width:${p.interests.length ? Math.max(3, p.pct * 100 / .62) : 100}%"></i></div>
           <div class="muted small">ターゲット</div><div class="small" style="margin-bottom:8px">${p.interests.length}個のインタレストを使用</div>
-          <div>${p.interests.map((i, n) => `<span class="chip">${esc(i)}<button data-rm="${k}:${n}" title="削除">✕</button></span>`).join("")}</div>
-          <div class="addint"><input placeholder="興味・関心を追加" data-add="${k}" list="intlist"><button class="btn ghost sm" data-addb="${k}">追加</button></div>
-          ${a.chosen !== k ? `<button class="btn ghost sm" style="margin-top:10px" data-use="${k}">この案を使う</button>` : ""}
+          <div>${p.interests.map((i, n) => `<span class="chip">${esc(i)}${EDIT[k] ? `<button data-rm="${k}:${n}" title="削除">×</button>` : ""}</span>`).join("")}</div>
+          ${EDIT[k] ? `<div class="addint"><input placeholder="利用者層、興味・関心、行動を追加" data-add="${k}" list="intlist"><button class="btn ghost sm" data-addb="${k}">追加</button><button class="btn sm" data-ed="${k}">完了</button></div>` : ""}
         </div>`; }).join("")}</div>
       <datalist id="intlist">${[...new Set([...a.plans.wide.interests, ...(b.ai?.interests?.wide || [])])].map((i) => `<option value="${esc(i)}">`).join("")}</datalist>
       <p class="muted tiny" style="margin-top:12px">※ トライアルの推定サイズは HAWK の簡易モデルによる目安です。正式版では媒体の API から推定オーディエンスを取得します。</p>`;
   };
   draw();
-  body.oninput = (e) => { if (e.target.id === "an") a.name = e.target.value; };
   body.onclick = (e) => {
     const t = e.target;
     if (t.dataset.rm) { const [k, n] = t.dataset.rm.split(":"); a.plans[k].interests.splice(+n, 1); draw(); return; }
     if (t.dataset.addb) { const inp = body.querySelector(`[data-add="${t.dataset.addb}"]`); const v = inp.value.trim(); if (v) { a.plans[t.dataset.addb].interests.push(v); draw(); } return; }
-    if (t.dataset.use) { a.chosen = t.dataset.use; draw(); return; }
+    const ed = t.closest("[data-ed]"); if (ed) { EDIT[ed.dataset.ed] = !EDIT[ed.dataset.ed]; draw(); return; }
+    if (t.closest("#anr")) { const v = prompt("オーディエンス設計の名前", a.name); if (v && v.trim()) { a.name = v.trim(); draw(); } return; }
+    const pl = t.closest(".plan"); if (pl && !t.closest("input,button")) { a.chosen = pl.dataset.k; draw(); }
   };
   body.onkeydown = (e) => { if (e.target.dataset.add && e.key === "Enter") { const v = e.target.value.trim(); if (v) { a.plans[e.target.dataset.add].interests.push(v); draw(); body.querySelector(`[data-add="${e.target.dataset.add}"]`)?.focus(); } } };
   const save = () => { const i = b.audiences.findIndex((x) => x.id === a.id); if (i >= 0) b.audiences[i] = a; else b.audiences.unshift(a); persist(); return a; };
@@ -818,14 +852,15 @@ function openEstimate(b, eid, audId) {
   let e = eid ? structuredClone(b.estimates.find((x) => x.id === eid)) : makeEstimate(b, audId);
   const aud = b.audiences.find((x) => x.id === e.audId);
   const tt = d.platform === "TikTok";
-  const m = modal(`<div class="mh"><h2>見積り</h2><button class="close">✕</button></div><div class="mb" id="eb"></div>
-    <div class="mf"><button class="btn ghost" id="eSave">保存</button><button class="btn" id="eDlv">⊕ 配信設計を作成</button></div>`);
+  const m = modal(`<div class="mh"><h2>見積り</h2><button class="close">${ic("x")}</button></div><div class="mb" id="eb"></div>
+    <div class="mf"><button class="btn ghost" id="eSave">保存</button><button class="btn" id="eDlv">${ic("plusC")}配信設計を作成</button></div>`);
   const body = m.querySelector("#eb");
   const row = (label, k, a, x, kind) => {
     if (!a) return `<td colspan="3" class="muted" style="text-align:center">-</td>`;
     const w = (v, max) => Math.max(4, Math.min(100, v / max * 100));
     const cell = (v, max) => `<td class="n"><i style="width:${w(v, max)}%"></i><span>${num(v)}</span></td>`;
-    const inp = (f, v, step) => `<input type="number" step="${step}" data-f="${kind}.${f}" value="${v}">`;
+    const inp = (f, v, step) => EF === `${kind}.${f}` ? `<input type="number" step="${step}" data-f="${kind}.${f}" value="${v}">`
+      : `<span class="ev" data-ef="${kind}.${f}" title="クリックして編集">${f === "cpm" ? Number(v).toFixed(2) : v}${ic("pen", "width:13px;height:13px;color:var(--faint);margin-left:4px")}</span>`;
     switch (k) {
       case "imp": return `${cell(a.imp, a.imp)}<td>-</td><td><span class="u">CPM</span>¥${inp("cpm", x.cpm, "0.01")}</td>`;
       case "reach": return `${cell(a.reach, a.imp)}<td><span class="u">FQ</span>${inp("fq", +a.fq.toFixed(2), "0.01")}</td><td>¥${a.rcost.toFixed(2)}</td>`;
@@ -834,6 +869,7 @@ function openEstimate(b, eid, audId) {
       case "cv": return a.cvn != null ? `${cell(a.cvn, a.imp)}<td>${inp("cv", x.cv, "0.1")}%</td><td>¥${a.cvc.toFixed(2)}</td>` : `<td class="muted" style="text-align:center">-</td><td>-</td><td>-</td>`;
     }
   };
+  let EF = "";
   const draw = () => {
     const V = calc(e.gross, e.video, aud), I = e.image ? calc(e.gross, e.image, aud) : null;
     const warn = [];
@@ -841,16 +877,16 @@ function openEstimate(b, eid, audId) {
     if (V.capped) warn.push("推定リーチがオーディエンスサイズを超えるため、フリークエンシーを自動で引き上げました");
     const kpi = d.kpiType && d.kpiValue ? (() => { const est = d.kpiType === "CPM" ? V.cpm : d.kpiType === "CPC" ? V.cpc : d.kpiType === "CPV" ? V.tpc : null; return est ? `<span class="kpicmp ${est <= d.kpiValue ? "ok" : "ng"}">KPI ${d.kpiType} ¥${num(d.kpiValue)} に対し 見積り ¥${est.toFixed(0)}</span>` : ""; })() : "";
     const refs = refCases(b);
-    body.innerHTML = `<div class="titleedit"><input id="en" value="${esc(e.name)}"> ✎</div>
+    body.innerHTML = `<div class="titleedit"><span>${esc(e.name)}</span><button class="editico" id="enr" title="名前を変更">${ic("pen")}</button></div>
       <div class="muted">マージン率: ${Number(e.margin).toFixed(2)}%（マージン）　予算: ${yen(e.gross)}（媒体金額 ${yen(e.gross * (1 - e.margin / 100))}）${aud ? `　オーディエンス: ${esc(aud.name)}（${({ narrow: "狭い", normal: "普通", wide: "広い" })[aud.chosen]}）` : ""}</div>
-      <div style="display:flex;align-items:center;margin:20px 0 8px"><b>自社グロスでの見積り結果</b>${kpi}<span style="flex:1"></span><button class="btn ghost sm" id="cp1">⧉ コピー</button></div>
+      <div style="display:flex;align-items:center;margin:20px 0 8px"><b>自社グロスでの見積り結果</b>${kpi}<span style="flex:1"></span><button class="btn ghost sm" id="cp1" title="コピー">${ic("copy")}</button></div>
       <div class="card esttab-wrap" style="padding:10px 14px"><table class="esttab"><thead>
         <tr><th></th><th class="grp" colspan="3">${tt ? "動画（TikTok）" : "動画"}</th><th class="gap"></th>${tt ? "" : '<th class="grp" colspan="3">静止画</th>'}</tr>
         <tr><th></th><th>数</th><th>率</th><th>単価</th><th></th>${tt ? "" : "<th>数</th><th>率</th><th>単価</th>"}</tr></thead><tbody>
         ${[["imp", "imp"], ["reach", "リーチ"], ["clk", "クリック"], ["tp", tt ? "6秒視聴" : "ThruPlay"], ["cv", "完全視聴"]].map(([k, l]) =>
           `<tr><td class="m">${l}</td>${row(l, k, V, e.video, "video")}<td></td>${tt ? "" : row(l, k, I, e.image, "image")}</tr>`).join("")}
-      </tbody></table>${warn.map((w) => `<div class="warnline">⚠ ${esc(w)}</div>`).join("")}</div>
-      <div style="display:flex;align-items:center;margin:24px 0 4px"><b>動画の参考案件</b><button class="btn ghost sm" style="margin-left:10px" id="redo">選び直す</button><span style="flex:1"></span><button class="btn ghost sm" id="cp2">⧉ コピー</button></div>
+      </tbody></table>${warn.map((w) => `<div class="warnline">${ic("alert")} ${esc(w)}</div>`).join("")}</div>
+      <div style="display:flex;align-items:center;margin:24px 0 4px"><b>動画の参考案件</b><button class="btn ghost sm" style="margin-left:10px" id="redo">選び直す</button><span style="flex:1"></span><button class="btn ghost sm" id="cp2" title="コピー">${ic("copy")}</button></div>
       <div class="muted small" style="margin-bottom:6px">金額はメディア数値です。※ トライアルでは架空のサンプル案件を表示しています。正式版では自社アカウントの過去実績（不足分は FreakOut の匿名化カテゴリ平均）から算出します。</div>
       <div class="refs-wrap"><table class="refs"><thead><tr><th>アカウント / キャンペーン</th><th>目的</th><th>配信金額</th><th>imp</th><th>クリック</th><th>リーチ</th><th>ThruPlay</th><th>視聴完了</th></tr></thead><tbody>
       ${refs.map((r) => `<tr><td><b>${esc(r.name)}</b><span class="s">${esc(r.acct)}</span></td><td>${esc(r.obj)}</td><td>${yen(r.spend)}</td><td>${num(r.imp)}<span class="s">単価: ¥${(r.spend / r.imp * 1000).toFixed(0)}</span></td>
@@ -867,16 +903,21 @@ function openEstimate(b, eid, audId) {
       copyText(L.map((r) => r.map((c) => typeof c === "number" ? (c > 100 ? Math.round(c) : c.toFixed(2)) : c).join("\t")).join("\n"));
     };
     body.querySelector("#cp2").onclick = () => copyText(["アカウント/キャンペーン\t目的\t配信金額\timp\tクリック\tリーチ", ...refs.map((r) => [r.name, r.obj, r.spend, Math.round(r.imp), Math.round(r.clk), Math.round(r.reach)].join("\t"))].join("\n"));
-    body.querySelector("#redo").onclick = () => toast("🔒 参考案件の選び直しは正式版でご利用いただけます（自社アカウントの実績から選べます）", 3500);
+    body.querySelector("#redo").onclick = () => toast("参考案件の選び直しは正式版でご利用いただけます（自社アカウントの実績から選べます）", 3500);
   };
   draw();
-  body.oninput = (ev) => { if (ev.target.id === "en") e.name = ev.target.value; };
-  body.onchange = (ev) => {
-    const f = ev.target.dataset.f; if (!f) return; const [kind, k] = f.split("."); let v = +ev.target.value;
-    if (!(v > 0)) return draw();
-    if (k === "fq" && v > 1000) v = 1000; if (k === "ctr" && v > 100) v = 100;
-    e[kind][k] = v; draw();
+  body.addEventListener("click", (ev) => {
+    const t = ev.target.closest("[data-ef],#enr"); if (!t) return;
+    if (t.id === "enr") { const v = prompt("見積りの名前", e.name); if (v && v.trim()) { e.name = v.trim(); draw(); } return; }
+    EF = t.dataset.ef; draw(); const inp = body.querySelector(`input[data-f="${EF}"]`); inp?.focus(); inp?.select();
+  });
+  const commit = (el) => {
+    const f = el.dataset.f; if (!f) return; const [kind, k] = f.split("."); let v = +el.value; EF = "";
+    if (v > 0) { if (k === "fq" && v > 1000) v = 1000; if (k === "ctr" && v > 100) v = 100; e[kind][k] = v; }
+    draw();
   };
+  body.addEventListener("keydown", (ev) => { if (ev.target.dataset.f && ev.key === "Enter") commit(ev.target); if (ev.key === "Escape" && EF) { EF = ""; draw(); ev.stopPropagation(); } });
+  body.addEventListener("focusout", (ev) => { if (ev.target.dataset.f && EF) commit(ev.target); });
   const save = () => { const i = b.estimates.findIndex((x) => x.id === e.id); if (i >= 0) b.estimates[i] = e; else b.estimates.unshift(e); persist(); };
   m.querySelector("#eSave").onclick = () => { save(); closeModal(m); toast("見積りを保存しました"); refresh(b); };
   m.querySelector("#eDlv").onclick = () => { save(); closeModal(m); refresh(b); openDelivery(b, null, e.audId, e.id); };
@@ -916,15 +957,15 @@ function openDelivery(b, did, audId) {
   if (!did && (lack.includes("予算") || lack.includes("期間"))) { toast(`配信設計には ${lack.join("・")} が必要です`, 3500); if (!location.hash.includes(b.id)) go(`#/brief/${b.id}`); return; }
   let x = did ? structuredClone(b.deliveries.find((y) => y.id === did)) : makeDelivery(b, audId);
   let edit = false;
-  const m = modal(`<div class="mh"><h2>${platformIcons(d)} 配信設計</h2><button class="btn" id="mode">編集モードに切替</button><button class="close">✕</button></div><div class="mb" id="db"></div>
-    <div class="mf"><span class="muted small" style="margin-right:auto;align-self:center" id="dmsg"></span><button class="btn ghost" id="dSave">保存</button><button class="btn" id="dGo">連携に進む →</button></div>`);
+  const m = modal(`<div class="mh"><h2>${platformIcons(d)} 配信設計</h2><button class="btn" id="mode">編集モードに切替</button><button class="close">${ic("x")}</button></div><div class="mb" id="db"></div>
+    <div class="mf"><span class="muted small" style="margin-right:auto;align-self:center" id="dmsg"></span><button class="btn ghost" id="dSave">保存</button><button class="btn" id="dGo">連携に進む${ic("arrowR")}</button></div>`);
   const body = m.querySelector("#db");
   const nAds = () => x.adsets.reduce((n, s) => n + s.ads.length, 0);
   const mgMedia = (v) => yen(v * (1 - x.margin / 100));
   const F = (k, v, cls = "") => `<div class="${cls}"><div class="k">${k}</div><div class="v">${v || '<span class="muted">—</span>'}</div></div>`;
   const I = (path, v, type = "text", cls = "") => `<div class="${cls}"><label class="k">${path.label}</label><input data-p="${path.p}" type="${type}" value="${esc(v ?? "")}"></div>`;
   const Sel = (label, p, opts, v, cls = "") => `<div class="${cls}"><label class="k">${label}</label><select data-p="${p}">${opts.map((o) => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>`;
-  const chips = (arr, p) => `${arr.map((v, i) => `<span class="chip">${esc(v)}${edit ? `<button data-rmc="${p}:${i}">✕</button>` : ""}</span>`).join("") || '<span class="muted">なし</span>'}${edit ? `<div class="addint" style="max-width:520px"><input data-addc="${p}" placeholder="追加して Enter"></div>` : ""}`;
+  const chips = (arr, p) => `${arr.map((v, i) => `<span class="chip">${esc(v)}${edit ? `<button data-rmc="${p}:${i}">×</button>` : ""}</span>`).join("") || '<span class="muted">なし</span>'}${edit ? `<div class="addint" style="max-width:520px"><input data-addc="${p}" placeholder="追加して Enter"></div>` : ""}`;
   const draw = () => {
     m.querySelector("#mode").textContent = edit ? "閲覧モードに切替" : "編集モードに切替";
     const c = x.campaign;
@@ -937,11 +978,11 @@ function openDelivery(b, did, audId) {
             ${tt ? "" : Sel("特別な広告カテゴリ", "campaign.special", ["なし", "住宅", "雇用", "金融商品とサービス", "社会問題、選挙または政治"], c.special)}
             <div class="w2"><label class="k">&nbsp;</label><label><input type="checkbox" data-p="campaign.equal" ${c.equal ? "checked" : ""} style="width:auto"> 全ての広告セットに予算を均等に割り当てる</label></div></div>`
         : `<div class="nm">${esc(c.name)}</div><div class="fgrid">${F("キャンペーン目的", esc(c.objective))}${F("予算", `${yen(c.budget)}<span class="s">メディア通算予算: ${mgMedia(c.budget)}</span>`)}${F("", `<label class="muted small"><input type="checkbox" disabled ${c.equal ? "checked" : ""} style="width:auto"> 全ての広告セットに予算を均等に割り当てる</label>`)}${tt ? "" : F("特別な広告カテゴリ", esc(c.special))}</div>`}
-        ${c.special && c.special !== "なし" ? `<div class="warnline">⚠ 特別な広告カテゴリ「${esc(c.special)}」では、年齢・性別・詳細ターゲットの指定が制限されます（年齢18〜65+・性別すべてに固定）</div>` : ""}
+        ${c.special && c.special !== "なし" ? `<div class="warnline">${ic("alert")} 特別な広告カテゴリ「${esc(c.special)}」では、年齢・性別・詳細ターゲットの指定が制限されます（年齢18〜65+・性別すべてに固定）</div>` : ""}
       </div>
       ${x.adsets.map((s, si) => `
-      <div class="lvl adset">${edit ? `<div class="tools"><button class="btn ghost sm" data-dup="${si}">⧉ 複製</button><button class="btn ghost sm" data-split="${si}">分割</button>${x.adsets.length > 1 ? `<button class="btn danger sm" data-dels="${si}">削除</button>` : ""}</div>` : ""}
-        <span class="pill adset">広告セット</span> <span class="muted small" style="float:${edit ? "none" : "right"}">👥 推定オーディエンス ${(() => { const a = b.audiences.find((y) => y.id === x.audId); return a ? range(a.plans[a.chosen].size).map(num).join("〜") : "—"; })()}</span>
+      <div class="lvl adset">${edit ? `<div class="tools"><button class="btn ghost sm" data-dup="${si}">${ic("copy")}複製</button><button class="btn ghost sm" data-split="${si}">分割</button>${x.adsets.length > 1 ? `<button class="btn danger sm" data-dels="${si}">${ic("trash")}削除</button>` : ""}</div>` : ""}
+        <span class="pill adset">広告セット</span> <span class="muted small" style="float:${edit ? "none" : "right"}">${ic("users")} 推定オーディエンス ${(() => { const a = b.audiences.find((y) => y.id === x.audId); return a ? range(a.plans[a.chosen].size).map(num).join("〜") : "—"; })()}</span>
         ${edit ? `<div class="fgrid" style="margin-top:10px">
             ${I({ label: "広告セット名", p: `adsets.${si}.name` }, s.name, "text", "w2")}${I({ label: "日予算（グロス）", p: `adsets.${si}.daily` }, s.daily, "number")}${I({ label: "パフォーマンスの目標", p: `adsets.${si}.goal` }, s.goal)}
             ${Sel("入札戦略", `adsets.${si}.bidStrategy`, tt ? ["最大"] : ["最大数量", "単価の目標", "入札価格上限"], s.bidStrategy)}${tt ? "" : I({ label: "入札価格上限（円）", p: `adsets.${si}.bidCap` }, s.bidCap, "number")}
@@ -960,7 +1001,7 @@ function openDelivery(b, did, audId) {
             ${F(tt ? "言語" : "配信面", esc(tt ? s.language : s.surface))}${F("配置", s.placements.map(esc).join(", "), "w2")}${F("地域", `${s.regionMode === "除外" ? "除外: " : ""}${s.regions.map(esc).join("、")}`)}
             ${F("詳細ターゲット設定", s.interests.map((i) => `<span class="chip">${esc(i)}</span>`).join("") || "", "w4")}</div>`}
         ${s.ads.map((a, ai) => `
-        <div class="lvl ad" style="margin-top:12px">${edit ? `<div class="tools"><button class="btn ghost sm" data-dupa="${si}:${ai}">⧉ 複製</button>${s.ads.length > 1 ? `<button class="btn danger sm" data-dela="${si}:${ai}">削除</button>` : ""}</div>` : ""}
+        <div class="lvl ad" style="margin-top:12px">${edit ? `<div class="tools"><button class="btn ghost sm" data-dupa="${si}:${ai}">${ic("copy")}複製</button>${s.ads.length > 1 ? `<button class="btn danger sm" data-dela="${si}:${ai}">${ic("trash")}削除</button>` : ""}</div>` : ""}
           <span class="pill ad">広告</span>
           ${edit ? `<div class="fgrid" style="margin-top:10px">${I({ label: "広告名 *", p: `adsets.${si}.ads.${ai}.name` }, a.name, "text", "w2")}${Sel("CTA", `adsets.${si}.ads.${ai}.cta`, CTAS, a.cta)}${I({ label: tt ? "アイデンティティ" : "Facebookページ", p: `adsets.${si}.ads.${ai}.page` }, a.page)}
               <div class="w4"><label class="k">クリエイティブ選択 *</label><div class="picker">${S.creatives.map((cr) => `<img src="${cr.src}" title="${esc(cr.name)}" class="${a.creative === cr.id ? "on" : ""}" data-pick="${si}:${ai}:${cr.id}">`).join("")}</div></div>
@@ -974,7 +1015,7 @@ function openDelivery(b, did, audId) {
       <div class="fixed">HAWK が固定する設定: 購入タイプ＝オークション、予算戦略＝広告セット予算、A/Bテスト＝OFF、ダイナミッククリエイティブ＝OFF、配置＝手動</div>`;
     const issues = [];
     x.adsets.forEach((s) => s.ads.forEach((a) => { if (!a.creative) issues.push("クリエイティブ未選択の広告があります"); if (!a.lp) issues.push("LP の URL が未入力の広告があります"); }));
-    m.querySelector("#dmsg").innerHTML = [...new Set(issues)].map((t) => `⚠ ${esc(t)}`).join("　");
+    m.querySelector("#dmsg").innerHTML = [...new Set(issues)].map((t) => `${ic("alert")} ${esc(t)}`).join("　");
   };
   const setP = (p, v) => { const ks = p.split("."); let o = x; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; const last = ks.at(-1); o[last] = typeof o[last] === "number" ? (+v || 0) : v; };
   const getP = (p) => p.split(".").reduce((o, k) => o[k], x);
@@ -1030,8 +1071,8 @@ function renderConfirm(bid, did) {
   const tt = b.d.platform === "TikTok", P = tt ? "TikTok" : "Meta", c = x.campaign;
   const T = (rows) => `<table class="ctable">${rows.filter(Boolean).map(([k, v]) => `<tr><th>${k}</th><td>${v || '<span class="muted">—</span>'}</td></tr>`).join("")}</table>`;
   $("#main").innerHTML = `<div class="confirm">
-    <div class="toolbar no-print"><button class="btn ghost" onclick="go('#/brief/${b.id}')">‹ 与件に戻る</button><span style="flex:1"></span>
-      <button class="btn ghost" id="share">🔗 リンクをコピー</button><button class="btn ghost" onclick="window.print()">🖨 印刷 / PDF</button></div>
+    <div class="toolbar no-print"><button class="btn ghost" onclick="go('#/brief/${b.id}')">${ic("chevL")}与件に戻る</button><span style="flex:1"></span>
+      <button class="btn ghost" id="share">${ic("link")}リンクをコピー</button><button class="btn ghost" onclick="window.print()">${ic("printer")}印刷 / PDF</button></div>
     <h1 class="page" style="margin-bottom:4px">${platformIcons(b.d)} ${esc(x.name)}</h1><p class="muted" style="margin-top:0">${P}連携確認 ・ ${esc(x.at)} 作成</p>
     <div class="card" style="margin-bottom:14px"><div class="chead">基本設定</div>${T([["広告アカウント", esc(x.account)], ["マージン", `代理店 -　自社 ${Number(x.margin).toFixed(2)}%`]])}</div>
     <div class="card" style="margin-bottom:14px"><div class="chead"><span class="pill camp">キャンペーン</span> ${esc(c.name)}</div>${T([["キャンペーン目的", esc(c.objective)], ["予算（通算）", `${yen(c.budget)}（メディア ${yen(c.budget * (1 - x.margin / 100))}）`], ["予算配分", c.equal ? "全ての広告セットに均等" : "広告セット予算"], !tt && ["特別な広告カテゴリ", esc(c.special)], ["購入タイプ", "オークション（固定）"]])}</div>
@@ -1048,14 +1089,14 @@ function renderConfirm(bid, did) {
         [tt ? "アイデンティティ" : "Facebookページ", esc(a.page)], ["広告テキスト", esc(a.text)], ["ランディングページURL", a.lp ? esc(a.lp) : '<span style="color:var(--red)">未入力</span>'],
         ["CTA", esc(a.cta)], !tt && ["見出し", esc(a.headline)], !tt && ["説明", esc(a.description)]])}</div>`).join("")}`).join("")}
     <div class="offer">
-      <h3>🎁 ${fmtDeadline(ME.trial.offerDeadline)}までのお申込みで、1ヵ月無料</h3>
+      <h3>${ic("gift", "width:20px;height:20px")}${fmtDeadline(ME.trial.offerDeadline)}までのお申込みで、1ヵ月無料</h3>
       <div>トライアルでは${P}への連携はできません。正式にお申込みいただくと、この配信設計をそのまま${P}に作成できます（キャンペーンは OFF の状態で作成され、確認後に配信開始）。</div>
       <div>お申込み時にクーポンコードをお伝えください：</div>
       <div class="code"><span id="cpn">${esc(ME.trial.coupon)}</span><button class="btn ghost sm" id="cpc">コピー</button></div>
       <div style="margin-top:8px"><button class="btn" id="apply">本申込みについて見る</button></div>
     </div>
     <div class="card linkbox"><label><input type="checkbox" id="ok"> 上記の設定内容で${P}に連携することを確認しました</label>
-      <button class="btn lockbtn" id="link" style="padding:12px 40px;font-size:16px;opacity:.55">${P}に連携</button>
+      <button class="btn lockbtn" id="link">${P}に連携</button>
       <div class="muted tiny" style="margin-top:8px">トライアル期間中は連携ボタンを押せません</div></div>
   </div>`;
   $("#ok").onchange = () => toast("トライアルでは連携できません。下のボタンから本申込みについてご確認ください", 3200);
@@ -1066,8 +1107,8 @@ function renderConfirm(bid, did) {
   S.seen.confirm = true; persist(); guideUpdate();
 }
 function openOffer(P) {
-  modal(`<div class="mh"><h2>HAWK 本申込みのご案内</h2><button class="close">✕</button></div><div class="mb">
-    <div class="offer" style="margin-top:0"><h3>🎁 ${fmtDeadline(ME.trial.offerDeadline)}までのお申込みで 1ヵ月無料</h3><div class="code">${esc(ME.trial.coupon)}</div></div>
+  modal(`<div class="mh"><h2>HAWK 本申込みのご案内</h2><button class="close">${ic("x")}</button></div><div class="mb">
+    <div class="offer" style="margin-top:0"><h3>${ic("gift", "width:20px;height:20px")}${fmtDeadline(ME.trial.offerDeadline)}までのお申込みで 1ヵ月無料</h3><div class="code">${esc(ME.trial.coupon)}</div></div>
     <ol style="padding-left:20px;line-height:2">
       <li><b>お申込み</b>：申込書と利用規約をご確認のうえ、ご提出ください（担当者からお送りします）</li>
       <li><b>アカウント発行</b>：IO 締結後、正式なワークスペースを発行します</li>
@@ -1084,7 +1125,7 @@ function openOffer(P) {
 // =====================================================================
 function renderCreatives(filter = "すべて") {
   const list = S.creatives.filter((c) => filter === "すべて" || c.platform === filter || c.type === filter);
-  $("#main").innerHTML = `<div class="toolbar"><h1 class="page">クリエイティブ</h1><span style="flex:1"></span><button class="btn" id="newC">＋ 新規作成</button></div>
+  $("#main").innerHTML = `<div class="toolbar"><h1 class="page">クリエイティブ</h1><span style="flex:1"></span><button class="btn" id="newC">${ic("plus")}新規作成</button></div>
     <div class="seg" style="margin-bottom:14px">${["すべて", "Meta", "TikTok", "静止画", "動画"].map((f) => `<button data-f="${f}" class="${f === filter ? "on" : ""}">${f}</button>`).join("")}</div>
     <div class="cgrid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${list.map((c) => `<div class="card" style="overflow:hidden"><img src="${c.src}" style="width:100%;aspect-ratio:4/5;object-fit:cover;display:block" alt="">
       <div style="padding:8px 10px"><div class="small" style="font-weight:600;word-break:break-all">${esc(c.name)}</div><div class="tiny muted">${esc(c.platform)}・${esc(c.type)}</div>
@@ -1095,7 +1136,7 @@ function renderCreatives(filter = "すべて") {
 }
 function openCreativeNew(done, b) {
   const plat = b?.d.platform || "Meta";
-  const m = modal(`<div class="mh"><h2>クリエイティブ新規作成</h2><button class="close">✕</button></div><div class="mb">
+  const m = modal(`<div class="mh"><h2>クリエイティブ新規作成</h2><button class="close">${ic("x")}</button></div><div class="mb">
     <label class="fl" style="margin-top:0">ファイル（画像・動画）</label><input type="file" id="file" accept="image/*,video/*">
     <div id="prev" style="margin-top:10px"></div>
     <label class="fl">クリエイティブ名</label><input id="cn" placeholder="例: 冬キャンペーン_静止画_A">
@@ -1132,7 +1173,7 @@ function videoThumb(file) {
 //   ロック画面（正式版の機能紹介）
 // =====================================================================
 function renderLocked(name) {
-  $("#main").innerHTML = `<div class="card locked"><div class="big">🔒</div><h2>${esc(name)}</h2><p>${esc(LOCKED[name] || "正式版でご利用いただけます。")}</p>
+  $("#main").innerHTML = `<div class="card locked"><div class="big">${ic("lock")}</div><h2>${esc(name)}</h2><p>${esc(LOCKED[name] || "正式版でご利用いただけます。")}</p>
     <p class="muted small">トライアルでは「与件 → オーディエンス設計 → 見積り → 配信設計」までをお試しいただけます。</p>
     <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px"><button class="btn ghost" onclick="go('#/briefs')">与件に戻る</button><button class="btn" id="of">本申込みについて見る</button></div></div>`;
   $("#of").onclick = () => openOffer("Meta・TikTok");
@@ -1152,8 +1193,8 @@ function guideUpdate() {
   if (S.seen.guideClosed) { g?.remove(); if (!$("#gfab")) { const f = document.createElement("button"); f.id = "gfab"; f.className = "btn guidefab no-print"; f.textContent = "？ 使い方"; f.onclick = () => { S.seen.guideClosed = false; persist(); f.remove(); guideUpdate(); }; document.body.append(f); } return; }
   if (!g) { g = document.createElement("div"); g.id = "guide"; g.className = "guide no-print"; document.body.append(g); }
   const st = guideState(); const now = GUIDE.findIndex(([k]) => !st[k]);
-  g.innerHTML = `<div class="gh">使い方（${GUIDE.filter(([k]) => st[k]).length}/${GUIDE.length}）<button id="gx">✕</button></div><ol>${GUIDE.map(([k, t], i) => `<li class="${st[k] ? "done" : i === now ? "now" : ""}">${t}</li>`).join("")}</ol>
-    ${now === 0 ? `<div style="padding:0 14px 12px"><button class="btn sm" id="gnew">＋ 与件を新規作成</button></div>` : ""}`;
+  g.innerHTML = `<div class="gh">使い方（${GUIDE.filter(([k]) => st[k]).length}/${GUIDE.length}）<button id="gx">${ic("x")}</button></div><ol>${GUIDE.map(([k, t], i) => `<li class="${st[k] ? "done" : i === now ? "now" : ""}">${t}</li>`).join("")}</ol>
+    ${now === 0 ? `<div style="padding:0 14px 12px"><button class="btn sm" id="gnew">${ic("plus")}与件を新規作成</button></div>` : ""}`;
   $("#gx").onclick = () => { S.seen.guideClosed = true; persist(); guideUpdate(); };
   const gn = $("#gnew"); if (gn) gn.onclick = () => { const b = newBrief(); persist(); go(`#/brief/${b.id}`); };
 }
@@ -1164,7 +1205,7 @@ function guideUpdate() {
   window.addEventListener("hashchange", route); route();
   if (!S.seen.welcome) {
     S.seen.welcome = true; persist();
-    modal(`<div class="mh"><h2>HAWK トライアルへようこそ</h2><button class="close">✕</button></div><div class="mb">
+    modal(`<div class="mh"><h2>HAWK トライアルへようこそ</h2><button class="close">${ic("x")}</button></div><div class="mb">
       <p>依頼メール・チャット・依頼書をそのまま貼り付けるだけで、AI が与件を読み取り、<b>オーディエンス設計 → 見積り → 配信設計</b>まで組み立てます。</p>
       <ol style="padding-left:20px;line-height:1.9"><li>「＋ 新規作成」で与件を作る</li><li>左の Notes に依頼メモを貼って → を押す（記入例もあります）</li><li>右の Menu からオーディエンス設計・見積り・配信設計を作る</li></ol>
       <p class="muted small">トライアル期間：あと ${ME.trial.daysLeft} 日 ／ 媒体への連携は正式版でご利用いただけます。サンプルの与件も入れてあります。</p></div>

@@ -3,36 +3,36 @@ const TERMS_VERSION = "2026-11-10-draft";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-const LOGO = `<svg viewBox="0 0 40 40" width="34" height="34" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#0f5132"/><path d="M9 24c4-7 10-11 18-12-3 2-5 4-6 7 3-1 6-1 9 0-5 1-8 3-10 7-2-2-6-3-11-2z" fill="#fff"/><circle cx="27" cy="15.5" r="1.3" fill="#0f5132"/></svg>`;
+const LOGO = `<img src="/logo.png" alt="HAWK" style="height:38px;display:block">`;
 
 const CSS = `
-:root{--bg:#f6f7f9;--card:#fff;--ink:#1f2328;--sub:#646b74;--line:#e3e6ea;--green:#1aa86b;--green-d:#128556;--red:#d1344b;--chip:#eef1f4}
-@media (prefers-color-scheme:dark){:root{--bg:#14171b;--card:#1d2126;--ink:#e8eaed;--sub:#a1a8b1;--line:#30363d;--chip:#262b31}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;line-height:1.7}
-a{color:var(--green-d)}header{display:flex;align-items:center;gap:10px;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--line)}
-header b{font-size:22px;letter-spacing:.04em}.badge{font-size:12px;background:#fff3cd;color:#7a5600;border-radius:99px;padding:2px 10px;font-weight:700}
-main{max-width:520px;margin:32px auto;padding:0 16px}main.wide{max-width:1100px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;margin-bottom:16px}
+:root{color-scheme:light;--bg:#f9fafb;--card:#fff;--ink:#111827;--ink2:#374151;--sub:#6b7280;--line:#e5e7eb;--green:#10b981;--green-d:#059669;--red:#ef4444;--chip:#f3f4f6}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",ui-sans-serif,system-ui,sans-serif;line-height:1.7;-webkit-font-smoothing:antialiased}
+a{color:var(--green-d)}header{display:flex;align-items:center;gap:12px;padding:0 24px;height:64px;background:#fff;border-bottom:1px solid var(--line)}
+.badge{font-size:11px;background:#fef3c7;color:#92400e;border-radius:9999px;padding:2px 10px;font-weight:700}
+main{max-width:520px;margin:36px auto;padding:0 16px}main.wide{max-width:1100px}
+.card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:28px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
 h1{font-size:22px;margin:0 0 6px}h2{font-size:17px;margin:22px 0 6px}p.lead{color:var(--sub);margin:0 0 18px}
-label{display:block;font-size:13px;font-weight:700;margin:14px 0 4px}input[type=text],input[type=email],input[type=password],textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--card);color:var(--ink)}
+label{display:block;font-size:13px;font-weight:700;margin:14px 0 4px;color:var(--ink2)}input[type=text],input[type=email],input[type=password],textarea{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font:inherit;background:#fff;color:var(--ink)}
+input:focus,textarea:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(16,185,129,.2)}
 input[readonly]{background:var(--chip)}textarea{min-height:70px}
-.check{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:10px 0}.check input{margin-top:5px}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin:10px 0}.check input{margin-top:5px;accent-color:var(--green)}
 .req{color:var(--red);font-size:11px;font-weight:700;margin-left:4px}.opt{color:var(--sub);font-size:11px;margin-left:4px}
-button,.btn{display:inline-block;border:0;border-radius:8px;padding:11px 18px;font:inherit;font-weight:700;cursor:pointer;background:var(--green);color:#fff;text-decoration:none}
-button:hover,.btn:hover{background:var(--green-d)}button:disabled{opacity:.45;cursor:not-allowed}button.ghost{background:var(--chip);color:var(--ink)}
+button,.btn{display:inline-block;border:0;border-radius:6px;padding:11px 18px;font:inherit;font-weight:700;cursor:pointer;background:var(--green);color:#fff;text-decoration:none;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+button:hover,.btn:hover{background:var(--green-d)}button:disabled{opacity:.5;cursor:not-allowed}button.ghost{background:#fff;color:var(--ink2);border:1px solid var(--line);font-weight:500}
 .full{width:100%;margin-top:18px}.err{color:var(--red);font-size:13px;min-height:20px;margin-top:8px}.ok{color:var(--green-d)}
-.steps{display:flex;gap:8px;margin:0 0 18px;padding:0;list-style:none;font-size:12px}.steps li{flex:1;text-align:center;padding:6px 4px;border-radius:8px;background:var(--chip);color:var(--sub)}.steps li.on{background:#dff5ea;color:#0f5132;font-weight:700}
-.terms{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13px;background:var(--bg)}
+.steps{display:flex;gap:8px;margin:0 0 20px;padding:0;list-style:none;font-size:12px}.steps li{flex:1;text-align:center;padding:6px 4px;border-radius:6px;background:var(--chip);color:var(--sub)}.steps li.on{background:#ecfdf5;color:#047857;font-weight:700;box-shadow:inset 0 0 0 1px #a7f3d0}
+.terms{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:12px 14px;font-size:13px;background:var(--bg)}
 .terms h3{font-size:13px;margin:12px 0 2px}.muted{color:var(--sub);font-size:13px}
-table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}th{color:var(--sub);font-weight:600}
-.pill{font-size:11px;border-radius:99px;padding:1px 8px;background:var(--chip)}.pill.pending{background:#fff3cd;color:#7a5600}.pill.invited{background:#dbeafe;color:#1e40af}.pill.signed_up{background:#dff5ea;color:#0f5132}
-pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:9px 8px;text-align:left;vertical-align:top}th{color:var(--ink2);font-weight:700;background:var(--bg)}
+.pill{font-size:11px;border-radius:9999px;padding:1px 9px;background:var(--chip)}.pill.pending{background:#fef3c7;color:#92400e}.pill.invited{background:#dbeafe;color:#1e40af}.pill.signed_up{background:#d1fae5;color:#065f46}
+pre{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;font-size:12px}
 `;
 
 function shell(title, body, { wide = false, script = "" } = {}) {
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)}</title><style>${CSS}</style></head><body>
-<header>${LOGO}<b>HAWK</b><span class="badge">トライアル</span></header>
+<title>${esc(title)}</title><link rel="icon" type="image/png" href="/favicon.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><style>${CSS}</style></head><body>
+<header>${LOGO}<span class="badge">トライアル</span></header>
 <main class="${wide ? "wide" : ""}">${body}</main>
 <script>
 async function post(url, data){const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});let j={};try{j=await r.json()}catch(e){}return {status:r.status,...j}}

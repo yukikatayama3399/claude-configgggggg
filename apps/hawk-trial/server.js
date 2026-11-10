@@ -130,6 +130,8 @@ function gmailDraft(mail) {
 
 // ---------- ルーティング ----------
 const APP_HTML = path.join(__dirname, "index.html");
+// ロゴ・アイコン（公式ロゴ hawk_logo_col02.png / col01.png から作成）
+const STATIC = { "/logo.png": "logo.png", "/favicon.png": "favicon.png", "/apple-touch-icon.png": "apple-touch-icon.png", "/app/logo.png": "logo.png" };
 
 async function handle(req, res) {
   const url = new URL(req.url, "http://x");
@@ -137,6 +139,7 @@ async function handle(req, res) {
   const user = currentUser(req);
 
   if (req.method === "GET") {
+    if (STATIC[p]) return send(res, 200, fs.readFileSync(path.join(__dirname, STATIC[p])), "image/png", { "Cache-Control": "public, max-age=86400" });
     if (p === "/") return user ? redirect(res, "/app") : send(res, 200, pages.landing());
     if (p === "/login") return user ? redirect(res, "/app") : send(res, 200, pages.login());
     if (p === "/terms") return send(res, 200, pages.terms());

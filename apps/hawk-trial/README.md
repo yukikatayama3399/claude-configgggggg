@@ -4,6 +4,10 @@
 **トライアルモード＝配信設計まで**。媒体連携ボタンは押せず、代わりに「〇〇までのお申込みで1ヵ月無料（クーポンコード）」を出す。
 
 画面と項目は「HAWK 機能取扱説明書マスター（v1）」のサイトマップ（S-03〜S-13、S-21）と、デモ紙芝居のキャプチャをもとに再現している。
+見た目も本番に合わせている:
+- ロゴ: Drive の公式ロゴ `hawk_logo_col02.png`（横組み）から `logo.png`、`hawk_logo_col01.png` の鷲マークから `favicon.png` / `apple-touch-icon.png` を作成
+- 配色: 本番キャプチャから測った Tailwind 標準色（ボタン・広告セット emerald-500、Menu は amber-50＋orange／blue-50＋blue／green-50＋emerald、不足項目 red-50、キャンペーン pink-700、広告 amber-500、見積りバー emerald-100、背景 gray-50）。本番に合わせてダークモードは無し
+- アイコン: 本番と同じ Lucide 系の線アイコン、Facebook／Instagram／TikTok は各社のロゴ形状
 
 ## 流れ
 
