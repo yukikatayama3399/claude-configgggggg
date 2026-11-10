@@ -1,0 +1,1177 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HAWK トライアル</title>
+<style>
+:root{
+  --bg:#f5f6f8;--card:#fff;--ink:#1f2328;--sub:#6a717b;--faint:#9aa1aa;--line:#e4e7eb;--chip:#eef1f4;--hover:#f7f8fa;
+  --green:#1aa86b;--green-d:#128556;--green-bg:#e9f8f1;--green-line:#bfe8d4;
+  --orange:#e8742a;--orange-bg:#fff4ea;--orange-line:#f7d2b5;
+  --blue:#2f6fda;--blue-bg:#edf3fd;--blue-line:#c8d9f6;
+  --red:#d1344b;--red-bg:#fdeef0;--red-line:#f4c4cc;
+  --camp:#d1346b;--adset:#1aa86b;--ad:#e3a008;
+  --est:#d8f3e8;--shadow:0 8px 30px rgba(15,23,42,.12);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121417;--card:#1b1f24;--ink:#e7e9ec;--sub:#a3aab3;--faint:#727a84;--line:#2e343b;--chip:#262b31;--hover:#22272d;
+  --green-bg:#16302a;--green-line:#24533f;--orange-bg:#33251a;--orange-line:#5a3b22;--blue-bg:#18263b;--blue-line:#2a4166;--red-bg:#3a1c22;--red-line:#64303a;--est:#173a2d;--shadow:0 8px 30px rgba(0,0,0,.5)}}
+:root[data-theme="dark"]{--bg:#121417;--card:#1b1f24;--ink:#e7e9ec;--sub:#a3aab3;--faint:#727a84;--line:#2e343b;--chip:#262b31;--hover:#22272d;
+  --green-bg:#16302a;--green-line:#24533f;--orange-bg:#33251a;--orange-line:#5a3b22;--blue-bg:#18263b;--blue-line:#2a4166;--red-bg:#3a1c22;--red-line:#64303a;--est:#173a2d;--shadow:0 8px 30px rgba(0,0,0,.5)}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;font-size:14px;line-height:1.6}
+button{font:inherit;color:inherit;cursor:pointer}a{color:var(--green-d)}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+textarea{resize:vertical}input:focus,select:focus,textarea:focus{outline:2px solid var(--green-line);border-color:var(--green)}
+.hidden{display:none!important}
+/* header */
+header{position:sticky;top:0;z-index:30;background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:0 20px;height:60px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:22px;letter-spacing:.03em;margin-right:18px;cursor:pointer;white-space:nowrap}
+.trial-badge{font-size:11px;font-weight:700;background:#fff3cd;color:#7a5600;border-radius:99px;padding:2px 9px;letter-spacing:0}
+nav{display:flex;gap:2px;flex:1;min-width:0}
+.menu{position:relative}.menu>button{background:none;border:0;padding:8px 12px;border-radius:8px;color:var(--ink);font-size:15px;white-space:nowrap}
+.menu>button::after{content:"▾";font-size:10px;color:var(--faint);margin-left:6px}.menu>button:hover,.menu.open>button{background:var(--chip)}
+.menu .dd{position:absolute;top:44px;left:0;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);min-width:210px;padding:6px;display:none}
+.menu.open .dd{display:block}.dd button{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:7px}
+.dd button:hover{background:var(--green-bg)}.dd .lock{font-size:11px;color:var(--faint)}
+.hright{display:flex;align-items:center;gap:14px;margin-left:auto}
+.who{line-height:1.25;font-size:12px}.who b{display:block;font-size:13px}.who span{color:var(--sub)}
+.hbtn{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 12px;white-space:nowrap}.hbtn:hover{background:var(--hover)}
+.days{font-size:12px;color:var(--sub);white-space:nowrap}.days b{color:var(--orange)}
+main{max-width:1320px;margin:0 auto;padding:22px 24px 60px}
+/* common */
+.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:8px;padding:9px 16px;font-weight:700;background:var(--green);color:#fff;white-space:nowrap}
+.btn:hover{background:var(--green-d)}.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line);font-weight:500}.btn.ghost:hover{background:var(--hover)}
+.btn.sm{padding:5px 10px;font-size:12px}.btn.danger{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--chip);border-radius:6px;padding:3px 9px;font-size:12px;margin:0 6px 6px 0}
+.chip button{background:none;border:0;padding:0 0 0 2px;color:var(--faint);font-size:13px;line-height:1}
+.muted{color:var(--sub)}.small{font-size:12px}.tiny{font-size:11px}
+h1.page{font-size:22px;margin:0}
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.pill{display:inline-block;font-size:11px;font-weight:700;border-radius:5px;padding:1px 8px;color:#fff}
+.pill.camp{background:var(--camp)}.pill.adset{background:var(--adset)}.pill.ad{background:var(--ad)}
+.platform-ico{display:inline-flex;gap:3px;vertical-align:middle}
+.ico{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff}
+.ico.fb{background:#1877f2}.ico.ig{background:linear-gradient(45deg,#f9a825,#e1306c,#833ab4)}.ico.tt{background:#111}
+/* brief list */
+.search{padding:14px 16px;margin-bottom:14px}.search label{font-size:12px;color:var(--sub)}
+table.list{width:100%;border-collapse:collapse}
+.list th{font-size:13px;text-align:left;color:var(--ink);padding:12px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+.list td{padding:14px;border-bottom:1px solid var(--line);vertical-align:top}
+.list tr:hover td{background:var(--hover)}
+.bname{font-size:16px;font-weight:600;cursor:pointer}.bname:hover{color:var(--green-d)}
+.notebox{background:var(--chip);border-radius:8px;padding:8px 10px;font-size:12px;max-height:92px;overflow:hidden;white-space:pre-wrap;max-width:320px}
+.mini{display:flex;flex-direction:column;gap:5px}.mini button{border-radius:7px;padding:5px 10px;font-size:12px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.b-aud{background:var(--orange-bg);border:1px solid var(--orange-line);color:var(--orange)}
+.b-est{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue)}
+.b-dlv{background:var(--green-bg);border:1px solid var(--green-line);color:var(--green-d)}
+.empty{text-align:center;padding:50px 20px;color:var(--sub)}
+/* brief detail */
+.dhead{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}
+.dhead h1{font-size:22px;margin:0;flex:1}.back{background:none;border:0;font-size:22px;color:var(--sub);padding:0 8px}
+.dgrid{display:grid;grid-template-columns:330px minmax(0,1fr) 300px}
+.dcol{padding:18px 22px;min-width:0}.dcol+.dcol{border-left:1px solid var(--line)}
+.dcol h3{margin:0 0 12px;font-size:17px}
+.noteinput{position:relative}.noteinput textarea{min-height:120px;padding-bottom:40px}
+.noteinput .send{position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;border:0;background:var(--green);color:#fff;font-size:18px}
+.noteinput .send:disabled{opacity:.4}
+.tmpl{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 14px}.tmpl button{font-size:11px;border:1px dashed var(--line);background:none;border-radius:6px;padding:2px 8px;color:var(--sub)}
+.note{background:var(--chip);border-radius:10px;padding:12px 14px;margin-bottom:10px;white-space:pre-wrap;font-size:13px;word-break:break-word}
+.note .at{color:var(--sub);font-size:12px;margin-bottom:4px}
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.tabs button{background:none;border:0;padding:8px 16px;font-size:15px;color:var(--sub);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.on{color:var(--green-d);border-color:var(--green);font-weight:700}
+.sect{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.sect>.sh{background:var(--hover);padding:10px 16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.frow{display:grid;grid-template-columns:130px 1fr 26px;gap:10px;align-items:center;padding:11px 16px;border-top:1px solid var(--line);min-height:52px}
+.frow .k{color:var(--sub);font-size:13px}.frow .v{font-size:15px;cursor:pointer;border-radius:6px;padding:2px 6px;margin-left:-6px;min-height:26px;word-break:break-word}
+.frow .v:hover{background:var(--hover)}.frow .v.blank{color:var(--faint);font-size:13px}
+.frow .v .s{display:block;font-size:12px;color:var(--sub)}
+.frow .x{background:none;border:0;color:var(--faint);font-size:16px}.frow .x:hover{color:var(--red)}
+.frow.missing .v.blank{color:var(--red)}
+.frow.flash{animation:flash 1.6s ease}@keyframes flash{0%{background:var(--green-bg)}100%{background:transparent}}
+.frow .editor{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.frow .editor input,.frow .editor select{flex:1;min-width:110px}
+.aibox{border:1px solid var(--green-line);background:var(--green-bg);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px}
+.aibox h4{margin:0 0 6px;font-size:13px;display:flex;align-items:center;gap:6px}.aibox ul{margin:4px 0 8px;padding-left:18px}.aibox li{margin:2px 0}
+.aibox.warn{border-color:var(--orange-line);background:var(--orange-bg)}
+.menuBtn{display:flex;align-items:center;gap:8px;width:100%;border-radius:8px;padding:11px 14px;font-weight:700;font-size:15px;margin-bottom:10px;text-align:left}
+.lack{background:var(--red-bg);border:1px solid var(--red-line);border-radius:8px;padding:10px 14px;color:var(--red);font-size:13px;margin-bottom:12px}
+.lack b{display:block;margin-bottom:2px}.lack ul{margin:0;padding-left:18px}
+.made{border-top:1px solid var(--line);padding-top:12px;margin-top:6px}
+.madeitem{display:flex;align-items:center;gap:6px;margin-bottom:6px}.madeitem button.open{flex:1;min-width:0;text-align:left;border-radius:7px;padding:6px 10px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.madeitem .del{background:none;border:0;color:var(--faint);font-size:14px}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:10px;margin-top:10px}
+.ccard{position:relative;border:2px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;background:var(--chip);aspect-ratio:4/5}
+.ccard img{width:100%;height:100%;object-fit:cover;display:block}.ccard.on{border-color:var(--green)}
+.ccard .ck{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.9);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--green-d)}
+.ccard.on .ck{background:var(--green);color:#fff;border-color:var(--green)}
+.ccard .cn{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.65));color:#fff;font-size:11px;padding:14px 6px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg{display:inline-flex;background:var(--chip);border-radius:9px;padding:3px}.seg button{border:0;background:none;padding:6px 14px;border-radius:7px;font-size:13px}.seg button.on{background:var(--card);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.fl{font-weight:700;margin:16px 0 6px;display:block}
+/* modal */
+.ov{position:fixed;inset:0;background:rgba(15,20,25,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow:auto}
+.modal{background:var(--card);border-radius:14px;width:min(1180px,100%);box-shadow:var(--shadow);margin:auto 0}
+.modal.narrow{width:min(620px,100%)}
+.mh{display:flex;align-items:center;gap:12px;padding:20px 26px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card);border-radius:14px 14px 0 0;z-index:2}
+.mh h2{margin:0;font-size:21px;flex:1;display:flex;align-items:center;gap:8px}.mh .close{background:none;border:0;font-size:26px;line-height:1;color:var(--ink)}
+.mb{padding:22px 26px}.mf{padding:16px 26px;border-top:1px solid var(--line);display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;position:sticky;bottom:0;background:var(--card);border-radius:0 0 14px 14px}
+.titleedit{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px;margin-bottom:6px}.titleedit input{max-width:520px;font-weight:700}
+/* audience */
+.kv4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0}
+.kv4>div{border:1px solid var(--line);border-radius:8px;padding:8px 14px}.kv4 .k{font-size:12px;color:var(--sub)}.kv4 .v{font-weight:700}
+.total{border:1px solid var(--line);border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.total b{font-size:20px}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.plan{border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;position:relative}.plan.on{border-color:var(--orange);box-shadow:0 0 0 2px var(--orange-line)}
+.plan .ph{display:flex;justify-content:space-between;font-weight:700;font-size:16px}.plan .sz{font-weight:600;margin:8px 0}
+.bar{height:8px;border-radius:9px;background:var(--chip);overflow:hidden;margin-bottom:12px}.bar i{display:block;height:100%;background:var(--orange);border-radius:9px}
+.plan .use{position:absolute;top:-10px;right:12px;background:var(--orange);color:#fff;font-size:11px;font-weight:700;border-radius:99px;padding:1px 9px}
+.addint{display:flex;gap:6px;margin-top:6px}.addint input{font-size:12px;padding:5px 8px}
+/* estimate */
+.esttab{width:100%;border-collapse:separate;border-spacing:0 6px}
+.esttab th{font-size:12px;color:var(--sub);font-weight:600;text-align:right;padding:2px 10px}.esttab th.grp{text-align:left;font-size:15px;color:var(--ink);font-weight:700}
+.esttab td{padding:8px 10px;text-align:right;white-space:nowrap}.esttab td.m{text-align:left;font-weight:700}
+.esttab td.n{position:relative;font-weight:600}.esttab td.n i{position:absolute;left:0;top:3px;bottom:3px;background:var(--est);border-radius:4px;z-index:0}.esttab td.n span{position:relative;z-index:1}
+.esttab .u{color:var(--sub);font-size:11px;margin-right:4px}
+.esttab input{width:78px;padding:3px 6px;text-align:right;font-size:13px;display:inline-block}
+.gap{width:24px}
+.refs{width:100%;border-collapse:collapse;font-size:12px}.refs th{color:var(--sub);text-align:right;padding:8px;border-bottom:1px solid var(--line);font-weight:600}.refs th:first-child,.refs td:first-child{text-align:left}
+.refs td{padding:8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}.refs td .s{display:block;color:var(--sub);font-size:11px}
+.kpicmp{display:inline-block;font-size:12px;border-radius:6px;padding:2px 8px;margin-left:8px}.kpicmp.ok{background:var(--green-bg);color:var(--green-d)}.kpicmp.ng{background:var(--orange-bg);color:var(--orange)}
+.warnline{color:var(--orange);font-size:12px;margin-top:4px}
+.cond{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 16px;font-size:13px}.cond div span{display:block;color:var(--sub);font-size:11px}
+/* delivery */
+.dl-head{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}.dl-head .k{font-size:12px;color:var(--sub)}
+.lvl{border:1px solid var(--line);border-left:4px solid var(--camp);border-radius:10px;padding:16px 18px;margin-bottom:12px}
+.lvl.adset{border-left-color:var(--adset);margin-left:14px}.lvl.ad{border-left-color:var(--ad);margin-left:28px}
+.lvl .nm{font-weight:700;font-size:16px;margin:8px 0 10px}
+.lvl .tools{float:right;display:flex;gap:6px}
+.fgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 18px}
+.fgrid .k{font-size:12px;color:var(--sub)}.fgrid .v{font-weight:500;word-break:break-word}.fgrid .s{display:block;font-size:11px;color:var(--faint)}
+.fgrid .w2{grid-column:span 2}.fgrid .w4{grid-column:1/-1}
+.fgrid label.k{display:block;margin-bottom:3px}
+.adthumb{width:120px;aspect-ratio:4/5;border-radius:8px;object-fit:cover;background:var(--chip);border:1px solid var(--line)}
+.picker{display:flex;gap:8px;flex-wrap:wrap}.picker img{width:64px;aspect-ratio:4/5;object-fit:cover;border-radius:6px;border:2px solid var(--line);cursor:pointer}.picker img.on{border-color:var(--green)}
+.fixed{font-size:12px;color:var(--sub);background:var(--hover);border-radius:8px;padding:8px 12px;margin-top:8px}
+/* confirm page */
+.confirm{max-width:980px;margin:0 auto}
+.ctable{width:100%;border-collapse:collapse}.ctable th{width:200px;text-align:left;font-weight:600;color:var(--sub);font-size:13px;padding:11px 16px;border-top:1px solid var(--line);vertical-align:top}
+.ctable td{padding:11px 16px;border-top:1px solid var(--line);word-break:break-word}.ctable tr:first-child th,.ctable tr:first-child td{border-top:0}
+.chead{padding:12px 16px;font-weight:700;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);background:var(--hover);border-radius:12px 12px 0 0}
+.offer{border:2px solid var(--orange);background:var(--orange-bg);border-radius:12px;padding:18px 20px;margin:20px 0 14px}
+.offer h3{margin:0 0 6px;font-size:17px;color:var(--orange)}.offer .code{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px dashed var(--orange);border-radius:8px;padding:6px 12px;font-family:ui-monospace,Menlo,monospace;font-weight:700;font-size:16px;margin:6px 0}
+.linkbox{text-align:center;padding:22px}.linkbox label{display:flex;gap:8px;justify-content:center;align-items:center;margin-bottom:14px;color:var(--sub)}.linkbox label input{width:auto}
+.lockbtn{position:relative}.lockbtn::before{content:"🔒 "}
+/* locked page */
+.locked{max-width:760px;margin:30px auto;text-align:center;padding:36px 30px}.locked h2{margin:6px 0 10px}.locked .big{font-size:40px}
+/* progress */
+.prog{padding:28px 30px}.prog .st{display:flex;align-items:center;gap:10px;padding:7px 0;color:var(--faint)}.prog .st.on{color:var(--ink);font-weight:600}.prog .st.done{color:var(--green-d)}
+.prog .st i{width:20px;height:20px;border-radius:50%;border:2px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;flex:none}
+.prog .st.on i{border-color:var(--green);border-top-color:transparent;animation:spin .8s linear infinite}.prog .st.done i{background:var(--green);border-color:var(--green);color:#fff}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1f2328;color:#fff;border-radius:10px;padding:10px 18px;z-index:80;box-shadow:var(--shadow);font-size:13px;max-width:90vw}
+.guide{position:fixed;right:18px;bottom:18px;z-index:40;width:300px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.guide .gh{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:700}.guide .gh button{margin-left:auto;background:none;border:0;color:var(--sub)}
+.guide ol{margin:0;padding:10px 14px 12px 34px;font-size:13px}.guide li{margin:5px 0;color:var(--sub)}.guide li.done{color:var(--green-d);text-decoration:line-through}.guide li.now{color:var(--ink);font-weight:700}
+.guidefab{position:fixed;right:18px;bottom:18px;z-index:40;border-radius:99px;box-shadow:var(--shadow)}
+@media (max-width:1100px){.dgrid{grid-template-columns:1fr}.dcol+.dcol{border-left:0;border-top:1px solid var(--line)}.fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){
+  header{padding:0 12px;gap:2px;height:auto;min-height:56px;flex-wrap:wrap}nav{order:3;width:100%;overflow-x:auto;padding-bottom:6px}.logo{margin-right:4px}.who{display:none}.days{display:none}
+  main{padding:14px 12px 60px}.plans,.kv4,.dl-head,.cond{grid-template-columns:1fr}.frow{grid-template-columns:92px 1fr 22px;padding:10px 12px}
+  .mb{padding:16px}.mh{padding:14px 16px}.mf{padding:12px 16px}.list thead{display:none}.list td{display:block;border:0;padding:6px 14px}.list tr{display:block;border-bottom:1px solid var(--line);padding:8px 0}
+  .esttab{font-size:12px}.esttab input{width:58px}.lvl.adset{margin-left:6px}.lvl.ad{margin-left:12px}.ctable th{width:110px}.guide{left:12px;right:12px;width:auto}
+  .esttab-wrap,.refs-wrap{overflow-x:auto}
+}
+@media print{header,.guide,.guidefab,.no-print{display:none!important}main{padding:0}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo" onclick="go('#/briefs')">
+    <svg viewBox="0 0 40 40" width="34" height="34" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#0f5132"/><path d="M9 24c4-7 10-11 18-12-3 2-5 4-6 7 3-1 6-1 9 0-5 1-8 3-10 7-2-2-6-3-11-2z" fill="#fff"/><circle cx="27" cy="15.5" r="1.3" fill="#0f5132"/></svg>
+    HAWK <span class="trial-badge">トライアル</span>
+  </div>
+  <nav id="nav"></nav>
+  <div class="hright">
+    <span class="days" id="days"></span>
+    <div class="who"><b id="wCompany"></b><span id="wUser"></span></div>
+    <button class="hbtn" id="logout">ログアウト</button>
+  </div>
+</header>
+<main id="main"></main>
+<div id="layer"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   HAWK トライアル（配信設計のみ）
+   - 与件メモ → AI 読み取り（/api/extract = サーバーで claude -p）→ Details
+   - オーディエンス設計（狭い/普通/広い）→ 見積り → 配信設計 → 確認ページ
+   - 媒体連携（Metaに連携/TikTokに連携）はトライアルではロック。代わりに本申込みオファーを出す
+   - データはこのブラウザの localStorage に保存（ユーザーごと）
+   ===================================================================== */
+
+// ---------- 小道具 ----------
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const yen = (n) => "¥" + Math.round(Number(n) || 0).toLocaleString("ja-JP");
+const num = (n) => Math.round(Number(n) || 0).toLocaleString("ja-JP");
+const uid = () => Math.random().toString(36).slice(2, 10);
+const pad = (n) => String(n).padStart(2, "0");
+const stamp = (d = new Date()) => `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const parseDT = (s) => { if (!s) return null; const m = String(s).match(/(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/); return m ? new Date(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0)) : null; };
+const showDT = (s) => s ? String(s).replace(/-/g, "/").replace("T", " ") : "";
+const days = (d) => { const a = parseDT(d.start), b = parseDT(d.end); return a && b && b > a ? Math.max(1, Math.ceil((b - a) / 86400000)) : 0; };
+const hashN = (s) => { let h = 2166136261; for (const c of String(s)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0) / 4294967295; };
+const sig3 = (n) => { if (n < 1000) return Math.round(n); const p = Math.pow(10, Math.floor(Math.log10(n)) - 2); return Math.round(n / p) * p; };
+function toast(msg, ms = 2600) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), ms); }
+async function copyText(t) { try { await navigator.clipboard.writeText(t); toast("コピーしました"); } catch (e) { toast("コピーできませんでした"); } }
+
+// ---------- サーバー / ユーザー ----------
+let ME = { user: { id: "local", name: "トライアルユーザー", email: "", company: "サンプル株式会社" }, trial: null, ai: { ok: false } };
+let SERVER = false;
+async function loadMe() {
+  try {
+    const r = await fetch("/api/me", { cache: "no-store" });
+    if (r.status === 401) { location.href = "/login"; return; }
+    if (r.ok) { ME = await r.json(); SERVER = true; }
+  } catch (e) { /* ファイルを直接開いた（ローカル試用）*/ }
+  if (!ME.trial) {
+    const end = new Date(Date.now() + 14 * 86400000).toISOString();
+    ME.trial = { endsAt: end, offerDeadline: end, coupon: "HAWK-1MONTH-FREE", daysLeft: 14 };
+  }
+}
+
+// ---------- 保存 ----------
+let S = null;
+const KEY = () => `hawk-trial:v1:${ME.user.id}`;
+function load() {
+  try { S = JSON.parse(localStorage.getItem(KEY()) || "null"); } catch (e) { S = null; }
+  if (!S) { S = { briefs: [], creatives: [], seen: {} }; seed(); persist(); }
+}
+function persist() {
+  try { localStorage.setItem(KEY(), JSON.stringify(S)); }
+  catch (e) { toast("ブラウザの保存容量がいっぱいです。不要なクリエイティブを削除してください", 5000); }
+}
+const brief = (id) => S.briefs.find((b) => b.id === id);
+
+// ---------- 定数 ----------
+const META_OBJ = ["認知", "トラフィック", "エンゲージメント", "リード", "アプリの宣伝", "売上"];
+const TT_OBJ = ["リーチ", "トラフィック", "動画視聴", "コミュニティインタラクション", "リード", "ウェブサイトのコンバージョン"];
+const MEDIA = { Meta: ["Instagram", "Facebook", "Instagram・Facebook"], TikTok: ["TikTok"] };
+const CTAS = ["詳しくはこちら", "購入する", "予約する", "申し込む", "登録する", "お問い合わせ", "ダウンロード", "視聴する", "今すぐ利用"];
+const IG_PL = ["フィード", "ストーリーズ", "リール", "発見タブ", "検索結果"];
+const FB_PL = ["Facebookフィード", "Facebookストーリーズ", "Facebookリール", "動画フィード", "Marketplace"];
+const GOALS = { 認知: "広告リーチを最大化", トラフィック: "リンクのクリック数を最大化", エンゲージメント: "ThruPlayを最大化", リード: "リードの数を最大化", "アプリの宣伝": "アプリインストール数を最大化", 売上: "コンバージョン数を最大化",
+  リーチ: "リーチ", 動画視聴: "6秒フォーカス視聴", コミュニティインタラクション: "フォロワー", ウェブサイトのコンバージョン: "コンバージョン" };
+const SAMPLE_ACCOUNT = { Meta: "トライアル用サンプル広告アカウント（ID: act_000000000000）", TikTok: "トライアル用サンプル広告アカウント（ID: 7000000000000000000）" };
+const TEMPLATES = {
+  "チャット": "10:00 お疲れ様です！エブリウェアの「サーモフィット」、冬の認知拡大でSNS広告を打ちたくてご相談です\n10:01 とにかく寒さで参ってる層に、サーモフィットの暖かさ・快適さを広く知ってもらいたくて\n10:05 媒体と期間、予算は？\n10:07 媒体はInstagram（IG/FB）で、来月1ヶ月配信、予算は35万くらいで\n10:08 目的は認知でリーチ最大化。CPMは300円目安、ターゲットは冬の寒さが苦手な30〜40代男性。マージンは20%でお見積りします",
+  "メール": "From: 田中 <tanaka@example-agency.co.jp>\nSubject: Re: 新商品の件\n\n山田様\nいつもお世話になっております。\nサンプル飲料様の新商品「ゼロスパーク レモン」のTikTok施策の件です。\n・配信期間：12月頭から年内いっぱい\n・予算：ネット300万（弊社手数料別）\n・ねらい：Z世代を中心に「新しい炭酸」として動画を見てもらいたい。再生数重視です。\n・地域：首都圏と関西\n・LP：https://example.com/zerospark\nお見積りと配信設計のご提案をお願いできますでしょうか。",
+  "依頼書": "【広告出稿依頼書】\n広告主：株式会社サンプル不動産\n商材：パークサイド港北 モデルルーム来場予約\n目的：モデルルーム来場予約（予約フォームの送信）\n媒体：Facebook・Instagram\n期間：1月10日〜2月28日\n予算：月80万（グロス）\nエリア：横浜市港北区・都筑区・青葉区\nターゲット：30〜45歳のファミリー層、子育て世帯\nKPI：CPA 15,000円\nLP：https://example.com/parkside/reserve",
+  "会話ログ": "えーと今回はアイネさんのフェイスカレントポインター、美顔器ですね、これの年末商戦で、EC売上を伸ばしたいと。女性、まあ20代後半から40代くらいまで、美容感度高い層。予算感は500万くらいで、期間は12月の頭から31日まで。媒体はインスタメインでいいと思います。あ、薬機は気をつけてくださいって言われてます。マージンはいつもどおり20で。",
+};
+
+// ---------- サンプル（初回だけ） ----------
+function svgCreative(title, sub, c1, c2) {
+  const t = esc(title).slice(0, 18), s = esc(sub).slice(0, 22);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="500"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="400" height="500" fill="url(#g)"/><circle cx="300" cy="330" r="120" fill="#fff" opacity=".12"/><text x="32" y="90" font-family="sans-serif" font-size="34" font-weight="700" fill="#fff">${t}</text><text x="32" y="134" font-family="sans-serif" font-size="20" fill="#fff" opacity=".9">${s}</text><rect x="32" y="430" width="150" height="40" rx="20" fill="#fff" opacity=".92"/><text x="52" y="456" font-family="sans-serif" font-size="16" font-weight="700" fill="${c2}">詳しくはこちら</text></svg>`;
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
+function seed() {
+  S.creatives.push(
+    { id: uid(), name: "サンプル_冬あったか_静止画", type: "静止画", platform: "Meta", src: svgCreative("この冬を、あたたかく。", "サンプルクリエイティブ", "#3b4a5a", "#1c2733") },
+    { id: uid(), name: "サンプル_新商品_縦動画", type: "動画", platform: "TikTok", src: svgCreative("新しい炭酸、はじまる。", "サンプル（動画サムネイル）", "#f2b632", "#d9534f") },
+    { id: uid(), name: "サンプル_来場予約_静止画", type: "静止画", platform: "Meta", src: svgCreative("モデルルーム公開中", "Webで来場予約", "#2f7d6d", "#174d43") },
+  );
+  const b = newBrief("【サンプル】エブリウェア サーモフィット冬広告");
+  b.notes.push({ at: "2026/11/10 10:00", text: TEMPLATES["チャット"] });
+  Object.assign(b.d, { platform: "Meta", media: "Instagram・Facebook", client: "エブリウェア", product: "サーモフィット", category: "小売 > ファッション・アパレル小売",
+    budget: 350000, margin: 20, start: nextMonth(0), end: nextMonth(1), objective: "認知", kpiType: "CPM", kpiValue: 300, bid: 240, gender: "男性", ageMin: 30, ageMax: 49,
+    regions: ["日本"], targetSummary: "冬の寒さが苦手な30〜40代男性に、サーモフィットの暖かさ・快適さを広く知ってもらう", placements: ["フィード", "ストーリーズ", "リール", "Facebookフィード"], lpUrl: "" });
+  b.ai = { at: "2026/11/10 10:00", interests: {
+      narrow: ["メンズファッション（ファッション）", "アウターウェア（アパレル）"],
+      normal: ["メンズファッション（ファッション）", "アウターウェア（アパレル）", "肌着・下着（アパレル）", "コート（衣料品）", "靴下", "タイツ（アパレル）", "アウトドア（アクティビティ）", "ジャケット（アパレル）", "セーター（アパレル）", "カジュアルウェア（ファッション）", "スポーツウェア"],
+      wide: ["メンズファッション（ファッション）", "アウターウェア（アパレル）", "肌着・下着（アパレル）", "コート（衣料品）", "靴下", "タイツ（アパレル）", "アウトドア（アクティビティ）", "ジャケット（アパレル）", "セーター（アパレル）", "カジュアルウェア（ファッション）", "スポーツウェア", "スキー・スノーボード（スポーツ）", "オンラインショッピング（小売り）", "ショッピング（小売り）", "衣料品（アパレル）", "ファッション小物（小物）"] },
+    ads: [{ text: "寒い朝、外に出るのがつらい。そんな冬にこそサーモフィット。体にほどよくフィットして、暖かさと快適さを毎日の通勤や休日に。", headline: "この冬はサーモフィットで", description: "暖かさと快適さを毎日に", cta: "詳しくはこちら" },
+      { text: "冬の寒さが苦手な方へ。サーモフィットは着るだけで暖かく、動きやすい快適な着心地。重ね着のストレスを減らして、冬をもっと身軽に。", headline: "寒さが苦手な人の冬の味方", description: "暖かく、動きやすい着心地", cta: "詳しくはこちら" }],
+    assumptions: ["予算: グロス 35万円（明記なし。マージン20%で見積もりとの記載から）", "地域: 日本全国（指定なし）"], missing: ["LP の URL", "広告素材（画像・動画）の有無"], engine: "sample" };
+  b.meta.creatives = [S.creatives[0].id];
+  b.meta.account = SAMPLE_ACCOUNT.Meta; b.meta.page = "エブリウェア（サンプル）";
+}
+function nextMonth(end) { const d = new Date(); const m = new Date(d.getFullYear(), d.getMonth() + 1 + (end ? 1 : 0), end ? 0 : 1); return `${m.getFullYear()}-${pad(m.getMonth() + 1)}-${pad(m.getDate())} ${end ? "23:59" : "00:00"}`; }
+function newBrief(name) {
+  const b = { id: uid(), name: name || "新規与件", owner: ME.user.name, createdAt: stamp(), notes: [],
+    d: { platform: "Meta", media: "", client: "", product: "", category: "", budget: 0, margin: 20, start: "", end: "", objective: "", kpiType: "", kpiValue: 0, bid: 0,
+      gender: "すべて", ageMin: 18, ageMax: 65, regions: ["日本"], targetSummary: "", placements: [], lpUrl: "" },
+    ai: null, meta: { account: "", page: "", creatives: [] }, audiences: [], estimates: [], deliveries: [] };
+  S.briefs.unshift(b);
+  return b;
+}
+
+// =====================================================================
+//   AI 読み取り
+// =====================================================================
+function currentForAI(b) {
+  const d = b.d; if (!b.ai) return null;
+  return { brief_name: b.name, platform: d.platform, media: d.media, client: d.client, product: d.product, category: d.category, budget_gross: d.budget, margin_pct: d.margin,
+    start: d.start, end: d.end, objective: d.objective, kpi_type: d.kpiType, kpi_value: d.kpiValue, gender: d.gender, age_min: d.ageMin, age_max: d.ageMax, regions: d.regions,
+    placements: d.placements, lp_url: d.lpUrl };
+}
+async function runExtract(b) {
+  const steps = ["依頼メモを読んでいます", "予算・期間・目的・ターゲットを整理しています", "興味・関心（狭い／普通／広い）を選んでいます", "広告文案を作っています", "確認が必要な項目を洗い出しています"];
+  const m = modal(`<div class="mh"><h2>テキストから与件情報を抽出</h2></div><div class="prog">${steps.map((s, i) => `<div class="st" data-i="${i}"><i></i>${esc(s)}</div>`).join("")}
+    <p class="muted small" style="margin-top:14px">${SERVER && ME.ai?.ok ? "AI が読み取っています（15秒ほどかかります）" : "簡易読み取り（ルールベース）で処理しています"}</p></div>`, { narrow: true, noclose: true });
+  let k = 0; const mark = () => m.querySelectorAll(".st").forEach((el, i) => el.className = "st" + (i < k ? " done" : i === k ? " on" : ""));
+  mark(); const timer = setInterval(() => { if (k < steps.length - 1) { k++; mark(); } }, 3200);
+  let res;
+  try {
+    if (SERVER && ME.ai?.ok) {
+      const r = await fetch("/api/extract", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: b.notes, current: currentForAI(b), today: todayISO() }) });
+      res = await r.json();
+      if (r.status === 401) { location.href = "/login"; return; }
+    } else res = { ok: true, data: ruleExtract(b.notes.map((n) => n.text).join("\n"), b), engine: "rule" };
+  } catch (e) { res = { ok: false, error: e.message }; }
+  clearInterval(timer);
+  if (!res.ok) {
+    closeModal(m);
+    const fb = confirm(`AI の読み取りに失敗しました：${res.error || ""}\n\n簡易読み取り（ルールベース）で続けますか？`);
+    if (!fb) return;
+    res = { ok: true, data: ruleExtract(b.notes.map((n) => n.text).join("\n"), b), engine: "rule" };
+  } else { k = steps.length; mark(); await new Promise((r) => setTimeout(r, 350)); closeModal(m); }
+  const changed = applyExtract(b, res.data, res.engine || "ai", res.secs);
+  persist(); TAB = "details"; renderBrief(b.id, { flash: changed });
+  toast(changed.length ? `${changed.length}項目を設定しました` : "変更はありませんでした");
+}
+function applyExtract(b, x, engine, secs) {
+  const d = b.d, before = JSON.stringify(d), changed = [];
+  const set = (k, v) => { if (v === undefined || v === null || v === "") return; if (JSON.stringify(d[k]) !== JSON.stringify(v)) { d[k] = v; changed.push(k); } };
+  if (x.brief_name && (b.name === "新規与件" || !b.ai)) b.name = x.brief_name;
+  set("platform", x.platform); set("media", x.media); set("client", x.client); set("product", x.product); set("category", x.category);
+  const margin = x.margin_pct >= 0 ? x.margin_pct : d.margin;
+  set("margin", margin);
+  if (x.budget > 0) set("budget", x.budget_basis === "ネット" ? Math.round(x.budget / (1 - margin / 100)) : x.budget);
+  set("start", x.start); set("end", x.end); set("objective", x.objective);
+  set("kpiType", x.kpi_type); if (x.kpi_value > 0) set("kpiValue", x.kpi_value);
+  if (x.kpi_type === "CPM" && x.kpi_value > 0 && (x.objective === "認知" || x.objective === "リーチ")) set("bid", Math.round(x.kpi_value * (1 - margin / 100)));
+  set("gender", x.gender); set("ageMin", x.age_min); set("ageMax", x.age_max);
+  if (x.regions?.length) set("regions", x.regions);
+  set("targetSummary", x.target_summary); if (x.placements?.length) set("placements", x.placements); set("lpUrl", x.lp_url);
+  const assumptions = [...(x.assumptions || [])];
+  if (!(x.margin_pct >= 0) && !b.ai) assumptions.push(`マージン: ${margin}%（ワークスペースの既定値。依頼メモに記載なし）`);
+  if (x.budget_basis === "ネット" && x.budget > 0) assumptions.unshift(`予算: ネット ${yen(x.budget)} をマージン ${margin}% でグロス ${yen(d.budget)} に換算`);
+  b.ai = { at: stamp(), interests: x.interests || { narrow: [], normal: [], wide: [] }, ads: x.ads || [], assumptions, missing: x.missing || [], engine, secs };
+  if (!b.meta.account) b.meta.account = SAMPLE_ACCOUNT[d.platform];
+  if (!b.meta.page && d.platform === "Meta" && d.client) b.meta.page = `${d.client}（サンプル）`;
+  return before === JSON.stringify(d) ? [] : changed;
+}
+
+// 簡易読み取り（サーバーに AI が無いとき用）。精度は AI より落ちる
+function ruleExtract(t, b) {
+  const z = t.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 65248)).replace(/，/g, ",");
+  const x = { brief_name: "", platform: "Meta", media: "Instagram・Facebook", client: "", product: "", category: "", budget: 0, budget_basis: "グロス", margin_pct: -1, start: "", end: "",
+    objective: "認知", kpi_type: "", kpi_value: 0, gender: "すべて", age_min: 18, age_max: 65, regions: ["日本"], target_summary: "", interests: { narrow: [], normal: [], wide: [] },
+    placements: [], lp_url: "", ads: [], assumptions: ["簡易読み取りのため、内容を必ずご確認ください"], missing: [] };
+  if (/tiktok|ティックトック/i.test(z)) { x.platform = "TikTok"; x.media = "TikTok"; x.objective = "リーチ"; x.placements = ["TikTokフィード"]; }
+  else if (/(instagram|インスタ|IG)/i.test(z) && !/(facebook|FB|フェイスブック)/i.test(z)) { x.media = "Instagram"; x.placements = ["フィード", "ストーリーズ", "リール"]; }
+  else x.placements = ["フィード", "ストーリーズ", "リール", "Facebookフィード"];
+  const q = z.match(/([^\s「」、。:：]{2,20})の「([^」]+)」/); if (q) { x.client = q[1]; x.product = q[2]; }
+  const c1 = z.match(/(広告主|クライアント)[:：\s]*([^\n]+)/); if (c1) x.client = c1[2].trim();
+  const p1 = z.match(/(商材|商品)[:：\s]*([^\n]+)/); if (p1) x.product = p1[2].trim();
+  const bm = z.match(/予算[^0-9\n]{0,10}([0-9][0-9,.]*)\s*(万|千)?/) || z.match(/([0-9][0-9,.]*)\s*万円?/);
+  if (bm) { let v = parseFloat(bm[1].replace(/,/g, "")); if (bm[2] === "万" || (!bm[2] && /万/.test(bm[0]))) v *= 10000; else if (bm[2] === "千") v *= 1000; x.budget = Math.round(v); }
+  if (/ネット/.test(z)) x.budget_basis = "ネット";
+  const mg = z.match(/マージン[^0-9\n]{0,8}([0-9]{1,2})/); if (mg) x.margin_pct = +mg[1];
+  const yr = new Date().getFullYear();
+  const dm = z.match(/(?:(\d{4})[\/年-])?(\d{1,2})[\/月](\d{1,2})日?\s*[〜~\-ー－から]+\s*(?:(\d{4})[\/年-])?(\d{1,2})[\/月](\d{1,2})/);
+  if (dm) { const y1 = dm[1] || yr, y2 = dm[4] || y1; x.start = `${y1}-${pad(dm[2])}-${pad(dm[3])} 00:00`; x.end = `${y2}-${pad(dm[5])}-${pad(dm[6])} 23:59`; }
+  if (/(トラフィック|サイト誘導|クリック)/.test(z)) x.objective = "トラフィック";
+  if (/(リード|資料請求|会員登録|予約|応募)/.test(z)) x.objective = "リード";
+  if (/(売上|購入|EC|コンバージョン|CV)/.test(z)) x.objective = x.platform === "TikTok" ? "ウェブサイトのコンバージョン" : "売上";
+  if (/(再生|視聴)/.test(z) && x.platform === "TikTok") x.objective = "動画視聴";
+  const kp = z.match(/(CPM|CPC|CPV|CPA)[^0-9\n]{0,6}([0-9][0-9,]*)/i); if (kp) { x.kpi_type = kp[1].toUpperCase(); x.kpi_value = +kp[2].replace(/,/g, ""); }
+  if (/男性/.test(z) && !/女性/.test(z)) x.gender = "男性"; if (/女性/.test(z) && !/男性/.test(z)) x.gender = "女性";
+  const ag = z.match(/(\d{2})\s*[〜~\-ー－]\s*(\d{2})\s*(代|歳)/); if (ag) { x.age_min = +ag[1]; x.age_max = ag[3] === "代" ? +ag[2] + 9 : +ag[2]; }
+  else { const a1 = z.match(/(\d{2})代/); if (a1) { x.age_min = +a1[1]; x.age_max = +a1[1] + 9; } }
+  const url = z.match(/https?:\/\/[^\s「」<>]+/); if (url) x.lp_url = url[0]; else x.missing.push("LP の URL");
+  if (/首都圏/.test(z)) x.regions = ["東京都", "神奈川県", "千葉県", "埼玉県"];
+  x.brief_name = [x.client, x.product].filter(Boolean).join(" ") || "新規与件";
+  x.target_summary = `${x.gender === "すべて" ? "" : x.gender}${x.age_min}〜${x.age_max}歳`;
+  const base = [x.product || "商品", "ショッピング（小売り）", "オンラインショッピング"].filter(Boolean);
+  x.interests = { narrow: base.slice(0, 2), normal: base, wide: [...base, "エンターテインメント", "旅行"] };
+  const p = x.product || "この商品";
+  x.ads = [{ text: `${p}をもっと身近に。詳しくはサイトでチェック。`, headline: `${p}`.slice(0, 25), description: "詳しくはこちら", cta: "詳しくはこちら" }];
+  if (!x.budget) x.missing.push("予算"); if (!x.start) x.missing.push("配信期間");
+  return x;
+}
+
+// =====================================================================
+//   ルーティングとヘッダー
+// =====================================================================
+const LOCKED = {
+  "Metaキャンペーン": "全キャンペーンを階層表示し、ON/OFF、予算・入札・終了日・マージン・KPI の編集、日予算の自動調整（残予算÷残日数）、実績の確認ができます。",
+  "TikTokキャンペーン": "TikTok キャンペーンを検索・絞り込みし、配信 ON/OFF、日予算自動調整、インサイトレポート出力、予算・入札を一覧で確認・編集できます。",
+  "広告アカウント": "Meta／TikTok の広告アカウントを追加・検索・連携解除できます。",
+  "Metaレポート": "レポート種別・期間・広告アカウント・キャンペーンを選んで、インサイトレポート（PowerPoint／Excel）をマージン込みで生成できます。",
+  "TikTokレポート": "TikTok キャンペーンのインサイトレポートを生成できます。",
+  "連携履歴": "HAWK から媒体へ連携したキャンペーンの履歴を確認できます。",
+  "アーティファクト": "作成したインサイトレポートやパフォーマンスレポートをまとめて保管・ダウンロードできます。",
+  "Metaピクセル": "ピクセルの作成、計測タグのコピー、カスタムコンバージョンの作成ができます。",
+  "設定": "デフォルトマージン率、代理店の有効化、Meta・TikTok 連携の設定ができます（管理者のみ）。",
+  "ユーザー": "ユーザーの招待・削除、ロール（admin／user／read only／sales）の管理ができます。",
+  "代理店一覧": "代理店ごとのマージン率を登録し、与件で代理店を選ぶと自動で反映されます。",
+};
+const NAV = [
+  ["与件", [["与件", "#/briefs"]]],
+  ["キャンペーン", [["Metaキャンペーン"], ["TikTokキャンペーン"], ["広告アカウント"], ["Metaレポート"], ["TikTokレポート"], ["連携履歴"]]],
+  ["オブジェクト", [["クリエイティブ", "#/creatives"], ["アーティファクト"], ["Metaピクセル"]]],
+  ["ワークスペース", [["設定"], ["ユーザー"], ["代理店一覧"]]],
+];
+function renderNav() {
+  $("#nav").innerHTML = NAV.map(([g, items], gi) => `<div class="menu" data-g="${gi}"><button>${g}</button><div class="dd">${items.map(([n, h]) =>
+    `<button data-go="${h || "#/locked/" + encodeURIComponent(n)}"><span>${n}</span>${h ? "" : '<span class="lock">🔒 正式版</span>'}</button>`).join("")}</div></div>`).join("");
+  $("#nav").onclick = (e) => {
+    const m = e.target.closest(".menu"); const it = e.target.closest("[data-go]");
+    if (it) { document.querySelectorAll(".menu").forEach((x) => x.classList.remove("open")); go(it.dataset.go); return; }
+    if (m && e.target.closest(".menu>button")) { const was = m.classList.contains("open"); document.querySelectorAll(".menu").forEach((x) => x.classList.remove("open")); if (!was) m.classList.add("open"); }
+  };
+  document.addEventListener("click", (e) => { if (!e.target.closest(".menu")) document.querySelectorAll(".menu").forEach((x) => x.classList.remove("open")); });
+  $("#wCompany").textContent = ME.user.company || ""; $("#wUser").textContent = ME.user.email || ME.user.name;
+  $("#days").innerHTML = `トライアル残り <b>${ME.trial.daysLeft}日</b>`;
+  $("#logout").onclick = () => { if (SERVER) location.href = "/logout"; else toast("ローカル試用中です"); };
+  if (!SERVER) $("#logout").classList.add("hidden");
+}
+const go = (h) => { if (location.hash === h) route(); else location.hash = h; };
+function route() {
+  const h = location.hash || "#/briefs"; const p = h.slice(2).split("/").map(decodeURIComponent);
+  window.scrollTo(0, 0);
+  if (p[0] === "brief" && brief(p[1])) return renderBrief(p[1]);
+  if (p[0] === "delivery" && brief(p[1])) return renderConfirm(p[1], p[2]);
+  if (p[0] === "creatives") return renderCreatives();
+  if (p[0] === "locked") return renderLocked(p[1]);
+  return renderList();
+}
+
+// =====================================================================
+//   与件一覧
+// =====================================================================
+function platformIcons(d) {
+  if (d.platform === "TikTok") return `<span class="platform-ico"><span class="ico tt">♪</span></span>`;
+  const m = d.media || "Instagram・Facebook";
+  return `<span class="platform-ico">${/Facebook/.test(m) ? '<span class="ico fb">f</span>' : ""}${/Instagram/.test(m) ? '<span class="ico ig">◎</span>' : ""}</span>`;
+}
+function renderList(q = "") {
+  const list = S.briefs.filter((b) => !b.archived && (!q || JSON.stringify([b.name, b.d.client, b.d.product, b.d.platform, b.owner]).includes(q)));
+  $("#main").innerHTML = `
+  <div class="toolbar"><h1 class="page">与件</h1><span style="flex:1"></span><button class="btn" id="newB">＋ 新規作成</button></div>
+  <div class="card search"><label>検索</label><input id="q" placeholder="与件名、商材名、クライアント名、担当者名、プラットフォームで検索..." value="${esc(q)}"></div>
+  <div class="card"><table class="list"><thead><tr><th>与件名</th><th>期間</th><th style="text-align:right">予算</th><th>Notes</th><th>オーディエンス設計</th><th>見積り</th><th>配信設計</th></tr></thead><tbody>
+  ${list.map((b) => `<tr>
+    <td><div class="bname" data-open="${b.id}">${platformIcons(b.d)} ${esc(b.name)}</div>
+      <div style="margin-top:8px;display:flex;gap:6px"><button class="btn ghost sm" data-open="${b.id}">詳細</button><button class="btn ghost sm" data-arch="${b.id}">アーカイブ</button></div></td>
+    <td class="small">${b.d.start ? `${showDT(b.d.start)}<br>〜<br>${showDT(b.d.end)}<br><span class="muted">${days(b.d)}日間</span>` : '<span class="muted">未設定</span>'}</td>
+    <td style="text-align:right;white-space:nowrap">${b.d.budget ? yen(b.d.budget) : '<span class="muted">—</span>'}</td>
+    <td>${b.notes.length ? `<div class="notebox"><span class="muted">${esc(b.notes.at(-1).at)}</span>\n${esc(b.notes.at(-1).text.slice(0, 160))}</div>` : '<span class="muted small">メモなし</span>'}</td>
+    <td><div class="mini"><button class="b-aud" data-act="aud" data-b="${b.id}">👥 オーディエンス設計</button>${b.audiences.slice(0, 3).map((a) => `<button class="b-aud" data-open-aud="${a.id}" data-b="${b.id}">${esc(a.name)}</button>`).join("")}</div></td>
+    <td><div class="mini"><button class="b-est" data-act="est" data-b="${b.id}">▦ 見積り</button>${b.estimates.slice(0, 3).map((a) => `<button class="b-est" data-open-est="${a.id}" data-b="${b.id}">${esc(a.name)}</button>`).join("")}</div></td>
+    <td><div class="mini"><button class="b-dlv" data-act="dlv" data-b="${b.id}">⊕ 配信設計</button>${b.deliveries.slice(0, 3).map((a) => `<button class="b-dlv" data-open-dlv="${a.id}" data-b="${b.id}">${esc(a.name)}</button>`).join("")}</div></td>
+  </tr>`).join("") || `<tr><td colspan="7"><div class="empty">与件がありません。「＋ 新規作成」から依頼メモを貼り付けてください。</div></td></tr>`}
+  </tbody></table></div>`;
+  $("#newB").onclick = () => { const b = newBrief(); persist(); go(`#/brief/${b.id}`); };
+  const qi = $("#q"); qi.oninput = () => { const v = qi.value; renderList(v); const n = $("#q"); n.focus(); n.setSelectionRange(v.length, v.length); };
+  $("#main").onclick = (e) => {
+    const t = e.target.closest("button,[data-open]"); if (!t) return;
+    const b = brief(t.dataset.b || t.dataset.open || t.dataset.arch);
+    if (t.dataset.arch) { if (confirm("この与件をアーカイブしますか？")) { b.archived = true; persist(); renderList(); } return; }
+    if (t.dataset.open) return go(`#/brief/${t.dataset.open}`);
+    if (t.dataset.act === "aud") return openAudience(b);
+    if (t.dataset.act === "est") return openEstimate(b);
+    if (t.dataset.act === "dlv") return openDelivery(b);
+    if (t.dataset.openAud) return openAudience(b, t.dataset.openAud);
+    if (t.dataset.openEst) return openEstimate(b, t.dataset.openEst);
+    if (t.dataset.openDlv) return openDelivery(b, t.dataset.openDlv);
+  };
+  guideUpdate();
+}
+
+// =====================================================================
+//   与件詳細
+// =====================================================================
+const FIELDS = [
+  ["platform", "プラットフォーム"], ["media", "媒体"], ["client", "クライアント"], ["product", "商材"], ["category", "カテゴリ"], ["budget", "予算"], ["margin", "マージン"],
+  ["period", "期間"], ["kpi", "KPI"], ["bid", "入札"], ["objective", "目的"], ["gender", "性別"], ["age", "年齢"], ["regions", "地域"], ["lpUrl", "LP"],
+];
+function fieldView(b, k) {
+  const d = b.d;
+  switch (k) {
+    case "budget": return d.budget ? `${yen(d.budget)}<span class="s">媒体金額 ${yen(d.budget * (1 - d.margin / 100))}（マージン ${d.margin}%）</span>` : "";
+    case "margin": return d.margin !== "" && d.margin != null ? `${d.margin}%` : "";
+    case "period": return d.start && d.end ? `${showDT(d.start)} 〜 ${showDT(d.end)}<span class="s">${days(d)}日間</span>` : "";
+    case "kpi": return d.kpiType && d.kpiValue ? `${esc(d.kpiType)} ${num(d.kpiValue)} 円` : "";
+    case "bid": return d.bid ? yen(d.bid) : "";
+    case "age": return `${d.ageMin}〜${d.ageMax >= 65 ? "65+" : d.ageMax}歳`;
+    case "regions": return (d.regions || []).map(esc).join("、");
+    case "lpUrl": return d.lpUrl ? `<span style="word-break:break-all">${esc(d.lpUrl)}</span>` : "";
+    case "media": return esc(d.media || (d.platform === "TikTok" ? "TikTok" : ""));
+    default: return esc(d[k] ?? "");
+  }
+}
+function missingItems(b) {
+  const d = b.d, out = [];
+  if (!b.meta.account) out.push(`${d.platform}広告アカウント`);
+  if (d.platform === "Meta" && !b.meta.page) out.push("Facebookページ");
+  if (!d.budget) out.push("予算"); if (!d.start || !d.end) out.push("期間"); if (!d.objective) out.push("目的");
+  if (!b.meta.creatives.length) out.push("クリエイティブ");
+  return out;
+}
+let TAB = "details";
+function renderBrief(id, { flash = [] } = {}) {
+  const b = brief(id); if (!b) return go("#/briefs");
+  const d = b.d, miss = missingItems(b);
+  const fmap = { platform: "platform", media: "media", client: "client", product: "product", category: "category", budget: "budget", margin: "margin", start: "period", end: "period",
+    objective: "objective", kpiType: "kpi", kpiValue: "kpi", bid: "bid", gender: "gender", ageMin: "age", ageMax: "age", regions: "regions", lpUrl: "lpUrl" };
+  const fl = new Set(flash.map((k) => fmap[k]).filter(Boolean));
+  const made = [...b.audiences.map((x) => ["aud", x]), ...b.estimates.map((x) => ["est", x]), ...b.deliveries.map((x) => ["dlv", x])];
+  $("#main").innerHTML = `
+  <div class="card">
+    <div class="dhead"><button class="back" onclick="go('#/briefs')">‹</button><h1><span id="bn">${esc(b.name)}</span> <button class="back" id="rn" title="名前を変更" style="font-size:16px">✎</button></h1>
+      <span class="muted small">担当者: ${esc(b.owner)}</span></div>
+    <div class="dgrid">
+      <div class="dcol">
+        <h3>Notes</h3>
+        <div class="noteinput"><textarea id="note" placeholder="依頼メール・チャット・依頼書・会話ログをそのまま貼り付けてください（最大10,000文字）&#10;追記で「予算は50万に変更」のように更新もできます" maxlength="10000"></textarea><button class="send" id="send" title="AI で読み取る" disabled>→</button></div>
+        <div class="tmpl"><span class="muted tiny" style="align-self:center">記入例:</span>${Object.keys(TEMPLATES).map((k) => `<button data-t="${esc(k)}">${esc(k)}</button>`).join("")}</div>
+        ${b.notes.slice().reverse().map((n) => `<div class="note"><div class="at">${esc(n.at)}</div>${esc(n.text)}</div>`).join("") || '<p class="muted small">まだメモがありません。依頼メモを貼り付けて → を押すと、AI が右の項目を埋めます。</p>'}
+      </div>
+      <div class="dcol">
+        <div class="tabs"><button data-tab="details" class="${TAB === "details" ? "on" : ""}">Details</button><button data-tab="media" class="${TAB === "media" ? "on" : ""}">${esc(d.platform)}</button></div>
+        <div id="tabbody"></div>
+      </div>
+      <div class="dcol">
+        <h3>Menu</h3>
+        <button class="menuBtn b-aud" id="mAud">👥 オーディエンス設計</button>
+        <button class="menuBtn b-est" id="mEst">▦ 見積り</button>
+        <button class="menuBtn b-dlv" id="mDlv">⊕ 配信設計 ${miss.length ? '<span title="不足項目があります" style="margin-left:auto;color:var(--orange)">⚠</span>' : ""}</button>
+        ${miss.length ? `<div class="lack"><b>不足項目</b><ul>${miss.map((m) => `<li>${esc(m)}</li>`).join("")}</ul></div>` : ""}
+        <div class="made">${made.length ? made.map(([t, x]) => `<div class="madeitem"><button class="open ${t === "aud" ? "b-aud" : t === "est" ? "b-est" : "b-dlv"}" data-o="${t}" data-id="${x.id}">${t === "aud" ? "👥" : t === "est" ? "▦" : "⊕"} ${esc(x.name)}<span class="tiny muted" style="display:block">${esc(x.at)}</span></button><button class="del" data-del="${t}" data-id="${x.id}" title="削除">✕</button></div>`).join("")
+          : '<p class="muted small">オーディエンス設計、見積りまたは配信設計を作成してください</p>'}</div>
+      </div>
+    </div>
+  </div>`;
+  const note = $("#note"), send = $("#send");
+  note.oninput = () => send.disabled = !note.value.trim();
+  send.onclick = async () => { const t = note.value.trim(); if (!t) return; b.notes.push({ at: stamp(), text: t }); persist(); note.value = ""; await runExtract(b); guideUpdate(); };
+  note.onkeydown = (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send.click(); };
+  document.querySelectorAll(".tmpl [data-t]").forEach((x) => x.onclick = () => { note.value = TEMPLATES[x.dataset.t]; send.disabled = false; note.focus(); });
+  $("#rn").onclick = () => { const v = prompt("与件名", b.name); if (v && v.trim()) { b.name = v.trim(); persist(); renderBrief(id); } };
+  document.querySelectorAll("[data-tab]").forEach((x) => x.onclick = () => { TAB = x.dataset.tab; renderBrief(id); });
+  $("#mAud").onclick = () => openAudience(b); $("#mEst").onclick = () => openEstimate(b); $("#mDlv").onclick = () => openDelivery(b);
+  document.querySelectorAll(".madeitem [data-o]").forEach((x) => x.onclick = () => ({ aud: openAudience, est: openEstimate, dlv: openDelivery })[x.dataset.o](b, x.dataset.id));
+  document.querySelectorAll(".madeitem [data-del]").forEach((x) => x.onclick = () => {
+    if (!confirm("削除しますか？")) return; const key = { aud: "audiences", est: "estimates", dlv: "deliveries" }[x.dataset.del];
+    b[key] = b[key].filter((y) => y.id !== x.dataset.id); persist(); renderBrief(id);
+  });
+  if (TAB === "details") renderDetails(b, fl, miss); else renderMediaTab(b);
+  guideUpdate();
+}
+function renderDetails(b, fl, miss) {
+  const tb = $("#tabbody"), ai = b.ai;
+  const reqMiss = new Set(miss);
+  tb.innerHTML = `
+  ${ai && (ai.assumptions?.length || ai.missing?.length) ? `
+    <div class="aibox"><h4>✦ AI の読み取りメモ <span class="muted tiny" style="font-weight:400">${esc(ai.at || "")}${ai.engine === "rule" ? "・簡易読み取り" : ai.secs ? `・${ai.secs}秒` : ""}</span></h4>
+      ${ai.assumptions?.length ? `<div class="small"><b>補完・推定した項目</b></div><ul>${ai.assumptions.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
+      ${ai.missing?.length ? `<div class="small"><b>依頼者に確認したいこと</b> <button class="btn ghost sm" id="cpq" style="margin-left:6px">確認メールの文面をコピー</button></div><ul>${ai.missing.map((a) => `<li>${esc(a)}</li>`).join("")}</ul>` : ""}
+    </div>` : ""}
+  <div class="sect"><div class="sh">▣ Details</div>
+  ${FIELDS.map(([k, label]) => { const v = fieldView(b, k);
+    const isMiss = (k === "budget" && reqMiss.has("予算")) || (k === "period" && reqMiss.has("期間")) || (k === "objective" && reqMiss.has("目的"));
+    return `<div class="frow ${fl.has(k) ? "flash" : ""} ${isMiss ? "missing" : ""}" data-f="${k}"><div class="k">${label}</div><div class="v ${v ? "" : "blank"}" data-edit="${k}">${v || (isMiss ? "未入力（必須）" : "クリックして入力")}</div>
+      ${v && !["platform", "gender", "age", "margin"].includes(k) ? `<button class="x" data-clear="${k}" title="クリア">✕</button>` : "<span></span>"}</div>`; }).join("")}
+  </div>
+  ${ai?.interests?.normal?.length ? `<div class="sect" style="margin-top:14px"><div class="sh">◎ ターゲット（AI 提案）</div><div style="padding:12px 16px">
+    <div class="small" style="margin-bottom:8px">${esc(b.d.targetSummary)}</div>${ai.interests.normal.map((i) => `<span class="chip">${esc(i)}</span>`).join("")}
+    <div style="margin-top:6px"><button class="btn sm" id="toAud">このままオーディエンス設計へ →</button></div></div></div>` : ""}`;
+  tb.onclick = (e) => {
+    const ed = e.target.closest("[data-edit]"), cl = e.target.closest("[data-clear]");
+    if (cl) { clearField(b, cl.dataset.clear); persist(); renderBrief(b.id); return; }
+    if (ed && !ed.querySelector("input,select")) editField(b, ed.dataset.edit, ed);
+  };
+  const ta = $("#toAud"); if (ta) ta.onclick = () => openAudience(b);
+  const cq = $("#cpq"); if (cq) cq.onclick = () => copyText(`お世話になっております。\n${b.name}の件、配信設計を進めるにあたり、以下をご確認いただけますでしょうか。\n\n${ai.missing.map((m, i) => `${i + 1}. ${m}`).join("\n")}\n\nお手数ですがよろしくお願いいたします。`);
+}
+function clearField(b, k) {
+  const d = b.d;
+  ({ client: () => d.client = "", product: () => d.product = "", category: () => d.category = "", budget: () => d.budget = 0, period: () => { d.start = ""; d.end = ""; },
+    kpi: () => { d.kpiType = ""; d.kpiValue = 0; }, bid: () => d.bid = 0, objective: () => d.objective = "", regions: () => d.regions = ["日本"], lpUrl: () => d.lpUrl = "", media: () => d.media = "" })[k]?.();
+}
+function editField(b, k, el) {
+  const d = b.d; let html = "";
+  const sel = (name, opts, v) => `<select name="${name}">${opts.map((o) => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+  const dt = (s) => s ? s.replace(" ", "T") : "";
+  switch (k) {
+    case "platform": html = sel("v", ["Meta", "TikTok"], d.platform); break;
+    case "media": html = sel("v", MEDIA[d.platform], d.media); break;
+    case "objective": html = sel("v", d.platform === "TikTok" ? TT_OBJ : META_OBJ, d.objective); break;
+    case "gender": html = sel("v", ["すべて", "男性", "女性"], d.gender); break;
+    case "budget": html = `<input name="v" type="number" min="0" step="1000" value="${d.budget || ""}" placeholder="グロス金額（円）">`; break;
+    case "margin": html = `<input name="v" type="number" min="0" max="90" step="0.5" value="${d.margin}"> %`; break;
+    case "bid": html = `<input name="v" type="number" min="0" value="${d.bid || ""}" placeholder="入札価格上限（円）">`; break;
+    case "period": html = `<input name="s" type="datetime-local" value="${dt(d.start)}"> 〜 <input name="e" type="datetime-local" value="${dt(d.end)}">`; break;
+    case "kpi": html = `${sel("t", ["CPM", "CPC", "CPV", "CPA", "CTR", "CPCV"], d.kpiType || "CPM")}<input name="v" type="number" min="0" value="${d.kpiValue || ""}"> 円`; break;
+    case "age": html = `<input name="a" type="number" min="13" max="65" value="${d.ageMin}"> 〜 <input name="b" type="number" min="13" max="65" value="${d.ageMax}"> 歳`; break;
+    case "regions": html = `<input name="v" value="${esc((d.regions || []).join("、"))}" placeholder="例: 東京都、神奈川県（全国は「日本」）">`; break;
+    default: html = `<input name="v" value="${esc(d[k] || "")}">`;
+  }
+  el.innerHTML = `<div class="editor">${html}<button class="btn sm" data-ok>保存</button></div>`;
+  const first = el.querySelector("input,select"); first.focus();
+  const save = () => {
+    const g = (n) => el.querySelector(`[name="${n}"]`)?.value ?? "";
+    switch (k) {
+      case "budget": d.budget = Math.max(0, Math.round(+g("v") || 0)); break;
+      case "margin": d.margin = Math.min(90, Math.max(0, +g("v") || 0)); break;
+      case "bid": d.bid = Math.max(0, Math.round(+g("v") || 0)); break;
+      case "period": d.start = g("s").replace("T", " "); d.end = g("e").replace("T", " "); break;
+      case "kpi": d.kpiType = g("t"); d.kpiValue = +g("v") || 0; break;
+      case "age": { let a = Math.min(65, Math.max(13, +g("a") || 18)), c = Math.min(65, Math.max(13, +g("b") || 65)); if (a > c) [a, c] = [c, a]; d.ageMin = a; d.ageMax = c; break; }
+      case "regions": d.regions = g("v").split(/[、,，\s]+/).filter(Boolean); if (!d.regions.length) d.regions = ["日本"]; break;
+      case "platform": d.platform = g("v"); d.media = MEDIA[d.platform][d.platform === "TikTok" ? 0 : 2]; d.objective = d.platform === "TikTok" ? "リーチ" : "認知"; b.meta.account = SAMPLE_ACCOUNT[d.platform]; TAB = "details"; break;
+      default: d[k] = g("v").trim();
+    }
+    persist(); renderBrief(b.id);
+  };
+  el.querySelector("[data-ok]").onclick = (e) => { e.stopPropagation(); save(); };
+  el.querySelectorAll("input,select").forEach((x) => x.onkeydown = (e) => { if (e.key === "Enter") save(); if (e.key === "Escape") renderBrief(b.id); });
+}
+let CTAB = "reg";
+function renderMediaTab(b) {
+  const d = b.d, tt = d.platform === "TikTok";
+  const cr = S.creatives;
+  $("#tabbody").innerHTML = `<div class="sect"><div class="sh">⊕ ${esc(d.platform)} 設定</div><div style="padding:14px 18px">
+    <span class="fl" style="margin-top:0">${esc(d.platform)}広告アカウント</span>
+    <select id="acc"><option value="">選択してください</option><option ${b.meta.account === SAMPLE_ACCOUNT[d.platform] ? "selected" : ""}>${esc(SAMPLE_ACCOUNT[d.platform])}</option></select>
+    <div class="tiny muted" style="margin-top:4px">🔒 トライアルでは実際の広告アカウントは連携できません（サンプルアカウントで設計できます）</div>
+    ${tt ? `<span class="fl">アイデンティティ</span><select id="page"><option>${esc((d.client || "ブランド") + "（サンプル）")}</option></select>`
+      : `<span class="fl">Facebookページ</span><select id="page"><option value="">選択してください</option><option ${b.meta.page ? "selected" : ""}>${esc(b.meta.page || ((d.client || "ブランド") + "（サンプル）"))}</option></select>`}
+    <span class="fl">クリエイティブ <span class="muted small" style="font-weight:400">${b.meta.creatives.length}件選択中</span></span>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div class="seg">
+      <button data-ct="reg" class="${CTAB === "reg" ? "on" : ""}">登録クリエイティブ</button><button data-ct="fb" class="${CTAB === "fb" ? "on" : ""}">${tt ? "TikTok投稿" : "Facebook投稿"}</button><button data-ct="ig" class="${CTAB === "ig" ? "on" : ""}">${tt ? "Spark Ads" : "Instagram投稿"}</button></div>
+      <span style="flex:1"></span><button class="btn sm" id="newC">＋ 新規作成</button></div>
+    ${CTAB === "reg" ? `<div class="cgrid">${cr.map((c) => `<div class="ccard ${b.meta.creatives.includes(c.id) ? "on" : ""}" data-c="${c.id}"><img src="${c.src}" alt=""><span class="ck">✓</span><div class="cn">${c.type === "動画" ? "▶ " : ""}${esc(c.name)}</div></div>`).join("")}</div>`
+      : `<div class="empty small">🔒 既存の投稿を広告に使う機能は、正式版で媒体と連携するとご利用いただけます。</div>`}
+  </div></div>`;
+  $("#acc").onchange = (e) => { b.meta.account = e.target.value; persist(); renderBrief(b.id); };
+  $("#page").onchange = (e) => { b.meta.page = e.target.value; persist(); renderBrief(b.id); };
+  document.querySelectorAll("[data-ct]").forEach((x) => x.onclick = () => { CTAB = x.dataset.ct; renderMediaTab(b); });
+  document.querySelectorAll("[data-c]").forEach((x) => x.onclick = () => {
+    const i = b.meta.creatives.indexOf(x.dataset.c); if (i >= 0) b.meta.creatives.splice(i, 1); else b.meta.creatives.push(x.dataset.c); persist(); renderBrief(b.id);
+  });
+  $("#newC").onclick = () => openCreativeNew((c) => { b.meta.creatives.push(c.id); persist(); renderBrief(b.id); }, b);
+}
+
+// =====================================================================
+//   モーダル
+// =====================================================================
+function modal(html, { narrow = false, noclose = false, onclose } = {}) {
+  const ov = document.createElement("div"); ov.className = "ov";
+  ov.innerHTML = `<div class="modal ${narrow ? "narrow" : ""}">${html}</div>`;
+  $("#layer").append(ov); document.body.style.overflow = "hidden";
+  const m = ov.firstElementChild; m._onclose = onclose;
+  if (!noclose) {
+    ov.addEventListener("mousedown", (e) => { if (e.target === ov) closeModal(m); });
+    m.querySelectorAll(".close").forEach((x) => x.onclick = () => closeModal(m));
+  }
+  return m;
+}
+function closeModal(m) { m.parentElement?.remove(); if (!$("#layer").children.length) document.body.style.overflow = ""; m._onclose?.(); }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { const ms = document.querySelectorAll("#layer .modal"); const m = ms[ms.length - 1]; if (m && m.querySelector(".close")) closeModal(m); } });
+
+// =====================================================================
+//   オーディエンス設計
+// =====================================================================
+const BASE_USERS = { Instagram: 66e6, Facebook: 26e6, "Instagram・Facebook": 72e6, TikTok: 33e6 };
+const AGE_BANDS = [[13, 17, .06], [18, 24, .15], [25, 34, .2], [35, 44, .2], [45, 54, .18], [55, 64, .13], [65, 65, .08]];
+const PREF = { 北海道: 4.1, 青森: .9, 岩手: .9, 宮城: 1.8, 秋田: .7, 山形: .8, 福島: 1.4, 茨城: 2.3, 栃木: 1.5, 群馬: 1.5, 埼玉: 5.9, 千葉: 5.0, 東京: 11.2, 神奈川: 7.4, 新潟: 1.7, 富山: .8, 石川: .9, 福井: .6, 山梨: .6, 長野: 1.6,
+  岐阜: 1.6, 静岡: 2.9, 愛知: 6.0, 三重: 1.4, 滋賀: 1.1, 京都: 2.0, 大阪: 7.1, 兵庫: 4.3, 奈良: 1.1, 和歌山: .7, 鳥取: .4, 島根: .5, 岡山: 1.5, 広島: 2.2, 山口: 1.0, 徳島: .6, 香川: .8, 愛媛: 1.0, 高知: .5,
+  福岡: 4.1, 佐賀: .6, 長崎: 1.0, 熊本: 1.4, 大分: .9, 宮崎: .9, 鹿児島: 1.3, 沖縄: 1.2 };
+function regionShare(regions) {
+  if (!regions?.length || regions.some((r) => /^(日本|全国|日本全国)$/.test(r))) return 1;
+  let s = 0;
+  for (const r of regions) {
+    const p = Object.keys(PREF).find((k) => r.includes(k));
+    const city = /[市区町村郡]/.test(r.replace(/^(東京都|京都府|大阪府|北海道|.{2,3}県)/, ""));
+    s += p ? PREF[p] / 100 * (city ? (/(横浜|大阪市|名古屋|札幌|福岡市|川崎|神戸)/.test(r) && !/区/.test(r.replace(/^.*?市/, "")) ? .35 : .08) : 1) : .01;
+  }
+  return Math.min(1, s);
+}
+function audienceBase(d) {
+  const base = BASE_USERS[d.media] || BASE_USERS[d.platform === "TikTok" ? "TikTok" : "Instagram・Facebook"];
+  let age = 0; for (const [a, z, w] of AGE_BANDS) { const lo = Math.max(a, d.ageMin), hi = Math.min(z, d.ageMax); if (hi >= lo) age += w * (hi - lo + 1) / (z - a + 1); }
+  const g = d.gender === "すべて" ? 1 : d.gender === "女性" ? .53 : .47;
+  return base * age * g * regionShare(d.regions);
+}
+const planPct = (ints, salt) => ints.length ? Math.min(.62, .0525 * Math.pow(ints.length, .573) * (.9 + hashN(ints.join() + salt) * .2)) : 1;
+const range = (n) => [sig3(n * .92), sig3(n * 1.08)];
+function computeAud(a) {
+  a.totalN = a.base;
+  for (const k of ["narrow", "normal", "wide"]) { const p = a.plans[k]; p.pct = planPct(p.interests, k); p.size = a.base * p.pct; }
+}
+function makeAudience(b) {
+  const d = b.d, ai = b.ai?.interests || { narrow: [], normal: [], wide: [] };
+  const a = { id: uid(), at: stamp(), name: `${d.platform}_${d.gender === "すべて" ? "すべての性別" : d.gender}_${d.ageMin}〜${d.ageMax >= 65 ? "65+" : d.ageMax}歳_${d.media || d.platform}`,
+    media: d.media || (d.platform === "TikTok" ? "TikTok" : "Instagram・Facebook"), gender: d.gender, ageMin: d.ageMin, ageMax: d.ageMax, regions: [...(d.regions || ["日本"])],
+    base: audienceBase(d), chosen: "normal",
+    plans: { narrow: { interests: [...ai.narrow] }, normal: { interests: [...ai.normal] }, wide: { interests: [...ai.wide] } } };
+  computeAud(a); return a;
+}
+function openAudience(b, aid) {
+  let a = aid ? structuredClone(b.audiences.find((x) => x.id === aid)) : makeAudience(b);
+  if (!b.ai?.interests?.normal?.length && !aid) toast("先に依頼メモを読み取ると、興味・関心が自動で入ります", 3500);
+  const isNew = !aid;
+  const m = modal(`<div class="mh"><h2>オーディエンス設計</h2><button class="close">✕</button></div><div class="mb" id="ab"></div>
+    <div class="mf"><span class="muted small" style="margin-right:auto;align-self:center">「この案を使う」で選んだ案が見積り・配信設計に使われます</span>
+    <button class="btn ghost" id="aSave">保存</button><button class="btn ghost" id="aEst" style="color:var(--blue)">▦ 見積りを作成</button><button class="btn" id="aDlv">⊕ 配信設計を作成</button></div>`);
+  const body = m.querySelector("#ab");
+  const draw = () => {
+    computeAud(a);
+    body.innerHTML = `<div class="titleedit"><input id="an" value="${esc(a.name)}"> ✎</div>
+      <div class="kv4"><div><div class="k">媒体</div><div class="v">${esc(a.media)}</div></div><div><div class="k">性別</div><div class="v">${esc(a.gender)}</div></div>
+      <div><div class="k">年代</div><div class="v">${a.ageMin}〜${a.ageMax >= 65 ? "65+" : a.ageMax}歳</div></div><div><div class="k">地域</div><div class="v">${esc(a.regions.join("、") === "日本" ? "日本全国" : a.regions.join("、"))}</div></div></div>
+      <div class="total"><span class="muted">全体サイズ</span><b>${range(a.base).map(num).join("〜")}</b></div>
+      <div class="plans">${[["narrow", "狭い"], ["normal", "普通"], ["wide", "広い"]].map(([k, l]) => { const p = a.plans[k]; return `
+        <div class="plan ${a.chosen === k ? "on" : ""}" data-k="${k}">${a.chosen === k ? '<span class="use">この案を使う</span>' : ""}
+          <div class="ph"><span>${l}</span><span>${p.interests.length ? (p.pct * 100).toFixed(1) + "%" : "—"}</span></div>
+          <div class="sz">${p.interests.length ? range(p.size).map(num).join("〜") : "インタレストなし（全体）"}</div>
+          <div class="bar"><i style="width:${p.interests.length ? Math.max(3, p.pct * 100 / .62) : 100}%"></i></div>
+          <div class="muted small">ターゲット</div><div class="small" style="margin-bottom:8px">${p.interests.length}個のインタレストを使用</div>
+          <div>${p.interests.map((i, n) => `<span class="chip">${esc(i)}<button data-rm="${k}:${n}" title="削除">✕</button></span>`).join("")}</div>
+          <div class="addint"><input placeholder="興味・関心を追加" data-add="${k}" list="intlist"><button class="btn ghost sm" data-addb="${k}">追加</button></div>
+          ${a.chosen !== k ? `<button class="btn ghost sm" style="margin-top:10px" data-use="${k}">この案を使う</button>` : ""}
+        </div>`; }).join("")}</div>
+      <datalist id="intlist">${[...new Set([...a.plans.wide.interests, ...(b.ai?.interests?.wide || [])])].map((i) => `<option value="${esc(i)}">`).join("")}</datalist>
+      <p class="muted tiny" style="margin-top:12px">※ トライアルの推定サイズは HAWK の簡易モデルによる目安です。正式版では媒体の API から推定オーディエンスを取得します。</p>`;
+  };
+  draw();
+  body.oninput = (e) => { if (e.target.id === "an") a.name = e.target.value; };
+  body.onclick = (e) => {
+    const t = e.target;
+    if (t.dataset.rm) { const [k, n] = t.dataset.rm.split(":"); a.plans[k].interests.splice(+n, 1); draw(); return; }
+    if (t.dataset.addb) { const inp = body.querySelector(`[data-add="${t.dataset.addb}"]`); const v = inp.value.trim(); if (v) { a.plans[t.dataset.addb].interests.push(v); draw(); } return; }
+    if (t.dataset.use) { a.chosen = t.dataset.use; draw(); return; }
+  };
+  body.onkeydown = (e) => { if (e.target.dataset.add && e.key === "Enter") { const v = e.target.value.trim(); if (v) { a.plans[e.target.dataset.add].interests.push(v); draw(); body.querySelector(`[data-add="${e.target.dataset.add}"]`)?.focus(); } } };
+  const save = () => { const i = b.audiences.findIndex((x) => x.id === a.id); if (i >= 0) b.audiences[i] = a; else b.audiences.unshift(a); persist(); return a; };
+  m.querySelector("#aSave").onclick = () => { save(); closeModal(m); toast("オーディエンス設計を保存しました"); refresh(b); };
+  m.querySelector("#aEst").onclick = () => { save(); closeModal(m); refresh(b); openEstimate(b, null, a.id); };
+  m.querySelector("#aDlv").onclick = () => { save(); closeModal(m); refresh(b); openDelivery(b, null, a.id); };
+}
+function refresh(b) { if (location.hash.startsWith("#/brief/")) renderBrief(b.id); else route(); }
+
+// =====================================================================
+//   見積り
+// =====================================================================
+const CAT_MUL = (c) => /(不動産|金融|保険)/.test(c) ? 1.25 : /(化粧品|美容)/.test(c) ? 1.12 : /(自動車)/.test(c) ? 1.1 : /(ゲーム|エンタメ)/.test(c) ? .92 : /(食品|飲料)/.test(c) ? .95 : 1;
+function baseRates(b, aud) {
+  const d = b.d, tt = d.platform === "TikTok", obj = d.objective || (tt ? "リーチ" : "認知");
+  const cpmBase = tt ? ({ リーチ: 380, 動画視聴: 300, トラフィック: 620, ウェブサイトのコンバージョン: 900, リード: 850, コミュニティインタラクション: 500 })[obj] || 420
+    : ({ 認知: 520, トラフィック: 760, エンゲージメント: 560, リード: 1100, 売上: 1250, "アプリの宣伝": 900 })[obj] || 600;
+  const narrow = aud ? ({ narrow: 1.15, normal: 1, wide: .93 })[aud.chosen] : 1;
+  const gm = d.gender === "すべて" ? 1 : 1.05, rm = regionShare(d.regions) < .3 ? 1.1 : 1;
+  const cpm = cpmBase * CAT_MUL(d.category) * narrow * gm * rm * (.97 + hashN(b.id) * .06);
+  const n = days(d) || 30;
+  const fq = Math.min(5.5, Math.max(1.3, (tt ? 1.2 : 1.35) + n * (obj === "認知" || obj === "リーチ" ? .053 : .04)));
+  const ctr = ({ 認知: .45, リーチ: .35, トラフィック: 1.05, エンゲージメント: .5, リード: .85, 売上: .95, "アプリの宣伝": .8, 動画視聴: .3, ウェブサイトのコンバージョン: .9, コミュニティインタラクション: .4 })[obj] || .6;
+  return { cpm, fq, ctr, tp: tt ? 12.0 : 15.5, cv: tt ? 5.2 : 7.9 };
+}
+function makeEstimate(b, audId) {
+  const d = b.d, aud = b.audiences.find((x) => x.id === audId) || b.audiences[0];
+  const r = baseRates(b, aud);
+  const tt = d.platform === "TikTok";
+  return { id: uid(), at: stamp(), audId: aud?.id || "", name: `${d.platform}_${d.objective || "認知"}_${d.budget ? Math.round(d.budget / 10000) + "万" : ""}_見積り`,
+    margin: d.margin, gross: d.budget, video: { cpm: +r.cpm.toFixed(2), fq: +r.fq.toFixed(2), ctr: +r.ctr.toFixed(2), tp: r.tp, cv: r.cv },
+    image: tt ? null : { cpm: +(r.cpm * 1.008).toFixed(2), fq: +(r.fq * .95).toFixed(2), ctr: +(r.ctr * 1.16).toFixed(2) } };
+}
+function calc(gross, x, aud) {
+  const imp = gross / x.cpm * 1000;
+  let fq = x.fq, reach = imp / fq;
+  const cap = aud ? aud.plans[aud.chosen].size * 1.08 : Infinity;
+  let capped = false; if (reach > cap) { reach = cap; fq = imp / reach; capped = true; }
+  const clk = imp * x.ctr / 100;
+  const o = { imp, reach, fq, clk, cpm: x.cpm, rcost: gross / reach, ctr: x.ctr, cpc: gross / clk, capped };
+  if (x.tp != null) { o.tp = imp * x.tp / 100; o.tpc = gross / o.tp; o.cvn = imp * x.cv / 100; o.cvc = gross / o.cvn; }
+  return o;
+}
+function refCases(b) {
+  const d = b.d, r = baseRates(b), cat = (d.category || "サンプル").split(">").pop().trim(), obj = d.objective || "認知";
+  return [0, 1, 2].map((i) => {
+    const h = hashN(b.id + i), spend = Math.round((800000 + h * 3000000) / 1000) * 1000, cpm = r.cpm * (.55 + h * .4) * .8;
+    const imp = spend / cpm * 1000, fq = 2.4 + h * 1.2, clk = imp * r.ctr / 100 * (.8 + h * .4);
+    return { name: `サンプル${["A", "B", "C"][i]}社_${cat}_${obj}_${["2506", "2508", "2510"][i]}`, acct: `サンプル${["A", "B", "C"][i]}社（架空）`, obj, spend, imp, clk, reach: imp / fq, fq, tp: imp * .155, cv: imp * .079 };
+  });
+}
+function openEstimate(b, eid, audId) {
+  const d = b.d;
+  if (!d.budget || !d.objective) { toast("見積りには「予算」と「目的」が必要です。Details で入力してください", 3500); if (!location.hash.includes(b.id)) go(`#/brief/${b.id}`); return; }
+  let e = eid ? structuredClone(b.estimates.find((x) => x.id === eid)) : makeEstimate(b, audId);
+  const aud = b.audiences.find((x) => x.id === e.audId);
+  const tt = d.platform === "TikTok";
+  const m = modal(`<div class="mh"><h2>見積り</h2><button class="close">✕</button></div><div class="mb" id="eb"></div>
+    <div class="mf"><button class="btn ghost" id="eSave">保存</button><button class="btn" id="eDlv">⊕ 配信設計を作成</button></div>`);
+  const body = m.querySelector("#eb");
+  const row = (label, k, a, x, kind) => {
+    if (!a) return `<td colspan="3" class="muted" style="text-align:center">-</td>`;
+    const w = (v, max) => Math.max(4, Math.min(100, v / max * 100));
+    const cell = (v, max) => `<td class="n"><i style="width:${w(v, max)}%"></i><span>${num(v)}</span></td>`;
+    const inp = (f, v, step) => `<input type="number" step="${step}" data-f="${kind}.${f}" value="${v}">`;
+    switch (k) {
+      case "imp": return `${cell(a.imp, a.imp)}<td>-</td><td><span class="u">CPM</span>¥${inp("cpm", x.cpm, "0.01")}</td>`;
+      case "reach": return `${cell(a.reach, a.imp)}<td><span class="u">FQ</span>${inp("fq", +a.fq.toFixed(2), "0.01")}</td><td>¥${a.rcost.toFixed(2)}</td>`;
+      case "clk": return `${cell(a.clk, a.imp)}<td><span class="u">CTR</span>${inp("ctr", x.ctr, "0.01")}%</td><td><span class="u">CPC</span>¥${a.cpc.toFixed(2)}</td>`;
+      case "tp": return a.tp != null ? `${cell(a.tp, a.imp)}<td>${inp("tp", x.tp, "0.1")}%</td><td>¥${a.tpc.toFixed(2)}</td>` : `<td class="muted" style="text-align:center">-</td><td>-</td><td>-</td>`;
+      case "cv": return a.cvn != null ? `${cell(a.cvn, a.imp)}<td>${inp("cv", x.cv, "0.1")}%</td><td>¥${a.cvc.toFixed(2)}</td>` : `<td class="muted" style="text-align:center">-</td><td>-</td><td>-</td>`;
+    }
+  };
+  const draw = () => {
+    const V = calc(e.gross, e.video, aud), I = e.image ? calc(e.gross, e.image, aud) : null;
+    const warn = [];
+    if (e.video.cv > e.video.tp) warn.push("視聴完了率が ThruPlay 率を上回っています");
+    if (V.capped) warn.push("推定リーチがオーディエンスサイズを超えるため、フリークエンシーを自動で引き上げました");
+    const kpi = d.kpiType && d.kpiValue ? (() => { const est = d.kpiType === "CPM" ? V.cpm : d.kpiType === "CPC" ? V.cpc : d.kpiType === "CPV" ? V.tpc : null; return est ? `<span class="kpicmp ${est <= d.kpiValue ? "ok" : "ng"}">KPI ${d.kpiType} ¥${num(d.kpiValue)} に対し 見積り ¥${est.toFixed(0)}</span>` : ""; })() : "";
+    const refs = refCases(b);
+    body.innerHTML = `<div class="titleedit"><input id="en" value="${esc(e.name)}"> ✎</div>
+      <div class="muted">マージン率: ${Number(e.margin).toFixed(2)}%（マージン）　予算: ${yen(e.gross)}（媒体金額 ${yen(e.gross * (1 - e.margin / 100))}）${aud ? `　オーディエンス: ${esc(aud.name)}（${({ narrow: "狭い", normal: "普通", wide: "広い" })[aud.chosen]}）` : ""}</div>
+      <div style="display:flex;align-items:center;margin:20px 0 8px"><b>自社グロスでの見積り結果</b>${kpi}<span style="flex:1"></span><button class="btn ghost sm" id="cp1">⧉ コピー</button></div>
+      <div class="card esttab-wrap" style="padding:10px 14px"><table class="esttab"><thead>
+        <tr><th></th><th class="grp" colspan="3">${tt ? "動画（TikTok）" : "動画"}</th><th class="gap"></th>${tt ? "" : '<th class="grp" colspan="3">静止画</th>'}</tr>
+        <tr><th></th><th>数</th><th>率</th><th>単価</th><th></th>${tt ? "" : "<th>数</th><th>率</th><th>単価</th>"}</tr></thead><tbody>
+        ${[["imp", "imp"], ["reach", "リーチ"], ["clk", "クリック"], ["tp", tt ? "6秒視聴" : "ThruPlay"], ["cv", "完全視聴"]].map(([k, l]) =>
+          `<tr><td class="m">${l}</td>${row(l, k, V, e.video, "video")}<td></td>${tt ? "" : row(l, k, I, e.image, "image")}</tr>`).join("")}
+      </tbody></table>${warn.map((w) => `<div class="warnline">⚠ ${esc(w)}</div>`).join("")}</div>
+      <div style="display:flex;align-items:center;margin:24px 0 4px"><b>動画の参考案件</b><button class="btn ghost sm" style="margin-left:10px" id="redo">選び直す</button><span style="flex:1"></span><button class="btn ghost sm" id="cp2">⧉ コピー</button></div>
+      <div class="muted small" style="margin-bottom:6px">金額はメディア数値です。※ トライアルでは架空のサンプル案件を表示しています。正式版では自社アカウントの過去実績（不足分は FreakOut の匿名化カテゴリ平均）から算出します。</div>
+      <div class="refs-wrap"><table class="refs"><thead><tr><th>アカウント / キャンペーン</th><th>目的</th><th>配信金額</th><th>imp</th><th>クリック</th><th>リーチ</th><th>ThruPlay</th><th>視聴完了</th></tr></thead><tbody>
+      ${refs.map((r) => `<tr><td><b>${esc(r.name)}</b><span class="s">${esc(r.acct)}</span></td><td>${esc(r.obj)}</td><td>${yen(r.spend)}</td><td>${num(r.imp)}<span class="s">単価: ¥${(r.spend / r.imp * 1000).toFixed(0)}</span></td>
+        <td>${num(r.clk)}<span class="s">CTR: ${(r.clk / r.imp * 100).toFixed(2)}%</span><span class="s">CPC: ¥${(r.spend / r.clk).toFixed(2)}</span></td><td>${num(r.reach)}<span class="s">FQ: ${r.fq.toFixed(2)}</span></td>
+        <td>${num(r.tp)}<span class="s">率: 15.50%</span></td><td>${num(r.cv)}<span class="s">率: 7.90%</span></td></tr>`).join("")}</tbody></table></div>
+      <details style="margin-top:20px"><summary class="muted">入力条件・推定条件</summary><div class="cond" style="margin-top:10px">
+        <div><span>自社グロス</span>${yen(e.gross)}</div><div><span>媒体金額</span>${yen(e.gross * (1 - e.margin / 100))}</div><div><span>キャンペーン目的</span>${esc(d.objective)}</div><div><span>フリークエンシーキャップ</span>なし</div>
+        <div><span>配信面</span>${esc(d.media || d.platform)}</div><div><span>地域</span>${esc((d.regions || []).join("、"))}</div><div><span>性別</span>${esc(d.gender)}</div><div><span>年齢</span>${d.ageMin}〜${d.ageMax >= 65 ? "65+" : d.ageMax}歳</div>
+        <div style="grid-column:1/-1"><span>詳細ターゲット</span>${aud ? aud.plans[aud.chosen].interests.map(esc).join("、") || "なし" : "なし"}</div></div></details>`;
+    body.querySelector("#cp1").onclick = () => {
+      const L = [["", "動画_数", "動画_率", "動画_単価", ...(I ? ["静止画_数", "静止画_率", "静止画_単価"] : [])],
+        ["imp", V.imp, "", V.cpm, ...(I ? [I.imp, "", I.cpm] : [])], ["リーチ", V.reach, V.fq, V.rcost, ...(I ? [I.reach, I.fq, I.rcost] : [])],
+        ["クリック", V.clk, V.ctr + "%", V.cpc, ...(I ? [I.clk, I.ctr + "%", I.cpc] : [])], [tt ? "6秒視聴" : "ThruPlay", V.tp, e.video.tp + "%", V.tpc], ["完全視聴", V.cvn, e.video.cv + "%", V.cvc]];
+      copyText(L.map((r) => r.map((c) => typeof c === "number" ? (c > 100 ? Math.round(c) : c.toFixed(2)) : c).join("\t")).join("\n"));
+    };
+    body.querySelector("#cp2").onclick = () => copyText(["アカウント/キャンペーン\t目的\t配信金額\timp\tクリック\tリーチ", ...refs.map((r) => [r.name, r.obj, r.spend, Math.round(r.imp), Math.round(r.clk), Math.round(r.reach)].join("\t"))].join("\n"));
+    body.querySelector("#redo").onclick = () => toast("🔒 参考案件の選び直しは正式版でご利用いただけます（自社アカウントの実績から選べます）", 3500);
+  };
+  draw();
+  body.oninput = (ev) => { if (ev.target.id === "en") e.name = ev.target.value; };
+  body.onchange = (ev) => {
+    const f = ev.target.dataset.f; if (!f) return; const [kind, k] = f.split("."); let v = +ev.target.value;
+    if (!(v > 0)) return draw();
+    if (k === "fq" && v > 1000) v = 1000; if (k === "ctr" && v > 100) v = 100;
+    e[kind][k] = v; draw();
+  };
+  const save = () => { const i = b.estimates.findIndex((x) => x.id === e.id); if (i >= 0) b.estimates[i] = e; else b.estimates.unshift(e); persist(); };
+  m.querySelector("#eSave").onclick = () => { save(); closeModal(m); toast("見積りを保存しました"); refresh(b); };
+  m.querySelector("#eDlv").onclick = () => { save(); closeModal(m); refresh(b); openDelivery(b, null, e.audId, e.id); };
+}
+
+// =====================================================================
+//   配信設計
+// =====================================================================
+function specialCat(c) { return /不動産|住宅/.test(c) ? "住宅" : /人材|採用|求人/.test(c) ? "雇用" : /金融|クレジット|ローン/.test(c) ? "金融商品とサービス" : "なし"; }
+function makeDelivery(b, audId) {
+  const d = b.d, tt = d.platform === "TikTok", n = days(d) || 30, mg = d.margin / 100;
+  const aud = b.audiences.find((x) => x.id === audId) || b.audiences[0];
+  const ints = aud ? aud.plans[aud.chosen].interests : (b.ai?.interests?.normal || []);
+  const obj = d.objective || (tt ? "リーチ" : "認知");
+  const base = `${b.name}_${obj}`;
+  const crs = b.meta.creatives.map((id) => S.creatives.find((c) => c.id === id)).filter(Boolean);
+  const copies = b.ai?.ads?.length ? b.ai.ads : [{ text: "", headline: "", description: "", cta: "詳しくはこちら" }];
+  const nAds = Math.max(crs.length, 1);
+  const ads = Array.from({ length: nAds }, (_, i) => { const c = copies[i % copies.length];
+    return { id: uid(), name: `${base}-${i + 1}`, creative: crs[i]?.id || "", page: b.meta.page || "", text: c.text, headline: c.headline, description: c.description, lp: d.lpUrl, cta: c.cta }; });
+  const pl = d.placements?.length ? d.placements : tt ? ["TikTokフィード"] : ["フィード", "ストーリーズ", "リール"];
+  const surf = tt ? "TikTok" : d.media === "Instagram" ? "Instagram のみ" : d.media === "Facebook" ? "Facebook のみ" : "Facebook と Instagram";
+  const sc = tt ? "なし" : specialCat(d.category);
+  return { id: uid(), at: stamp(), audId: aud?.id || "", name: `${base}_配信設計`,
+    account: b.meta.account || SAMPLE_ACCOUNT[d.platform], margin: d.margin,
+    campaign: { name: base, objective: obj, budget: d.budget, equal: false, special: sc },
+    adsets: [{ id: uid(), name: base, daily: Math.round(d.budget / n), goal: GOALS[obj] || "", bidStrategy: tt ? "最大" : d.bid ? "入札価格上限" : "最大数量", bidCap: tt ? 0 : d.bid || 0,
+      billing: "インプレッション", frequency: "制御なし", start: d.start, end: d.end, devices: "全てのデバイス",
+      gender: sc !== "なし" ? "すべて" : d.gender, ageMin: sc !== "なし" ? 18 : d.ageMin, ageMax: sc !== "なし" ? 65 : d.ageMax,
+      surface: surf, placements: pl, regionMode: "含める", regions: [...(d.regions || ["日本"])], customIn: "", customEx: "", interests: [...ints],
+      language: tt ? "日本語" : "すべての言語", ads }] };
+}
+function crSrc(id) { return S.creatives.find((c) => c.id === id)?.src || ""; }
+function openDelivery(b, did, audId) {
+  const d = b.d, tt = d.platform === "TikTok";
+  const lack = missingItems(b).filter((x) => x !== "クリエイティブ");
+  if (!did && (lack.includes("予算") || lack.includes("期間"))) { toast(`配信設計には ${lack.join("・")} が必要です`, 3500); if (!location.hash.includes(b.id)) go(`#/brief/${b.id}`); return; }
+  let x = did ? structuredClone(b.deliveries.find((y) => y.id === did)) : makeDelivery(b, audId);
+  let edit = false;
+  const m = modal(`<div class="mh"><h2>${platformIcons(d)} 配信設計</h2><button class="btn" id="mode">編集モードに切替</button><button class="close">✕</button></div><div class="mb" id="db"></div>
+    <div class="mf"><span class="muted small" style="margin-right:auto;align-self:center" id="dmsg"></span><button class="btn ghost" id="dSave">保存</button><button class="btn" id="dGo">連携に進む →</button></div>`);
+  const body = m.querySelector("#db");
+  const nAds = () => x.adsets.reduce((n, s) => n + s.ads.length, 0);
+  const mgMedia = (v) => yen(v * (1 - x.margin / 100));
+  const F = (k, v, cls = "") => `<div class="${cls}"><div class="k">${k}</div><div class="v">${v || '<span class="muted">—</span>'}</div></div>`;
+  const I = (path, v, type = "text", cls = "") => `<div class="${cls}"><label class="k">${path.label}</label><input data-p="${path.p}" type="${type}" value="${esc(v ?? "")}"></div>`;
+  const Sel = (label, p, opts, v, cls = "") => `<div class="${cls}"><label class="k">${label}</label><select data-p="${p}">${opts.map((o) => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></div>`;
+  const chips = (arr, p) => `${arr.map((v, i) => `<span class="chip">${esc(v)}${edit ? `<button data-rmc="${p}:${i}">✕</button>` : ""}</span>`).join("") || '<span class="muted">なし</span>'}${edit ? `<div class="addint" style="max-width:520px"><input data-addc="${p}" placeholder="追加して Enter"></div>` : ""}`;
+  const draw = () => {
+    m.querySelector("#mode").textContent = edit ? "閲覧モードに切替" : "編集モードに切替";
+    const c = x.campaign;
+    body.innerHTML = `
+      ${edit ? `<div class="titleedit"><input data-p="name" value="${esc(x.name)}"></div>` : `<div class="titleedit">${esc(x.name)}</div>`}
+      <div class="dl-head"><div><div class="k">広告アカウント</div>${esc(x.account)}</div><div><div class="k">マージン</div>代理店 -　自社 ${Number(x.margin).toFixed(2)}%</div></div>
+      <h3 style="margin:6px 0 12px">広告構成（1キャンペーン, ${x.adsets.length}広告セット, ${nAds()}広告）</h3>
+      <div class="lvl"><span class="pill camp">キャンペーン</span>
+        ${edit ? `<div class="fgrid" style="margin-top:10px">${I({ label: "キャンペーン名", p: "campaign.name" }, c.name, "text", "w2")}${Sel("キャンペーン目的", "campaign.objective", tt ? TT_OBJ : META_OBJ, c.objective)}${I({ label: "予算（通算・グロス）", p: "campaign.budget" }, c.budget, "number")}
+            ${tt ? "" : Sel("特別な広告カテゴリ", "campaign.special", ["なし", "住宅", "雇用", "金融商品とサービス", "社会問題、選挙または政治"], c.special)}
+            <div class="w2"><label class="k">&nbsp;</label><label><input type="checkbox" data-p="campaign.equal" ${c.equal ? "checked" : ""} style="width:auto"> 全ての広告セットに予算を均等に割り当てる</label></div></div>`
+        : `<div class="nm">${esc(c.name)}</div><div class="fgrid">${F("キャンペーン目的", esc(c.objective))}${F("予算", `${yen(c.budget)}<span class="s">メディア通算予算: ${mgMedia(c.budget)}</span>`)}${F("", `<label class="muted small"><input type="checkbox" disabled ${c.equal ? "checked" : ""} style="width:auto"> 全ての広告セットに予算を均等に割り当てる</label>`)}${tt ? "" : F("特別な広告カテゴリ", esc(c.special))}</div>`}
+        ${c.special && c.special !== "なし" ? `<div class="warnline">⚠ 特別な広告カテゴリ「${esc(c.special)}」では、年齢・性別・詳細ターゲットの指定が制限されます（年齢18〜65+・性別すべてに固定）</div>` : ""}
+      </div>
+      ${x.adsets.map((s, si) => `
+      <div class="lvl adset">${edit ? `<div class="tools"><button class="btn ghost sm" data-dup="${si}">⧉ 複製</button><button class="btn ghost sm" data-split="${si}">分割</button>${x.adsets.length > 1 ? `<button class="btn danger sm" data-dels="${si}">削除</button>` : ""}</div>` : ""}
+        <span class="pill adset">広告セット</span> <span class="muted small" style="float:${edit ? "none" : "right"}">👥 推定オーディエンス ${(() => { const a = b.audiences.find((y) => y.id === x.audId); return a ? range(a.plans[a.chosen].size).map(num).join("〜") : "—"; })()}</span>
+        ${edit ? `<div class="fgrid" style="margin-top:10px">
+            ${I({ label: "広告セット名", p: `adsets.${si}.name` }, s.name, "text", "w2")}${I({ label: "日予算（グロス）", p: `adsets.${si}.daily` }, s.daily, "number")}${I({ label: "パフォーマンスの目標", p: `adsets.${si}.goal` }, s.goal)}
+            ${Sel("入札戦略", `adsets.${si}.bidStrategy`, tt ? ["最大"] : ["最大数量", "単価の目標", "入札価格上限"], s.bidStrategy)}${tt ? "" : I({ label: "入札価格上限（円）", p: `adsets.${si}.bidCap` }, s.bidCap, "number")}
+            ${Sel("フリークエンシー", `adsets.${si}.frequency`, ["制御なし", "7日間に2回まで", "7日間に3回まで", "1日1回まで"], s.frequency)}${Sel("デバイス", `adsets.${si}.devices`, ["全てのデバイス", "モバイルのみ", "デスクトップのみ"], s.devices)}
+            ${I({ label: "開始", p: `adsets.${si}.start` }, (s.start || "").replace(" ", "T"), "datetime-local")}${I({ label: "終了", p: `adsets.${si}.end` }, (s.end || "").replace(" ", "T"), "datetime-local")}
+            ${Sel("性別", `adsets.${si}.gender`, ["すべて", "男性", "女性"], s.gender)}${I({ label: "最小年齢", p: `adsets.${si}.ageMin` }, s.ageMin, "number")}${I({ label: "最大年齢", p: `adsets.${si}.ageMax` }, s.ageMax, "number")}
+            ${tt ? Sel("言語", `adsets.${si}.language`, ["日本語", "英語", "すべての言語"], s.language) : Sel("配信面", `adsets.${si}.surface`, ["Facebook と Instagram", "Instagram のみ", "Facebook のみ"], s.surface)}
+            <div class="w4"><label class="k">配置</label>${chips(s.placements, `adsets.${si}.placements`)}</div>
+            <div class="w4"><label class="k">地域　<label style="font-weight:400"><input type="radio" name="rm${si}" data-p="adsets.${si}.regionMode" value="含める" ${s.regionMode === "含める" ? "checked" : ""} style="width:auto"> 次を含める</label>　<label style="font-weight:400"><input type="radio" name="rm${si}" data-p="adsets.${si}.regionMode" value="除外" ${s.regionMode === "除外" ? "checked" : ""} style="width:auto"> 次を除外</label></label>${chips(s.regions, `adsets.${si}.regions`)}</div>
+            ${tt ? "" : `${I({ label: "カスタムオーディエンス（含める）", p: `adsets.${si}.customIn` }, s.customIn, "text", "w2")}${I({ label: "カスタムオーディエンス（除外）", p: `adsets.${si}.customEx` }, s.customEx, "text", "w2")}`}
+            <div class="w4"><label class="k">詳細ターゲット設定（興味・関心）</label>${chips(s.interests, `adsets.${si}.interests`)}</div></div>`
+        : `<div class="nm">${esc(s.name)}</div><div class="fgrid">
+            ${F("日予算", `${yen(s.daily)}<span class="s">メディア日予算: ${mgMedia(s.daily)}</span>`)}${F("パフォーマンスの目標", esc(s.goal))}${F("入札戦略", esc(s.bidStrategy))}${tt ? "" : F("入札価格上限", s.bidStrategy === "入札価格上限" && s.bidCap ? yen(s.bidCap) : "")}
+            ${F("課金イベント", esc(s.billing))}${F("フリークエンシー", esc(s.frequency))}${F("開始", esc(showDT(s.start)))}${F("終了", esc(showDT(s.end)))}
+            ${F("デバイス", esc(s.devices))}${F("性別", esc(s.gender))}${F("最小年齢", s.ageMin)}${F("最大年齢", s.ageMax >= 65 ? "65+" : s.ageMax)}
+            ${F(tt ? "言語" : "配信面", esc(tt ? s.language : s.surface))}${F("配置", s.placements.map(esc).join(", "), "w2")}${F("地域", `${s.regionMode === "除外" ? "除外: " : ""}${s.regions.map(esc).join("、")}`)}
+            ${F("詳細ターゲット設定", s.interests.map((i) => `<span class="chip">${esc(i)}</span>`).join("") || "", "w4")}</div>`}
+        ${s.ads.map((a, ai) => `
+        <div class="lvl ad" style="margin-top:12px">${edit ? `<div class="tools"><button class="btn ghost sm" data-dupa="${si}:${ai}">⧉ 複製</button>${s.ads.length > 1 ? `<button class="btn danger sm" data-dela="${si}:${ai}">削除</button>` : ""}</div>` : ""}
+          <span class="pill ad">広告</span>
+          ${edit ? `<div class="fgrid" style="margin-top:10px">${I({ label: "広告名 *", p: `adsets.${si}.ads.${ai}.name` }, a.name, "text", "w2")}${Sel("CTA", `adsets.${si}.ads.${ai}.cta`, CTAS, a.cta)}${I({ label: tt ? "アイデンティティ" : "Facebookページ", p: `adsets.${si}.ads.${ai}.page` }, a.page)}
+              <div class="w4"><label class="k">クリエイティブ選択 *</label><div class="picker">${S.creatives.map((cr) => `<img src="${cr.src}" title="${esc(cr.name)}" class="${a.creative === cr.id ? "on" : ""}" data-pick="${si}:${ai}:${cr.id}">`).join("")}</div></div>
+              <div class="w4"><label class="k">広告テキスト（${tt ? 100 : 125}字目安）</label><textarea data-p="adsets.${si}.ads.${ai}.text" rows="3">${esc(a.text)}</textarea></div>
+              ${tt ? "" : `${I({ label: "見出し", p: `adsets.${si}.ads.${ai}.headline` }, a.headline, "text", "w2")}${I({ label: "説明", p: `adsets.${si}.ads.${ai}.description` }, a.description, "text", "w2")}`}
+              ${I({ label: "ランディングページURL", p: `adsets.${si}.ads.${ai}.lp` }, a.lp, "url", "w4")}</div>`
+          : `<div class="nm">${esc(a.name)}</div><div style="display:flex;gap:18px;flex-wrap:wrap">${a.creative ? `<img class="adthumb" src="${crSrc(a.creative)}" alt="">` : '<div class="adthumb" style="display:flex;align-items:center;justify-content:center;color:var(--red);font-size:12px;text-align:center">クリエイティブ<br>未選択</div>'}
+              <div class="fgrid" style="flex:1;min-width:260px;grid-template-columns:repeat(2,minmax(0,1fr))">${F(tt ? "アイデンティティ" : "Facebookページ", esc(a.page))}${F("CTA", esc(a.cta))}${F("広告テキスト", esc(a.text), "w2")}${tt ? "" : F("見出し", esc(a.headline)) + F("説明", esc(a.description))}${F("ランディングページURL", a.lp ? esc(a.lp) : '<span style="color:var(--red)">未入力</span>', "w2")}</div></div>`}
+        </div>`).join("")}
+      </div>`).join("")}
+      <div class="fixed">HAWK が固定する設定: 購入タイプ＝オークション、予算戦略＝広告セット予算、A/Bテスト＝OFF、ダイナミッククリエイティブ＝OFF、配置＝手動</div>`;
+    const issues = [];
+    x.adsets.forEach((s) => s.ads.forEach((a) => { if (!a.creative) issues.push("クリエイティブ未選択の広告があります"); if (!a.lp) issues.push("LP の URL が未入力の広告があります"); }));
+    m.querySelector("#dmsg").innerHTML = [...new Set(issues)].map((t) => `⚠ ${esc(t)}`).join("　");
+  };
+  const setP = (p, v) => { const ks = p.split("."); let o = x; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; const last = ks.at(-1); o[last] = typeof o[last] === "number" ? (+v || 0) : v; };
+  const getP = (p) => p.split(".").reduce((o, k) => o[k], x);
+  draw();
+  m.querySelector("#mode").onclick = () => { edit = !edit; draw(); };
+  body.addEventListener("change", (e) => {
+    const p = e.target.dataset.p; if (!p) return;
+    let v = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    if (e.target.type === "datetime-local") v = v.replace("T", " ");
+    setP(p, v);
+    if (p === "campaign.budget" || p === "campaign.equal") { if (x.campaign.equal || x.adsets.length === 1) { const n = days({ start: x.adsets[0].start, end: x.adsets[0].end }) || 30; x.adsets.forEach((s) => s.daily = Math.round(x.campaign.budget / n / x.adsets.length)); } }
+    if (p === "campaign.special" && x.campaign.special !== "なし") x.adsets.forEach((s) => { s.gender = "すべて"; s.ageMin = 18; s.ageMax = 65; });
+    draw();
+  });
+  body.addEventListener("keydown", (e) => {
+    if (e.target.dataset.addc && e.key === "Enter") { const v = e.target.value.trim(); if (v) { getP(e.target.dataset.addc).push(...v.split(/[、,]/).map((s) => s.trim()).filter(Boolean)); const k = e.target.dataset.addc; draw(); body.querySelector(`[data-addc="${k}"]`)?.focus(); } }
+  });
+  body.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-rmc],[data-dup],[data-dels],[data-dupa],[data-dela],[data-pick],[data-split]"); if (!t) return;
+    const ds = t.dataset;
+    if (ds.rmc) { const [p, i] = [ds.rmc.slice(0, ds.rmc.lastIndexOf(":")), +ds.rmc.slice(ds.rmc.lastIndexOf(":") + 1)]; getP(p).splice(i, 1); }
+    if (ds.dup) { const s = structuredClone(x.adsets[+ds.dup]); s.id = uid(); s.name += "_コピー"; s.ads.forEach((a) => a.id = uid()); x.adsets.splice(+ds.dup + 1, 0, s); rebalance(); }
+    if (ds.dels) { x.adsets.splice(+ds.dels, 1); rebalance(); }
+    if (ds.split) splitAdset(+ds.split);
+    if (ds.dupa) { const [si, ai] = ds.dupa.split(":").map(Number); const a = structuredClone(x.adsets[si].ads[ai]); a.id = uid(); a.name = a.name.replace(/-(\d+)$/, "") + "-" + (x.adsets[si].ads.length + 1); x.adsets[si].ads.splice(ai + 1, 0, a); }
+    if (ds.dela) { const [si, ai] = ds.dela.split(":").map(Number); x.adsets[si].ads.splice(ai, 1); }
+    if (ds.pick) { const [si, ai, cid] = ds.pick.split(":"); x.adsets[+si].ads[+ai].creative = cid; }
+    draw();
+  });
+  function rebalance() { const n = days({ start: x.adsets[0].start, end: x.adsets[0].end }) || 30; x.adsets.forEach((s) => s.daily = Math.round(x.campaign.budget / n / x.adsets.length)); }
+  function splitAdset(si) {
+    const axis = prompt("分割の軸を入力してください：性別 / 年代 / 配置", "年代"); if (!axis) return;
+    const s = x.adsets[si]; let parts = [];
+    if (axis.includes("性別")) parts = ["男性", "女性"].map((g) => ({ ...structuredClone(s), gender: g, name: `${s.name}_${g}` }));
+    else if (axis.includes("配置")) parts = s.placements.map((p) => ({ ...structuredClone(s), placements: [p], name: `${s.name}_${p}` }));
+    else { for (let a = s.ageMin; a <= s.ageMax; a += 10) { const z = Math.min(s.ageMax, a - (a % 10) + 9); parts.push({ ...structuredClone(s), ageMin: a, ageMax: z, name: `${s.name}_${a}-${z >= 65 ? "65+" : z}` }); a = a - (a % 10); } }
+    if (parts.length < 2) return toast("この軸では分割できません");
+    parts.forEach((p) => { p.id = uid(); p.ads.forEach((a) => a.id = uid()); });
+    x.adsets.splice(si, 1, ...parts); rebalance(); toast(`${parts.length}つの広告セットに分割しました（予算は均等配分）`);
+  }
+  const save = () => { const i = b.deliveries.findIndex((y) => y.id === x.id); if (i >= 0) b.deliveries[i] = x; else b.deliveries.unshift(x); persist(); };
+  m.querySelector("#dSave").onclick = () => { save(); closeModal(m); toast("配信設計を保存しました"); refresh(b); };
+  m.querySelector("#dGo").onclick = () => { save(); closeModal(m); go(`#/delivery/${b.id}/${x.id}`); };
+}
+
+// =====================================================================
+//   配信設計 確認ページ（媒体連携はロック → 本申込みオファー）
+// =====================================================================
+function fmtDeadline(iso) { const d = new Date(iso); return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`; }
+function renderConfirm(bid, did) {
+  const b = brief(bid), x = b?.deliveries.find((y) => y.id === did);
+  if (!x) return go(`#/brief/${bid}`);
+  const tt = b.d.platform === "TikTok", P = tt ? "TikTok" : "Meta", c = x.campaign;
+  const T = (rows) => `<table class="ctable">${rows.filter(Boolean).map(([k, v]) => `<tr><th>${k}</th><td>${v || '<span class="muted">—</span>'}</td></tr>`).join("")}</table>`;
+  $("#main").innerHTML = `<div class="confirm">
+    <div class="toolbar no-print"><button class="btn ghost" onclick="go('#/brief/${b.id}')">‹ 与件に戻る</button><span style="flex:1"></span>
+      <button class="btn ghost" id="share">🔗 リンクをコピー</button><button class="btn ghost" onclick="window.print()">🖨 印刷 / PDF</button></div>
+    <h1 class="page" style="margin-bottom:4px">${platformIcons(b.d)} ${esc(x.name)}</h1><p class="muted" style="margin-top:0">${P}連携確認 ・ ${esc(x.at)} 作成</p>
+    <div class="card" style="margin-bottom:14px"><div class="chead">基本設定</div>${T([["広告アカウント", esc(x.account)], ["マージン", `代理店 -　自社 ${Number(x.margin).toFixed(2)}%`]])}</div>
+    <div class="card" style="margin-bottom:14px"><div class="chead"><span class="pill camp">キャンペーン</span> ${esc(c.name)}</div>${T([["キャンペーン目的", esc(c.objective)], ["予算（通算）", `${yen(c.budget)}（メディア ${yen(c.budget * (1 - x.margin / 100))}）`], ["予算配分", c.equal ? "全ての広告セットに均等" : "広告セット予算"], !tt && ["特別な広告カテゴリ", esc(c.special)], ["購入タイプ", "オークション（固定）"]])}</div>
+    ${x.adsets.map((s, si) => `
+      <div class="card" style="margin-bottom:14px"><div class="chead"><span class="pill adset">広告セット ${si + 1}/${x.adsets.length}</span> ${esc(s.name)}</div>${T([
+        ["日予算", `${yen(s.daily)}（メディア ${yen(s.daily * (1 - x.margin / 100))}）`], ["パフォーマンスの目標", esc(s.goal)], ["課金イベント", esc(s.billing)],
+        ["入札", esc(s.bidStrategy) + (s.bidStrategy === "入札価格上限" && s.bidCap ? `（${yen(s.bidCap)}）` : "")], ["フリークエンシー", esc(s.frequency)],
+        ["配信期間", `${esc(showDT(s.start))} 〜 ${esc(showDT(s.end))}`], [tt ? "言語" : "配信面", esc(tt ? s.language : s.surface)], ["配置", s.placements.map(esc).join("、")],
+        ["配信地域", `${s.regionMode === "除外" ? "除外: " : ""}${s.regions.map(esc).join("、")}`], ["性別", esc(s.gender)], ["年齢", `${s.ageMin}〜${s.ageMax >= 65 ? "65+" : s.ageMax}歳`], ["デバイス", esc(s.devices)],
+        !tt && ["カスタムオーディエンス", [s.customIn && "含める: " + esc(s.customIn), s.customEx && "除外: " + esc(s.customEx)].filter(Boolean).join(" / ")],
+        ["詳細ターゲット", s.interests.map((i) => `<span class="chip">${esc(i)}</span>`).join("")]])}</div>
+      ${s.ads.map((a, ai) => `<div class="card" style="margin-bottom:14px"><div class="chead"><span class="pill ad">広告 ${ai + 1}/${s.ads.length}</span></div>${T([
+        ["広告名", esc(a.name)], ["クリエイティブ", a.creative ? `<img class="adthumb" style="width:200px" src="${crSrc(a.creative)}" alt="">` : '<span style="color:var(--red)">未選択</span>'],
+        [tt ? "アイデンティティ" : "Facebookページ", esc(a.page)], ["広告テキスト", esc(a.text)], ["ランディングページURL", a.lp ? esc(a.lp) : '<span style="color:var(--red)">未入力</span>'],
+        ["CTA", esc(a.cta)], !tt && ["見出し", esc(a.headline)], !tt && ["説明", esc(a.description)]])}</div>`).join("")}`).join("")}
+    <div class="offer">
+      <h3>🎁 ${fmtDeadline(ME.trial.offerDeadline)}までのお申込みで、1ヵ月無料</h3>
+      <div>トライアルでは${P}への連携はできません。正式にお申込みいただくと、この配信設計をそのまま${P}に作成できます（キャンペーンは OFF の状態で作成され、確認後に配信開始）。</div>
+      <div>お申込み時にクーポンコードをお伝えください：</div>
+      <div class="code"><span id="cpn">${esc(ME.trial.coupon)}</span><button class="btn ghost sm" id="cpc">コピー</button></div>
+      <div style="margin-top:8px"><button class="btn" id="apply">本申込みについて見る</button></div>
+    </div>
+    <div class="card linkbox"><label><input type="checkbox" id="ok"> 上記の設定内容で${P}に連携することを確認しました</label>
+      <button class="btn lockbtn" id="link" style="padding:12px 40px;font-size:16px;opacity:.55">${P}に連携</button>
+      <div class="muted tiny" style="margin-top:8px">トライアル期間中は連携ボタンを押せません</div></div>
+  </div>`;
+  $("#ok").onchange = () => toast("トライアルでは連携できません。下のボタンから本申込みについてご確認ください", 3200);
+  $("#link").onclick = () => openOffer(P);
+  $("#cpc").onclick = () => copyText(ME.trial.coupon);
+  $("#apply").onclick = () => openOffer(P);
+  $("#share").onclick = () => copyText(location.href);
+  S.seen.confirm = true; persist(); guideUpdate();
+}
+function openOffer(P) {
+  modal(`<div class="mh"><h2>HAWK 本申込みのご案内</h2><button class="close">✕</button></div><div class="mb">
+    <div class="offer" style="margin-top:0"><h3>🎁 ${fmtDeadline(ME.trial.offerDeadline)}までのお申込みで 1ヵ月無料</h3><div class="code">${esc(ME.trial.coupon)}</div></div>
+    <ol style="padding-left:20px;line-height:2">
+      <li><b>お申込み</b>：申込書と利用規約をご確認のうえ、ご提出ください（担当者からお送りします）</li>
+      <li><b>アカウント発行</b>：IO 締結後、正式なワークスペースを発行します</li>
+      <li><b>オンボーディング（初期設定）</b>：${P}との連携を担当者と一緒に行います。事前に HAWK・Meta ビジネスマネージャ・TikTok ビジネスセンターへログインしておくとスムーズです</li>
+      <li><b>配信開始</b>：トライアルで作った与件・配信設計を引き継いで、すぐに連携できます</li>
+    </ol>
+    <p class="muted small">正式版でできること：${P}への配信連携、キャンペーン管理（ON/OFF・予算自動調整）、インサイトレポート（PowerPoint／Excel）、Meta ピクセル・カスタムコンバージョン、ユーザー・代理店マージン管理 ほか</p>
+    <p>お申込み・ご質問は、トライアルのご案内メールにそのままご返信ください。</p></div>
+    <div class="mf"><button class="btn close">閉じる</button></div>`, { narrow: true });
+}
+
+// =====================================================================
+//   クリエイティブ
+// =====================================================================
+function renderCreatives(filter = "すべて") {
+  const list = S.creatives.filter((c) => filter === "すべて" || c.platform === filter || c.type === filter);
+  $("#main").innerHTML = `<div class="toolbar"><h1 class="page">クリエイティブ</h1><span style="flex:1"></span><button class="btn" id="newC">＋ 新規作成</button></div>
+    <div class="seg" style="margin-bottom:14px">${["すべて", "Meta", "TikTok", "静止画", "動画"].map((f) => `<button data-f="${f}" class="${f === filter ? "on" : ""}">${f}</button>`).join("")}</div>
+    <div class="cgrid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${list.map((c) => `<div class="card" style="overflow:hidden"><img src="${c.src}" style="width:100%;aspect-ratio:4/5;object-fit:cover;display:block" alt="">
+      <div style="padding:8px 10px"><div class="small" style="font-weight:600;word-break:break-all">${esc(c.name)}</div><div class="tiny muted">${esc(c.platform)}・${esc(c.type)}</div>
+      <button class="btn danger sm" style="margin-top:6px" data-del="${c.id}">削除</button></div></div>`).join("") || '<div class="empty">クリエイティブがありません</div>'}</div>`;
+  document.querySelectorAll("[data-f]").forEach((x) => x.onclick = () => renderCreatives(x.dataset.f));
+  document.querySelectorAll("[data-del]").forEach((x) => x.onclick = () => { if (!confirm("削除しますか？")) return; S.creatives = S.creatives.filter((c) => c.id !== x.dataset.del); S.briefs.forEach((b) => b.meta.creatives = b.meta.creatives.filter((i) => i !== x.dataset.del)); persist(); renderCreatives(filter); });
+  $("#newC").onclick = () => openCreativeNew(() => renderCreatives(filter));
+}
+function openCreativeNew(done, b) {
+  const plat = b?.d.platform || "Meta";
+  const m = modal(`<div class="mh"><h2>クリエイティブ新規作成</h2><button class="close">✕</button></div><div class="mb">
+    <label class="fl" style="margin-top:0">ファイル（画像・動画）</label><input type="file" id="file" accept="image/*,video/*">
+    <div id="prev" style="margin-top:10px"></div>
+    <label class="fl">クリエイティブ名</label><input id="cn" placeholder="例: 冬キャンペーン_静止画_A">
+    <label class="fl">配信先</label><select id="cp"><option ${plat === "Meta" ? "selected" : ""}>Meta</option><option ${plat === "TikTok" ? "selected" : ""}>TikTok</option></select>
+    <p class="muted tiny">トライアルでは画像はこのブラウザ内に縮小して保存します。動画は先頭のコマをサムネイルとして保存します（媒体へのアップロードは正式版で行います）。</p></div>
+    <div class="mf"><button class="btn ghost close">キャンセル</button><button class="btn" id="ok" disabled>作成</button></div>`, { narrow: true });
+  let src = "", type = "静止画";
+  m.querySelector("#file").onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    type = f.type.startsWith("video") ? "動画" : "静止画";
+    try { src = type === "動画" ? await videoThumb(f) : await shrink(f); } catch (err) { toast("このファイルは読み込めませんでした"); return; }
+    m.querySelector("#prev").innerHTML = `<img src="${src}" style="max-width:160px;border-radius:8px;border:1px solid var(--line)">`;
+    if (!m.querySelector("#cn").value) m.querySelector("#cn").value = f.name.replace(/\.[^.]+$/, "");
+    m.querySelector("#ok").disabled = false;
+  };
+  m.querySelector("#ok").onclick = () => {
+    const c = { id: uid(), name: m.querySelector("#cn").value.trim() || "クリエイティブ", type, platform: m.querySelector("#cp").value, src };
+    S.creatives.unshift(c); persist(); closeModal(m); toast("クリエイティブを作成しました"); done?.(c);
+  };
+}
+function shrink(file, max = 640) {
+  return new Promise((res, rej) => { const img = new Image(); img.onload = () => { const r = Math.min(1, max / Math.max(img.width, img.height)); const cv = document.createElement("canvas"); cv.width = img.width * r; cv.height = img.height * r; cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height); URL.revokeObjectURL(img.src); res(cv.toDataURL("image/jpeg", .82)); }; img.onerror = rej; img.src = URL.createObjectURL(file); });
+}
+function videoThumb(file) {
+  return new Promise((res, rej) => { const v = document.createElement("video"); v.muted = true; v.preload = "metadata"; v.src = URL.createObjectURL(file);
+    v.onloadeddata = () => { v.currentTime = Math.min(.5, v.duration / 2 || 0); };
+    v.onseeked = () => { const r = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight)); const cv = document.createElement("canvas"); cv.width = v.videoWidth * r; cv.height = v.videoHeight * r; const g = cv.getContext("2d"); g.drawImage(v, 0, 0, cv.width, cv.height);
+      g.fillStyle = "rgba(0,0,0,.45)"; g.beginPath(); g.arc(cv.width / 2, cv.height / 2, 30, 0, 7); g.fill(); g.fillStyle = "#fff"; g.beginPath(); g.moveTo(cv.width / 2 - 10, cv.height / 2 - 16); g.lineTo(cv.width / 2 + 16, cv.height / 2); g.lineTo(cv.width / 2 - 10, cv.height / 2 + 16); g.fill();
+      URL.revokeObjectURL(v.src); res(cv.toDataURL("image/jpeg", .8)); };
+    v.onerror = rej; });
+}
+
+// =====================================================================
+//   ロック画面（正式版の機能紹介）
+// =====================================================================
+function renderLocked(name) {
+  $("#main").innerHTML = `<div class="card locked"><div class="big">🔒</div><h2>${esc(name)}</h2><p>${esc(LOCKED[name] || "正式版でご利用いただけます。")}</p>
+    <p class="muted small">トライアルでは「与件 → オーディエンス設計 → 見積り → 配信設計」までをお試しいただけます。</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px"><button class="btn ghost" onclick="go('#/briefs')">与件に戻る</button><button class="btn" id="of">本申込みについて見る</button></div></div>`;
+  $("#of").onclick = () => openOffer("Meta・TikTok");
+}
+
+// =====================================================================
+//   使い方ガイド
+// =====================================================================
+const GUIDE = [["memo", "与件を作って、依頼メモを貼り付ける"], ["ai", "AI が埋めた Details を確認・修正"], ["aud", "オーディエンス設計（狭い／普通／広い）"], ["est", "見積りを作る"], ["dlv", "配信設計を作る"], ["confirm", "確認ページで設定を確認"]];
+function guideState() {
+  const own = S.briefs.filter((b) => !b.name.startsWith("【サンプル】"));
+  const any = (f) => own.some(f);
+  return { memo: any((b) => b.notes.length), ai: any((b) => b.ai && b.ai.engine !== "sample"), aud: any((b) => b.audiences.length), est: any((b) => b.estimates.length), dlv: any((b) => b.deliveries.length), confirm: !!S.seen.confirm };
+}
+function guideUpdate() {
+  let g = $("#guide");
+  if (S.seen.guideClosed) { g?.remove(); if (!$("#gfab")) { const f = document.createElement("button"); f.id = "gfab"; f.className = "btn guidefab no-print"; f.textContent = "？ 使い方"; f.onclick = () => { S.seen.guideClosed = false; persist(); f.remove(); guideUpdate(); }; document.body.append(f); } return; }
+  if (!g) { g = document.createElement("div"); g.id = "guide"; g.className = "guide no-print"; document.body.append(g); }
+  const st = guideState(); const now = GUIDE.findIndex(([k]) => !st[k]);
+  g.innerHTML = `<div class="gh">使い方（${GUIDE.filter(([k]) => st[k]).length}/${GUIDE.length}）<button id="gx">✕</button></div><ol>${GUIDE.map(([k, t], i) => `<li class="${st[k] ? "done" : i === now ? "now" : ""}">${t}</li>`).join("")}</ol>
+    ${now === 0 ? `<div style="padding:0 14px 12px"><button class="btn sm" id="gnew">＋ 与件を新規作成</button></div>` : ""}`;
+  $("#gx").onclick = () => { S.seen.guideClosed = true; persist(); guideUpdate(); };
+  const gn = $("#gnew"); if (gn) gn.onclick = () => { const b = newBrief(); persist(); go(`#/brief/${b.id}`); };
+}
+
+// ---------- 起動 ----------
+(async () => {
+  await loadMe(); load(); renderNav();
+  window.addEventListener("hashchange", route); route();
+  if (!S.seen.welcome) {
+    S.seen.welcome = true; persist();
+    modal(`<div class="mh"><h2>HAWK トライアルへようこそ</h2><button class="close">✕</button></div><div class="mb">
+      <p>依頼メール・チャット・依頼書をそのまま貼り付けるだけで、AI が与件を読み取り、<b>オーディエンス設計 → 見積り → 配信設計</b>まで組み立てます。</p>
+      <ol style="padding-left:20px;line-height:1.9"><li>「＋ 新規作成」で与件を作る</li><li>左の Notes に依頼メモを貼って → を押す（記入例もあります）</li><li>右の Menu からオーディエンス設計・見積り・配信設計を作る</li></ol>
+      <p class="muted small">トライアル期間：あと ${ME.trial.daysLeft} 日 ／ 媒体への連携は正式版でご利用いただけます。サンプルの与件も入れてあります。</p></div>
+      <div class="mf"><button class="btn ghost close">サンプルを見る</button><button class="btn" id="wnew">与件を作ってみる</button></div>`, { narrow: true });
+    $("#wnew").onclick = () => { closeModal($("#wnew").closest(".modal")); const b = newBrief(); persist(); go(`#/brief/${b.id}`); };
+  }
+})();
+</script>
+</body>
+</html>
