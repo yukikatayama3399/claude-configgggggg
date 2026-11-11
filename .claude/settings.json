@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Bash(gog --account yuki.katayama@fout.jp --gmail-no-send -j calendar create primary --summary \"[作業] 今日のToDo\" *)",
       "Bash(gog --account yuki.katayama@fout.jp --gmail-no-send -j calendar create primary --summary \"[作業] 今日の5件\" *)"
     ]
   },
