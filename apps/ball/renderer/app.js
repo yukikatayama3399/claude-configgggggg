@@ -1914,7 +1914,7 @@ ${lastInit ? `\n直近の会話で読み込まれたもの:\n・スキル ${skil
       const day = e.start.slice(0, 10);
       // 自分ボールにするのは、今日と明日の [作業]（時刻のあるもの）。それより先は下の日ごとの予定に並ぶ
       const tomorrow = new Date(Date.now() + 86400e3 + 9 * 3600e3).toISOString().slice(0, 10);
-      const isBall = e.isWork && !/今日の5件/.test(e.summary) && !e.allDay && day <= tomorrow;
+      const isBall = e.isWork && !/今日の(5件|ToDo)/.test(e.summary) && !e.allDay && day <= tomorrow;
       // 「[作業/定例]」だけの件名は、説明欄の1行目か「（件名なし）」にする
       const bare = e.summary.replace(/^\[作業[^\]]*\]\s*/, "").trim();
       const workTitle = bare || (String(e.description || "").split("\n").map((x) => x.trim()).find(Boolean) || "").slice(0, 60) || `${e.summary}（件名なし）`;
