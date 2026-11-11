@@ -12,6 +12,17 @@
   投稿するものは、これまでどおり自動で送ってよい。
 - 新しく定期実行や自動化を作るときも、宛先が片山さん本人か決まったチャンネル以外なら、送らずに下書きで止める。
 
+## カレンダー予定を作るときの既定（2026-11-11 片山さん決定）
+
+片山さんのカレンダーに AI が予定を作るときは、**ゲスト権限「予定を変更する」を必ず ON** にする
+（ゲストが概要欄などを編集できる状態）。ゲストをまだ招待しない予定でも同じ。
+
+- Calendar MCP: `guestPermissions: {"guestsCanModify": true}`
+- gog: `gog --account ... calendar create ... --guests-can-modify`（フラグ名は `gog calendar create --help` で確認）
+- gws / API: `"guestsCanModify": true`
+- 「招待は送らないで」と言われたら、参加者を入れず（通知も出さず）に作る。
+  上の「送信の絶対ルール」により、招待の送信は片山さんが自分で行う。
+
 ## Google Workspace 操作は gog を最優先で使う
 
 Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操作は、
