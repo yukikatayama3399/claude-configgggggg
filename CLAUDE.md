@@ -68,6 +68,12 @@
   （`gws drive files copy`、`mimeType: application/vnd.google-apps.presentation`）→
   `gog drive download <id> --format pdf` → **一時コピーは必ず削除**。
   添付ファイル名は `FreakOut_HAWK_Overview_<期間>.pdf`（例: `FreakOut_HAWK_Overview_2026_10-12.pdf`）。
+- 概要資料と一緒に「テキストサンプル」「レポートサンプル」を求められたら（商談のカレンダー予定への添付など）、
+  社外共有用フォルダ `【HAWK】参考資料_20261127インプット会（社外共有用）`（ID `1zEJW-9KfgnbtppcvDbqtTOMbwaysxxWu`）の
+  `02_HAWK_入稿用テキストテンプレート.docx` と `03_HAWK_レポートサンプル.pdf`（広告主名を伏せた 15ページ版）を使う。
+  ただし同じフォルダの `01_HAWK_概要資料（Overview）.pdf` は上記の 2026-08 版なので、概要資料だけは上の最新版にする。
+  カレンダーに添付するときは `gws calendar events patch` に `supportsAttachments: true` と `sendUpdates: "none"` を付ける
+  （ゲストに更新通知が飛ばないように）。2026-11-18 に 11/20 の小田急AG・エヌエヌ生命の予定へ、この3点を添付済み。
 - 送信はしない。下書きまで（冒頭の「送信の絶対ルール」）。
   片山さんが手直しした下書きの添付を差し替えるときは、本文（太字など HTML 部分）を作り直さず、
   元の MIME を取得して添付部分だけ入れ替える（`gws gmail users drafts update` に `--upload` で
