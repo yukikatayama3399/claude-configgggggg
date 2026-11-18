@@ -49,6 +49,30 @@
   旧 In or Out から流入経路に当てはめられなかった9社は空欄）。手元メモのみ C列(ステータス)の入力規則を200行目まで延長。
 - 未解決: 1123週以降の本番の週タブを誰が作るか（以前は水曜の週報ルーティンが作っていた）。
 
+## 顧客メールに添付する「最新の概要資料」（2026-11-18 片山さん決定）
+
+顧客宛てメール（御礼・資料送付・展示会の予約御礼など）に「最新の会社概要」「概要資料」「overview」を
+添付するよう言われたら、**HAWK Overview の最新版を PDF にして添付する**。今後ずっとこれを使う。
+
+- 置き場所: 共有ドライブ `07_HAWK/01_概要資料`（フォルダ ID `1E3WvuymV8e1HuhBDYwVskVC4WdTnV5PA`）。
+  古い版は同じフォルダ内の `旧バージョン` に移されている。
+- 2026-11-18 時点の最新版: `FreakOut_HAWK_Overview_媒体資料_2026_10-12.pptx`
+  （ID `1l834fpPZeamuW7n2XuBZVOTDzD2CmY_8`、表紙「HAWK OVERVIEW 2026年 10-12月」、33枚、2枚目に会社概要あり）。
+- **ファイル ID やファイル名は決め打ちしない。** 毎回このフォルダで名前に `Overview` を含むファイルを
+  更新日の新しい順に並べ、表紙の期間（「2026年 10-12月」など）が一番新しいものを選ぶ。
+  `【〇〇様】` のような顧客名入りのコピーや `旧バージョン` 内のファイルは使わない。
+- **罠: `【概要資料】HAWK_Overview_株式会社フリークアウト.pdf` は使わない。** 2026-11-17 更新で新しく見えるが、
+  中身は 2026-08 版（表紙「2026-08」、23ページ）。`【HAWK】参考資料_20261127インプット会（社外共有用）` フォルダの
+  `01_HAWK_概要資料（Overview）.pdf` も中身は同じファイル（md5 が一致）。更新日ではなく表紙の期間で判断する。
+- PDF にする手順: pptx を Google スライドとしてマイドライブに一時コピー
+  （`gws drive files copy`、`mimeType: application/vnd.google-apps.presentation`）→
+  `gog drive download <id> --format pdf` → **一時コピーは必ず削除**。
+  添付ファイル名は `FreakOut_HAWK_Overview_<期間>.pdf`（例: `FreakOut_HAWK_Overview_2026_10-12.pdf`）。
+- 送信はしない。下書きまで（冒頭の「送信の絶対ルール」）。
+  片山さんが手直しした下書きの添付を差し替えるときは、本文（太字など HTML 部分）を作り直さず、
+  元の MIME を取得して添付部分だけ入れ替える（`gws gmail users drafts update` に `--upload` で
+  message/rfc822 を渡す。base64 を `--json` に入れると大きすぎて黙って失敗する）。
+
 ## Google Workspace 操作は gog を最優先で使う
 
 Google Sheets / Docs / Calendar / Gmail / Drive などの Google Workspace 操作は、
